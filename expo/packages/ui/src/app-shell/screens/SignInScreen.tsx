@@ -18,7 +18,7 @@ import { useAppHost } from '../app-host';
 import type { WordPressAuth } from '../../app';
 
 export function SignInScreen(): React.ReactElement {
-  const { home } = useAppHost();
+  const { home, refreshHomeStatus } = useAppHost();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -44,6 +44,7 @@ export function SignInScreen(): React.ReactElement {
     };
 
     home.signIn(auth);
+    refreshHomeStatus();
   };
 
   return (

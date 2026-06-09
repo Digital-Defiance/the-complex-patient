@@ -14,7 +14,7 @@
     "packages/domain",
     "packages/ui",
     "packages/insights",
-    "packages/polypharmacy",
+    "packages/medications",
     "packages/symptom-journal"
   ],
   "scripts": {

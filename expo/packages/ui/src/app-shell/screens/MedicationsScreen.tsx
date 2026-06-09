@@ -1,7 +1,7 @@
 /**
- * @complex-patient/ui — PolypharmacyScreen
+ * @complex-patient/ui — MedicationsScreen
  *
- * Renders the adaptive polypharmacy view produced by `buildPolypharmacyView` in
+ * Renders the adaptive medications view produced by `buildPolypharmacyView` in
  * the exact order returned — no blocks omitted, reordered, or inserted. When
  * zero medication profiles exist, displays an empty-medication-list message with
  * no medication rows. Persists edits exclusively through `home.commit('medications', …)`.
@@ -12,7 +12,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, StyleSheet } from 'react-native';
-import { buildPolypharmacyView, type PolyView, type PolyViewBlock } from '@complex-patient/polypharmacy';
+import { buildPolypharmacyView, type PolyView, type PolyViewBlock } from '@complex-patient/medications';
 import type { MedicationProfile } from '@complex-patient/domain';
 import { useAppHost } from '../app-host';
 import { usePartition } from '../hooks';
@@ -21,7 +21,7 @@ import { usePartition } from '../hooks';
 // Props
 // ---------------------------------------------------------------------------
 
-export interface PolypharmacyScreenProps {
+export interface MedicationsScreenProps {
   /** Called when navigating back or to PRN screen. */
   onNavigatePrn?: () => void;
   /** Called when navigating back to home. */
@@ -45,14 +45,14 @@ interface EditState {
 // Component
 // ---------------------------------------------------------------------------
 
-export function PolypharmacyScreen({ onNavigatePrn, onBack }: PolypharmacyScreenProps): React.ReactElement {
+export function MedicationsScreen({ onNavigatePrn, onBack }: MedicationsScreenProps): React.ReactElement {
   const { home } = useAppHost();
 
   // If home is not available, render the data-unavailable fallback.
   if (!home) {
     return (
-      <View style={styles.container} testID="polypharmacy-screen">
-        <Text style={styles.errorText} accessibilityRole="alert" testID="polypharmacy-data-unavailable">
+      <View style={styles.container} testID="medications-screen">
+        <Text style={styles.errorText} accessibilityRole="alert" testID="medications-data-unavailable">
           Data unavailable. Please try again later.
         </Text>
       </View>
@@ -60,7 +60,7 @@ export function PolypharmacyScreen({ onNavigatePrn, onBack }: PolypharmacyScreen
   }
 
   return (
-    <PolypharmacyScreenInner home={home} onNavigatePrn={onNavigatePrn} onBack={onBack} />
+    <MedicationsScreenInner home={home} onNavigatePrn={onNavigatePrn} onBack={onBack} />
   );
 }
 
@@ -74,7 +74,7 @@ interface InnerProps {
   onBack?: () => void;
 }
 
-function PolypharmacyScreenInner({ home, onNavigatePrn, onBack }: InnerProps): React.ReactElement {
+function MedicationsScreenInner({ home, onNavigatePrn, onBack }: InnerProps): React.ReactElement {
   // Read medications exclusively through home.read via usePartition (Requirement 9.6, 14.1).
   const records = usePartition<MedicationProfile>(home, 'medications');
 
@@ -145,20 +145,20 @@ function PolypharmacyScreenInner({ home, onNavigatePrn, onBack }: InnerProps): R
   // Requirement 9.3: zero profiles → empty-medication-list message, no rows.
   if (polyView.layout === 'flat' && polyView.medications.length === 0) {
     return (
-      <View style={styles.container} testID="polypharmacy-screen">
+      <View style={styles.container} testID="medications-screen">
         <View style={styles.headerRow}>
           {onBack && (
-            <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" testID="polypharmacy-back">
+            <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" testID="medications-back">
               <Text style={styles.backText}>← Back</Text>
             </Pressable>
           )}
           <Text style={styles.title}>Medications</Text>
         </View>
-        <Text style={styles.emptyMessage} testID="polypharmacy-empty-message">
+        <Text style={styles.emptyMessage} testID="medications-empty-message">
           No medications found. Add a medication to get started.
         </Text>
         {onNavigatePrn && (
-          <Pressable onPress={onNavigatePrn} accessibilityRole="button" testID="polypharmacy-nav-prn">
+          <Pressable onPress={onNavigatePrn} accessibilityRole="button" testID="medications-nav-prn">
             <Text style={styles.linkText}>PRN Quick Log</Text>
           </Pressable>
         )}
@@ -167,16 +167,16 @@ function PolypharmacyScreenInner({ home, onNavigatePrn, onBack }: InnerProps): R
   }
 
   return (
-    <ScrollView style={styles.container} testID="polypharmacy-screen">
+    <ScrollView style={styles.container} testID="medications-screen">
       <View style={styles.headerRow}>
         {onBack && (
-          <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" testID="polypharmacy-back">
+          <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" testID="medications-back">
             <Text style={styles.backText}>← Back</Text>
           </Pressable>
         )}
         <Text style={styles.title}>Medications</Text>
         {onNavigatePrn && (
-          <Pressable onPress={onNavigatePrn} accessibilityRole="button" testID="polypharmacy-nav-prn">
+          <Pressable onPress={onNavigatePrn} accessibilityRole="button" testID="medications-nav-prn">
             <Text style={styles.linkText}>PRN Quick Log</Text>
           </Pressable>
         )}
@@ -184,7 +184,7 @@ function PolypharmacyScreenInner({ home, onNavigatePrn, onBack }: InnerProps): R
 
       {/* Commit failure message (Requirement 9.7) */}
       {commitError && (
-        <Text style={styles.errorText} accessibilityRole="alert" testID="polypharmacy-commit-error">
+        <Text style={styles.errorText} accessibilityRole="alert" testID="medications-commit-error">
           {commitError}
         </Text>
       )}
@@ -229,7 +229,7 @@ interface ListProps {
 
 function FlatMedicationList({ medications, editing, onEdit, onSave, onCancel, onUpdateField }: ListProps): React.ReactElement {
   return (
-    <View testID="polypharmacy-flat-list">
+    <View testID="medications-flat-list">
       {medications.map((med) => (
         <MedicationRow
           key={med.id}
@@ -261,10 +261,10 @@ interface GroupedProps {
 
 function GroupedMedicationView({ blocks, asNeeded, editing, onEdit, onSave, onCancel, onUpdateField }: GroupedProps): React.ReactElement {
   return (
-    <View testID="polypharmacy-grouped-view">
+    <View testID="medications-grouped-view">
       {/* Render blocks in the exact order returned by buildPolypharmacyView (Requirement 9.2) */}
       {blocks.map((block) => (
-        <View key={block.block} testID={`polypharmacy-block-${block.block}`}>
+        <View key={block.block} testID={`medications-block-${block.block}`}>
           <Text style={styles.blockHeader}>{block.block}</Text>
           {block.medications.map((med) => (
             <MedicationRow
@@ -281,7 +281,7 @@ function GroupedMedicationView({ blocks, asNeeded, editing, onEdit, onSave, onCa
       ))}
       {/* As Needed section, positioned after blocks (Requirement 9.2) */}
       {asNeeded.length > 0 && (
-        <View testID="polypharmacy-block-as-needed">
+        <View testID="medications-block-as-needed">
           <Text style={styles.blockHeader}>As Needed</Text>
           {asNeeded.map((med) => (
             <MedicationRow

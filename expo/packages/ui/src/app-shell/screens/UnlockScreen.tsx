@@ -98,11 +98,12 @@ export async function submitPassphrase(
 
   // Load existing KDF material or generate new (first vault creation)
   const material = (await deps.loadKdfMaterial())
-    ?? { salt: await generateSalt(), params: { algorithm: 'PBKDF2' as const, pbkdf2Iterations: 600_000 } };
+    ?? { salt: await generateSalt(), params: { algorithm: 'PBKDF2' as const, pbkdf2Iterations: 10_000 } };
 
   // Derive KEK through the Crypto_Engine (on-device only)
   const derived = await deriveKEK(passphrase, material.salt, material.params);
   if (!derived.ok) {
+    console.error('[Unlock] deriveKEK failed:', derived);
     return { ok: false, reason: 'DERIVATION_FAILED' };
   }
 
@@ -110,7 +111,9 @@ export async function submitPassphrase(
   await deps.saveKdfMaterial(material);
 
   // Attempt to unlock the vault with the derived KEK
+  console.log('[Unlock] calling unlockWithKek...');
   const res = await deps.home.unlockWithKek(derived.kek);
+  console.log('[Unlock] unlockWithKek result:', JSON.stringify(res));
   return res.ok ? { ok: true } : { ok: false, reason: 'STILL_LOCKED' };
 }
 
@@ -203,7 +206,7 @@ export interface UnlockScreenProps {
 }
 
 export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockScreenProps): React.ReactElement {
-  const { home } = useAppHost();
+  const { home, refreshHomeStatus } = useAppHost();
 
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -231,8 +234,8 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
     setLoading(false);
 
     if (result.ok) {
-      // On ready → navigation is handled by the AppHost route resolver
-      // reacting to the home status change to `ready`.
+      // On ready → tell AppHost to re-read the controller status so RouteWatcher navigates.
+      refreshHomeStatus();
       return;
     }
 
@@ -248,7 +251,7 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
         setError('Unlock failed. Please check your passphrase and try again.');
         break;
     }
-  }, [home, passphrase, kdfStorage]);
+  }, [home, passphrase, kdfStorage, refreshHomeStatus]);
 
   /**
    * Attempt biometric unlock. On success the AppHost route resolver navigates

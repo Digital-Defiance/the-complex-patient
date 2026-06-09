@@ -22,7 +22,7 @@ import type {
   FlareUp,
   Association,
 } from '@complex-patient/domain';
-import { buildPolypharmacyView, type PolyView, type PolyViewBlock } from '@complex-patient/polypharmacy';
+import { buildPolypharmacyView, type PolyView, type PolyViewBlock } from '@complex-patient/medications';
 import { buildConditionTimeline, type TimelineEntry } from '@complex-patient/symptom-journal';
 
 // ---------------------------------------------------------------------------

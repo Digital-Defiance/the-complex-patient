@@ -1,29 +1,32 @@
 /**
- * @complex-patient/mobile — Unlock route (native)
+ * @complex-patient/mobile — Unlock route
  *
- * Expo Router route file that renders the shared UnlockScreen component with
- * biometric unlock support enabled. On native, the biometric path calls
- * `home.unlock()` which gates KEK release behind the device biometric challenge
- * (expo-local-authentication). On BIOMETRIC_FAILED / BIOMETRIC_LOCKED_OUT, the
- * screen falls back to passphrase re-entry (Requirement 7.5).
+ * Renders the shared UnlockScreen. Uses an in-memory KDF storage for Expo Go
+ * compatibility (no native expo-secure-store dependency).
  *
- * The `kdfStorage` prop receives the native flag storage backed by
- * `expo-secure-store` — the same non-secret storage used for the ineligibility
- * flag. This persists KDF material (salt + params) outside the vault so it is
- * available before unlock.
- *
- * Requirements: 7.2, 7.3, 7.4, 7.5, 7.6, 7.8, 7.9
+ * Requirements: 7.2, 7.3, 7.6, 7.8, 7.9
  */
 
 import React from 'react';
 import { UnlockScreen } from '@complex-patient/ui';
-import { nativeFlagStorage } from '../../src/adapters';
+
+/**
+ * In-memory KDF material storage for Expo Go. In production (dev client),
+ * this would be backed by expo-secure-store via nativeFlagStorage.
+ */
+const inMemoryKdfStorage = (() => {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => { store.set(key, value); },
+  };
+})();
 
 export default function Unlock(): React.ReactElement {
   return (
     <UnlockScreen
-      kdfStorage={nativeFlagStorage}
-      biometricAvailable={true}
+      kdfStorage={inMemoryKdfStorage}
+      biometricAvailable={false}
     />
   );
 }

@@ -15,7 +15,7 @@
     "@complex-patient/insights": "*",
     "@complex-patient/key-store": "*",
     "@complex-patient/local-vault": "*",
-    "@complex-patient/polypharmacy": "*",
+    "@complex-patient/medications": "*",
     "@complex-patient/sync-engine": "*",
     "@complex-patient/ui": "*",
     "expo-local-authentication": "17.0.8",

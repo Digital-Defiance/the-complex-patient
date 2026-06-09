@@ -16,7 +16,7 @@ import {
   evaluatePrnQuickLog,
   computeTrailing24hCumulative,
   type PrnQuickLogEvaluation,
-} from '@complex-patient/polypharmacy';
+} from '@complex-patient/medications';
 import { useAppHost } from '../app-host';
 import { usePartition } from '../hooks';
 import type { HomeEntryController } from '../../app/home-entry';
@@ -43,7 +43,7 @@ function generateId(): string {
 // ---------------------------------------------------------------------------
 
 export interface PrnQuickLogScreenProps {
-  /** Navigate back to the polypharmacy list. */
+  /** Navigate back to the medications list. */
   onBack?: () => void;
 }
 

@@ -1,5 +1,5 @@
 /**
- * @complex-patient/polypharmacy — Medication partition gateway
+ * @complex-patient/medications — Medication partition gateway
  *
  * Bridges the decrypted-record world the Polypharmacy_Engine operates in and
  * the encrypted `medications` {@link VaultBlobLike} persisted by the

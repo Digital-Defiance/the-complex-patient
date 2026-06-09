@@ -1,5 +1,5 @@
 {
-  "name": "@complex-patient/polypharmacy",
+  "name": "@complex-patient/medications",
   "version": "0.0.1",
   "private": true,
   "description": "Polypharmacy_Engine: medication profile CRUD, scheduling, PRN safety, adaptive view",

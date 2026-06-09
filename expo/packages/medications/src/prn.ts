@@ -1,5 +1,5 @@
 /**
- * @complex-patient/polypharmacy — PRN Quick Log and 24-hour safety threshold
+ * @complex-patient/medications — PRN Quick Log and 24-hour safety threshold
  *
  * Implements the one-tap Quick Log flow for as-needed (PRN) medications and the
  * trailing-24-hour cumulative safety check against `PrnConfig.safetyLimit24h`

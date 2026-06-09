@@ -1,5 +1,5 @@
 /**
- * @complex-patient/polypharmacy — Adaptive polypharmacy view (Requirement 14)
+ * @complex-patient/medications — Adaptive polypharmacy view (Requirement 14)
  *
  * A pure function that maps the active medication set to a display model:
  *
