@@ -14,7 +14,11 @@
       "expo-secure-store"
     ],
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "static"
+    },
+    "experiments": {
+      "baseUrl": "/secure"
     },
     "extra": {
       "eas": {
