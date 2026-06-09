@@ -1,0 +1,2008 @@
+{
+  "name": "complex-patient",
+  "private": true,
+  "version": "0.0.1",
+  "main": "expo-router/entry",
+  "description": "The Complex Patient – zero-knowledge E2EE health platform",
+  "workspaces": [
+    "apps/mobile",
+    "apps/web",
+    "packages/crypto-engine",
+    "packages/key-store",
+    "packages/local-vault",
+    "packages/sync-engine",
+    "packages/domain",
+    "packages/ui",
+    "packages/insights",
+    "packages/polypharmacy",
+    "packages/symptom-journal"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@fast-check/vitest": "^0.1.3",
+    "@types/babel__core": "^7",
+    "@types/babel__generator": "^7",
+    "@types/babel__traverse": "^7",
+    "@types/node": "^20.14.0",
+    "@types/react": "~19.1.0",
+    "fast-check": "^3.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/generator": "^7.29.7",
+    "@babel/traverse": "^7.29.7",
+    "@babel/types": "^7.29.7",
+    "@expo/metro-runtime": "6.1.2",
+    "expo": "54.0.10",
+    "expo-constants": "18.0.13",
+    "expo-linking": "8.0.12",
+    "expo-local-authentication": "17.0.8",
+    "expo-notifications": "0.32.17",
+    "expo-router": "6.0.24",
+    "expo-secure-store": "15.0.8",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "2.28.0",
+    "react-native-reanimated": "4.1.1",
+    "react-native-safe-area-context": "5.6.0",
+    "react-native-screens": "4.16.0",
+    "react-native-web": "0.21.2",
+    "react-native-worklets": "^0.9.1"
+  },
+  "dependenciesMeta": {
+    "@adobe/css-tools@4.5.0": {
+      "unplugged": true
+    },
+    "@babel/code-frame@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/compat-data@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/core@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/generator@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-annotate-as-pure@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-compilation-targets@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-create-class-features-plugin@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-create-regexp-features-plugin@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-define-polyfill-provider@0.6.8": {
+      "unplugged": true
+    },
+    "@babel/helper-globals@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-member-expression-to-functions@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-module-imports@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-module-transforms@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-optimise-call-expression@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-plugin-utils@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-remap-async-to-generator@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-replace-supers@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-skip-transparent-expression-wrappers@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-string-parser@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-validator-identifier@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-validator-option@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helper-wrap-function@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/helpers@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/parser@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-proposal-decorators@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-proposal-export-default-from@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-syntax-decorators@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-syntax-dynamic-import@7.8.3": {
+      "unplugged": true
+    },
+    "@babel/plugin-syntax-export-default-from@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-syntax-flow@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-syntax-jsx@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-syntax-nullish-coalescing-operator@7.8.3": {
+      "unplugged": true
+    },
+    "@babel/plugin-syntax-optional-chaining@7.8.3": {
+      "unplugged": true
+    },
+    "@babel/plugin-syntax-typescript@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-async-generator-functions@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-async-to-generator@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-block-scoping@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-class-properties@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-class-static-block@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-classes@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-destructuring@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-export-namespace-from@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-flow-strip-types@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-for-of@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-logical-assignment-operators@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-modules-commonjs@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-named-capturing-groups-regex@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-nullish-coalescing-operator@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-object-rest-spread@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-optional-catch-binding@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-optional-chaining@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-parameters@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-private-methods@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-private-property-in-object@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-react-display-name@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-react-jsx@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-react-jsx-development@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-react-pure-annotations@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-runtime@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-typescript@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/plugin-transform-unicode-regex@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/preset-typescript@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/runtime@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/template@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/traverse@7.29.7": {
+      "unplugged": true
+    },
+    "@babel/types@7.29.7": {
+      "unplugged": true
+    },
+    "@esbuild/aix-ppc64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/android-arm@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/android-arm64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/android-x64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/darwin-arm64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/darwin-x64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/freebsd-arm64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/freebsd-x64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/linux-arm@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/linux-arm64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/linux-ia32@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/linux-loong64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/linux-mips64el@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/linux-ppc64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/linux-riscv64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/linux-s390x@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/linux-x64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/netbsd-x64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/openbsd-x64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/sunos-x64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/win32-arm64@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/win32-ia32@0.21.5": {
+      "unplugged": true
+    },
+    "@esbuild/win32-x64@0.21.5": {
+      "unplugged": true
+    },
+    "@expo-google-fonts/material-symbols@0.4.38": {
+      "unplugged": true
+    },
+    "@expo/cli@56.1.14": {
+      "unplugged": true
+    },
+    "@expo/code-signing-certificates@0.0.6": {
+      "unplugged": true
+    },
+    "@expo/config@56.0.9": {
+      "unplugged": true
+    },
+    "@expo/config-plugins@56.0.8": {
+      "unplugged": true
+    },
+    "@expo/config-types@56.0.5": {
+      "unplugged": true
+    },
+    "@expo/devcert@1.2.1": {
+      "unplugged": true
+    },
+    "@expo/devtools@56.0.2": {
+      "unplugged": true
+    },
+    "@expo/dom-webview@56.0.5": {
+      "unplugged": true
+    },
+    "@expo/env@2.3.0": {
+      "unplugged": true
+    },
+    "@expo/expo-modules-macros-plugin@0.0.9": {
+      "unplugged": true
+    },
+    "@expo/fingerprint@0.19.4": {
+      "unplugged": true
+    },
+    "@expo/image-utils@0.10.1": {
+      "unplugged": true
+    },
+    "@expo/inline-modules@0.0.11": {
+      "unplugged": true
+    },
+    "@expo/json-file@10.2.0": {
+      "unplugged": true
+    },
+    "@expo/local-build-cache-provider@56.0.8": {
+      "unplugged": true
+    },
+    "@expo/log-box@56.0.12": {
+      "unplugged": true
+    },
+    "@expo/metro@56.0.0": {
+      "unplugged": true
+    },
+    "@expo/metro-config@56.0.13": {
+      "unplugged": true
+    },
+    "@expo/metro-file-map@56.0.3": {
+      "unplugged": true
+    },
+    "@expo/metro-runtime@6.1.2": {
+      "unplugged": true
+    },
+    "@expo/osascript@2.6.0": {
+      "unplugged": true
+    },
+    "@expo/package-manager@1.12.1": {
+      "unplugged": true
+    },
+    "@expo/plist@0.7.0": {
+      "unplugged": true
+    },
+    "@expo/prebuild-config@56.0.15": {
+      "unplugged": true
+    },
+    "@expo/require-utils@56.1.3": {
+      "unplugged": true
+    },
+    "@expo/router-server@56.0.13": {
+      "unplugged": true
+    },
+    "@expo/schema-utils@56.0.1": {
+      "unplugged": true
+    },
+    "@expo/sdk-runtime-versions@1.0.0": {
+      "unplugged": true
+    },
+    "@expo/spawn-async@1.8.0": {
+      "unplugged": true
+    },
+    "@expo/sudo-prompt@9.3.2": {
+      "unplugged": true
+    },
+    "@expo/ui@56.0.16": {
+      "unplugged": true
+    },
+    "@expo/ws-tunnel@1.0.6": {
+      "unplugged": true
+    },
+    "@expo/xcpretty@4.4.4": {
+      "unplugged": true
+    },
+    "@fast-check/vitest@0.1.6": {
+      "unplugged": true
+    },
+    "@isaacs/fs-minipass@4.0.1": {
+      "unplugged": true
+    },
+    "@isaacs/ttlcache@1.4.1": {
+      "unplugged": true
+    },
+    "@jest/schemas@29.6.3": {
+      "unplugged": true
+    },
+    "@jest/types@29.6.3": {
+      "unplugged": true
+    },
+    "@jridgewell/gen-mapping@0.3.13": {
+      "unplugged": true
+    },
+    "@jridgewell/remapping@2.3.5": {
+      "unplugged": true
+    },
+    "@jridgewell/resolve-uri@3.1.2": {
+      "unplugged": true
+    },
+    "@jridgewell/source-map@0.3.11": {
+      "unplugged": true
+    },
+    "@jridgewell/sourcemap-codec@1.5.5": {
+      "unplugged": true
+    },
+    "@jridgewell/trace-mapping@0.3.31": {
+      "unplugged": true
+    },
+    "@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4": {
+      "unplugged": true
+    },
+    "@msgpackr-extract/msgpackr-extract-darwin-x64@3.0.4": {
+      "unplugged": true
+    },
+    "@msgpackr-extract/msgpackr-extract-linux-arm@3.0.4": {
+      "unplugged": true
+    },
+    "@msgpackr-extract/msgpackr-extract-linux-arm64@3.0.4": {
+      "unplugged": true
+    },
+    "@msgpackr-extract/msgpackr-extract-linux-x64@3.0.4": {
+      "unplugged": true
+    },
+    "@msgpackr-extract/msgpackr-extract-win32-x64@3.0.4": {
+      "unplugged": true
+    },
+    "@radix-ui/primitive@1.1.4": {
+      "unplugged": true
+    },
+    "@radix-ui/react-collection@1.1.9": {
+      "unplugged": true
+    },
+    "@radix-ui/react-compose-refs@1.1.3": {
+      "unplugged": true
+    },
+    "@radix-ui/react-context@1.1.4": {
+      "unplugged": true
+    },
+    "@radix-ui/react-dialog@1.1.16": {
+      "unplugged": true
+    },
+    "@radix-ui/react-direction@1.1.2": {
+      "unplugged": true
+    },
+    "@radix-ui/react-dismissable-layer@1.1.12": {
+      "unplugged": true
+    },
+    "@radix-ui/react-focus-guards@1.1.4": {
+      "unplugged": true
+    },
+    "@radix-ui/react-focus-scope@1.1.9": {
+      "unplugged": true
+    },
+    "@radix-ui/react-id@1.1.2": {
+      "unplugged": true
+    },
+    "@radix-ui/react-portal@1.1.11": {
+      "unplugged": true
+    },
+    "@radix-ui/react-presence@1.1.6": {
+      "unplugged": true
+    },
+    "@radix-ui/react-primitive@2.1.5": {
+      "unplugged": true
+    },
+    "@radix-ui/react-roving-focus@1.1.12": {
+      "unplugged": true
+    },
+    "@radix-ui/react-slot@1.2.5": {
+      "unplugged": true
+    },
+    "@radix-ui/react-tabs@1.1.14": {
+      "unplugged": true
+    },
+    "@radix-ui/react-use-callback-ref@1.1.2": {
+      "unplugged": true
+    },
+    "@radix-ui/react-use-controllable-state@1.2.3": {
+      "unplugged": true
+    },
+    "@radix-ui/react-use-effect-event@0.0.3": {
+      "unplugged": true
+    },
+    "@radix-ui/react-use-escape-keydown@1.1.2": {
+      "unplugged": true
+    },
+    "@radix-ui/react-use-layout-effect@1.1.2": {
+      "unplugged": true
+    },
+    "@react-native-masked-view/masked-view@0.3.2": {
+      "unplugged": true
+    },
+    "@react-native/assets-registry@0.85.3": {
+      "unplugged": true
+    },
+    "@react-native/babel-plugin-codegen@0.85.3": {
+      "unplugged": true
+    },
+    "@react-native/codegen@0.85.3": {
+      "unplugged": true
+    },
+    "@react-native/community-cli-plugin@0.85.3": {
+      "unplugged": true
+    },
+    "@react-native/debugger-frontend@0.85.3": {
+      "unplugged": true
+    },
+    "@react-native/debugger-shell@0.85.3": {
+      "unplugged": true
+    },
+    "@react-native/dev-middleware@0.85.3": {
+      "unplugged": true
+    },
+    "@react-native/gradle-plugin@0.85.3": {
+      "unplugged": true
+    },
+    "@react-native/js-polyfills@0.85.3": {
+      "unplugged": true
+    },
+    "@react-native/normalize-colors@0.74.89": {
+      "unplugged": true
+    },
+    "@react-native/normalize-colors@0.85.3": {
+      "unplugged": true
+    },
+    "@react-native/virtualized-lists@0.85.3": {
+      "unplugged": true
+    },
+    "@rollup/rollup-android-arm-eabi@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-android-arm64@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-darwin-arm64@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-darwin-x64@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-freebsd-arm64@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-freebsd-x64@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-arm-gnueabihf@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-arm-musleabihf@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-arm64-gnu@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-arm64-musl@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-loong64-gnu@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-loong64-musl@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-ppc64-gnu@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-ppc64-musl@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-riscv64-gnu@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-riscv64-musl@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-s390x-gnu@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-x64-gnu@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-linux-x64-musl@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-openbsd-x64@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-openharmony-arm64@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-win32-arm64-msvc@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-win32-ia32-msvc@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-win32-x64-gnu@4.61.1": {
+      "unplugged": true
+    },
+    "@rollup/rollup-win32-x64-msvc@4.61.1": {
+      "unplugged": true
+    },
+    "@sinclair/typebox@0.27.10": {
+      "unplugged": true
+    },
+    "@testing-library/jest-dom@6.9.1": {
+      "unplugged": true
+    },
+    "@testing-library/user-event@14.6.1": {
+      "unplugged": true
+    },
+    "@types/estree@1.0.9": {
+      "unplugged": true
+    },
+    "@types/istanbul-lib-coverage@2.0.6": {
+      "unplugged": true
+    },
+    "@types/istanbul-lib-report@3.0.3": {
+      "unplugged": true
+    },
+    "@types/istanbul-reports@3.0.4": {
+      "unplugged": true
+    },
+    "@types/node@20.19.42": {
+      "unplugged": true
+    },
+    "@types/node@25.9.2": {
+      "unplugged": true
+    },
+    "@types/react@19.2.17": {
+      "unplugged": true
+    },
+    "@types/yargs@17.0.35": {
+      "unplugged": true
+    },
+    "@types/yargs-parser@21.0.3": {
+      "unplugged": true
+    },
+    "@ungap/structured-clone@1.3.1": {
+      "unplugged": true
+    },
+    "@vitest/expect@2.1.9": {
+      "unplugged": true
+    },
+    "@vitest/mocker@2.1.9": {
+      "unplugged": true
+    },
+    "@vitest/pretty-format@2.1.9": {
+      "unplugged": true
+    },
+    "@vitest/runner@2.1.9": {
+      "unplugged": true
+    },
+    "@vitest/snapshot@2.1.9": {
+      "unplugged": true
+    },
+    "@vitest/spy@2.1.9": {
+      "unplugged": true
+    },
+    "@vitest/utils@2.1.9": {
+      "unplugged": true
+    },
+    "@xmldom/xmldom@0.8.13": {
+      "unplugged": true
+    },
+    "@xmldom/xmldom@0.9.10": {
+      "unplugged": true
+    },
+    "abbrev@4.0.0": {
+      "unplugged": true
+    },
+    "abort-controller@3.0.0": {
+      "unplugged": true
+    },
+    "accepts@1.3.8": {
+      "unplugged": true
+    },
+    "accepts@2.0.0": {
+      "unplugged": true
+    },
+    "acorn@8.16.0": {
+      "unplugged": true
+    },
+    "agent-base@7.1.4": {
+      "unplugged": true
+    },
+    "anser@1.4.10": {
+      "unplugged": true
+    },
+    "ansi-escapes@4.3.2": {
+      "unplugged": true
+    },
+    "ansi-regex@4.1.1": {
+      "unplugged": true
+    },
+    "ansi-regex@5.0.1": {
+      "unplugged": true
+    },
+    "ansi-styles@3.2.1": {
+      "unplugged": true
+    },
+    "ansi-styles@4.3.0": {
+      "unplugged": true
+    },
+    "ansi-styles@5.2.0": {
+      "unplugged": true
+    },
+    "arg@5.0.2": {
+      "unplugged": true
+    },
+    "argparse@2.0.1": {
+      "unplugged": true
+    },
+    "aria-hidden@1.2.6": {
+      "unplugged": true
+    },
+    "aria-query@5.3.2": {
+      "unplugged": true
+    },
+    "asap@2.0.6": {
+      "unplugged": true
+    },
+    "assertion-error@2.0.1": {
+      "unplugged": true
+    },
+    "babel-plugin-polyfill-corejs2@0.4.17": {
+      "unplugged": true
+    },
+    "babel-plugin-polyfill-corejs3@0.13.0": {
+      "unplugged": true
+    },
+    "babel-plugin-polyfill-regenerator@0.6.8": {
+      "unplugged": true
+    },
+    "babel-plugin-react-compiler@1.0.0": {
+      "unplugged": true
+    },
+    "babel-plugin-react-native-web@0.21.2": {
+      "unplugged": true
+    },
+    "babel-plugin-syntax-hermes-parser@0.33.3": {
+      "unplugged": true
+    },
+    "babel-plugin-transform-flow-enums@0.0.2": {
+      "unplugged": true
+    },
+    "babel-preset-expo@56.0.14": {
+      "unplugged": true
+    },
+    "balanced-match@4.0.4": {
+      "unplugged": true
+    },
+    "base64-js@1.5.1": {
+      "unplugged": true
+    },
+    "baseline-browser-mapping@2.10.34": {
+      "unplugged": true
+    },
+    "big-integer@1.6.52": {
+      "unplugged": true
+    },
+    "bplist-creator@0.1.0": {
+      "unplugged": true
+    },
+    "bplist-creator@0.1.1": {
+      "unplugged": true
+    },
+    "bplist-parser@0.3.2": {
+      "unplugged": true
+    },
+    "brace-expansion@5.0.6": {
+      "unplugged": true
+    },
+    "braces@3.0.3": {
+      "unplugged": true
+    },
+    "browserslist@4.28.2": {
+      "unplugged": true
+    },
+    "bser@2.1.1": {
+      "unplugged": true
+    },
+    "buffer-from@1.1.2": {
+      "unplugged": true
+    },
+    "bytes@3.1.2": {
+      "unplugged": true
+    },
+    "cac@6.7.14": {
+      "unplugged": true
+    },
+    "camelcase@6.3.0": {
+      "unplugged": true
+    },
+    "caniuse-lite@1.0.30001797": {
+      "unplugged": true
+    },
+    "chai@5.3.3": {
+      "unplugged": true
+    },
+    "chalk@2.4.2": {
+      "unplugged": true
+    },
+    "chalk@4.1.2": {
+      "unplugged": true
+    },
+    "check-error@2.1.3": {
+      "unplugged": true
+    },
+    "chownr@3.0.0": {
+      "unplugged": true
+    },
+    "chrome-launcher@0.15.2": {
+      "unplugged": true
+    },
+    "chromium-edge-launcher@0.3.0": {
+      "unplugged": true
+    },
+    "ci-info@2.0.0": {
+      "unplugged": true
+    },
+    "ci-info@3.9.0": {
+      "unplugged": true
+    },
+    "cli-cursor@2.1.0": {
+      "unplugged": true
+    },
+    "cli-spinners@2.9.2": {
+      "unplugged": true
+    },
+    "client-only@0.0.1": {
+      "unplugged": true
+    },
+    "cliui@8.0.1": {
+      "unplugged": true
+    },
+    "clone@1.0.4": {
+      "unplugged": true
+    },
+    "color@4.2.3": {
+      "unplugged": true
+    },
+    "color-convert@1.9.3": {
+      "unplugged": true
+    },
+    "color-convert@2.0.1": {
+      "unplugged": true
+    },
+    "color-name@1.1.3": {
+      "unplugged": true
+    },
+    "color-name@1.1.4": {
+      "unplugged": true
+    },
+    "color-string@1.9.1": {
+      "unplugged": true
+    },
+    "commander@12.1.0": {
+      "unplugged": true
+    },
+    "commander@2.20.3": {
+      "unplugged": true
+    },
+    "commander@7.2.0": {
+      "unplugged": true
+    },
+    "compressible@2.0.18": {
+      "unplugged": true
+    },
+    "compression@1.8.1": {
+      "unplugged": true
+    },
+    "connect@3.7.0": {
+      "unplugged": true
+    },
+    "convert-source-map@2.0.0": {
+      "unplugged": true
+    },
+    "core-js-compat@3.49.0": {
+      "unplugged": true
+    },
+    "cross-fetch@3.2.0": {
+      "unplugged": true
+    },
+    "cross-spawn@7.0.6": {
+      "unplugged": true
+    },
+    "css-in-js-utils@3.1.0": {
+      "unplugged": true
+    },
+    "css.escape@1.5.1": {
+      "unplugged": true
+    },
+    "csstype@3.2.3": {
+      "unplugged": true
+    },
+    "debug@2.6.9": {
+      "unplugged": true
+    },
+    "debug@3.2.7": {
+      "unplugged": true
+    },
+    "debug@4.4.3": {
+      "unplugged": true
+    },
+    "decode-uri-component@0.2.2": {
+      "unplugged": true
+    },
+    "deep-eql@5.0.2": {
+      "unplugged": true
+    },
+    "deepmerge@4.3.1": {
+      "unplugged": true
+    },
+    "defaults@1.0.4": {
+      "unplugged": true
+    },
+    "depd@2.0.0": {
+      "unplugged": true
+    },
+    "destroy@1.2.0": {
+      "unplugged": true
+    },
+    "detect-libc@2.1.2": {
+      "unplugged": true
+    },
+    "detect-node-es@1.1.0": {
+      "unplugged": true
+    },
+    "dnssd-advertise@1.1.4": {
+      "unplugged": true
+    },
+    "dom-accessibility-api@0.6.3": {
+      "unplugged": true
+    },
+    "ee-first@1.1.1": {
+      "unplugged": true
+    },
+    "electron-to-chromium@1.5.368": {
+      "unplugged": true
+    },
+    "emoji-regex@8.0.0": {
+      "unplugged": true
+    },
+    "encodeurl@1.0.2": {
+      "unplugged": true
+    },
+    "encodeurl@2.0.0": {
+      "unplugged": true
+    },
+    "env-paths@2.2.1": {
+      "unplugged": true
+    },
+    "error-stack-parser@2.1.4": {
+      "unplugged": true
+    },
+    "es-errors@1.3.0": {
+      "unplugged": true
+    },
+    "es-module-lexer@1.7.0": {
+      "unplugged": true
+    },
+    "esbuild@0.21.5": {
+      "unplugged": true
+    },
+    "escalade@3.2.0": {
+      "unplugged": true
+    },
+    "escape-html@1.0.3": {
+      "unplugged": true
+    },
+    "escape-string-regexp@1.0.5": {
+      "unplugged": true
+    },
+    "escape-string-regexp@4.0.0": {
+      "unplugged": true
+    },
+    "estree-walker@3.0.3": {
+      "unplugged": true
+    },
+    "etag@1.8.1": {
+      "unplugged": true
+    },
+    "event-target-shim@5.0.1": {
+      "unplugged": true
+    },
+    "expect-type@1.3.0": {
+      "unplugged": true
+    },
+    "expo@56.0.9": {
+      "unplugged": true
+    },
+    "expo-asset@56.0.16": {
+      "unplugged": true
+    },
+    "expo-constants@56.0.17": {
+      "unplugged": true
+    },
+    "expo-file-system@56.0.7": {
+      "unplugged": true
+    },
+    "expo-font@56.0.5": {
+      "unplugged": true
+    },
+    "expo-glass-effect@56.0.4": {
+      "unplugged": true
+    },
+    "expo-keep-awake@56.0.3": {
+      "unplugged": true
+    },
+    "expo-modules-autolinking@56.0.15": {
+      "unplugged": true
+    },
+    "expo-modules-core@56.0.15": {
+      "unplugged": true
+    },
+    "expo-modules-jsi@56.0.8": {
+      "unplugged": true
+    },
+    "expo-router@56.2.9": {
+      "unplugged": true
+    },
+    "expo-server@56.0.5": {
+      "unplugged": true
+    },
+    "expo-symbols@56.0.6": {
+      "unplugged": true
+    },
+    "exponential-backoff@3.1.3": {
+      "unplugged": true
+    },
+    "fast-check@3.23.2": {
+      "unplugged": true
+    },
+    "fast-check@4.8.0": {
+      "unplugged": true
+    },
+    "fast-deep-equal@3.1.3": {
+      "unplugged": true
+    },
+    "fb-dotslash@0.5.8": {
+      "unplugged": true
+    },
+    "fb-watchman@2.0.2": {
+      "unplugged": true
+    },
+    "fbjs@3.0.5": {
+      "unplugged": true
+    },
+    "fbjs-css-vars@1.0.2": {
+      "unplugged": true
+    },
+    "fdir@6.5.0": {
+      "unplugged": true
+    },
+    "fetch-nodeshim@0.4.10": {
+      "unplugged": true
+    },
+    "fill-range@7.1.1": {
+      "unplugged": true
+    },
+    "filter-obj@1.1.0": {
+      "unplugged": true
+    },
+    "finalhandler@1.1.2": {
+      "unplugged": true
+    },
+    "flow-enums-runtime@0.0.6": {
+      "unplugged": true
+    },
+    "fontfaceobserver@2.3.0": {
+      "unplugged": true
+    },
+    "fresh@0.5.2": {
+      "unplugged": true
+    },
+    "fsevents@2.3.3": {
+      "unplugged": true
+    },
+    "function-bind@1.1.2": {
+      "unplugged": true
+    },
+    "gensync@1.0.0-beta.2": {
+      "unplugged": true
+    },
+    "get-caller-file@2.0.5": {
+      "unplugged": true
+    },
+    "get-nonce@1.0.1": {
+      "unplugged": true
+    },
+    "getenv@2.0.0": {
+      "unplugged": true
+    },
+    "glob@13.0.6": {
+      "unplugged": true
+    },
+    "graceful-fs@4.2.11": {
+      "unplugged": true
+    },
+    "has-flag@3.0.0": {
+      "unplugged": true
+    },
+    "has-flag@4.0.0": {
+      "unplugged": true
+    },
+    "hasown@2.0.4": {
+      "unplugged": true
+    },
+    "hermes-compiler@250829098.0.10": {
+      "unplugged": true
+    },
+    "hermes-estree@0.33.3": {
+      "unplugged": true
+    },
+    "hermes-estree@0.35.0": {
+      "unplugged": true
+    },
+    "hermes-parser@0.33.3": {
+      "unplugged": true
+    },
+    "hermes-parser@0.35.0": {
+      "unplugged": true
+    },
+    "hosted-git-info@7.0.2": {
+      "unplugged": true
+    },
+    "http-errors@2.0.1": {
+      "unplugged": true
+    },
+    "https-proxy-agent@7.0.6": {
+      "unplugged": true
+    },
+    "hyphenate-style-name@1.1.0": {
+      "unplugged": true
+    },
+    "ignore@5.3.2": {
+      "unplugged": true
+    },
+    "image-size@1.2.1": {
+      "unplugged": true
+    },
+    "indent-string@4.0.0": {
+      "unplugged": true
+    },
+    "inherits@2.0.4": {
+      "unplugged": true
+    },
+    "inline-style-prefixer@7.0.1": {
+      "unplugged": true
+    },
+    "invariant@2.2.4": {
+      "unplugged": true
+    },
+    "is-arrayish@0.3.4": {
+      "unplugged": true
+    },
+    "is-core-module@2.16.2": {
+      "unplugged": true
+    },
+    "is-docker@2.2.1": {
+      "unplugged": true
+    },
+    "is-fullwidth-code-point@3.0.0": {
+      "unplugged": true
+    },
+    "is-number@7.0.0": {
+      "unplugged": true
+    },
+    "is-wsl@2.2.0": {
+      "unplugged": true
+    },
+    "isexe@2.0.0": {
+      "unplugged": true
+    },
+    "isexe@4.0.0": {
+      "unplugged": true
+    },
+    "jest-get-type@29.6.3": {
+      "unplugged": true
+    },
+    "jest-util@29.7.0": {
+      "unplugged": true
+    },
+    "jest-validate@29.7.0": {
+      "unplugged": true
+    },
+    "jest-worker@29.7.0": {
+      "unplugged": true
+    },
+    "jimp-compact@0.16.1": {
+      "unplugged": true
+    },
+    "js-tokens@4.0.0": {
+      "unplugged": true
+    },
+    "js-yaml@4.2.0": {
+      "unplugged": true
+    },
+    "jsc-safe-url@0.2.4": {
+      "unplugged": true
+    },
+    "jsesc@3.1.0": {
+      "unplugged": true
+    },
+    "json5@2.2.3": {
+      "unplugged": true
+    },
+    "kleur@3.0.3": {
+      "unplugged": true
+    },
+    "lan-network@0.2.1": {
+      "unplugged": true
+    },
+    "leven@3.1.0": {
+      "unplugged": true
+    },
+    "lighthouse-logger@1.4.2": {
+      "unplugged": true
+    },
+    "lightningcss@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-android-arm64@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-darwin-arm64@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-darwin-x64@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-freebsd-x64@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-linux-arm-gnueabihf@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-linux-arm64-gnu@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-linux-arm64-musl@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-linux-x64-gnu@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-linux-x64-musl@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-win32-arm64-msvc@1.32.0": {
+      "unplugged": true
+    },
+    "lightningcss-win32-x64-msvc@1.32.0": {
+      "unplugged": true
+    },
+    "lodash.debounce@4.0.8": {
+      "unplugged": true
+    },
+    "lodash.throttle@4.1.1": {
+      "unplugged": true
+    },
+    "log-symbols@2.2.0": {
+      "unplugged": true
+    },
+    "loose-envify@1.4.0": {
+      "unplugged": true
+    },
+    "loupe@3.2.1": {
+      "unplugged": true
+    },
+    "lru-cache@10.4.3": {
+      "unplugged": true
+    },
+    "lru-cache@11.5.1": {
+      "unplugged": true
+    },
+    "lru-cache@5.1.1": {
+      "unplugged": true
+    },
+    "magic-string@0.30.21": {
+      "unplugged": true
+    },
+    "makeerror@1.0.12": {
+      "unplugged": true
+    },
+    "marky@1.3.0": {
+      "unplugged": true
+    },
+    "memoize-one@5.2.1": {
+      "unplugged": true
+    },
+    "memoize-one@6.0.0": {
+      "unplugged": true
+    },
+    "merge-stream@2.0.0": {
+      "unplugged": true
+    },
+    "metro@0.84.4": {
+      "unplugged": true
+    },
+    "metro-babel-transformer@0.84.4": {
+      "unplugged": true
+    },
+    "metro-cache@0.84.4": {
+      "unplugged": true
+    },
+    "metro-cache-key@0.84.4": {
+      "unplugged": true
+    },
+    "metro-config@0.84.4": {
+      "unplugged": true
+    },
+    "metro-core@0.84.4": {
+      "unplugged": true
+    },
+    "metro-file-map@0.84.4": {
+      "unplugged": true
+    },
+    "metro-minify-terser@0.84.4": {
+      "unplugged": true
+    },
+    "metro-resolver@0.84.4": {
+      "unplugged": true
+    },
+    "metro-runtime@0.84.4": {
+      "unplugged": true
+    },
+    "metro-source-map@0.84.4": {
+      "unplugged": true
+    },
+    "metro-symbolicate@0.84.4": {
+      "unplugged": true
+    },
+    "metro-transform-plugins@0.84.4": {
+      "unplugged": true
+    },
+    "metro-transform-worker@0.84.4": {
+      "unplugged": true
+    },
+    "micromatch@4.0.8": {
+      "unplugged": true
+    },
+    "mime@1.6.0": {
+      "unplugged": true
+    },
+    "mime-db@1.52.0": {
+      "unplugged": true
+    },
+    "mime-db@1.54.0": {
+      "unplugged": true
+    },
+    "mime-types@2.1.35": {
+      "unplugged": true
+    },
+    "mime-types@3.0.2": {
+      "unplugged": true
+    },
+    "mimic-fn@1.2.0": {
+      "unplugged": true
+    },
+    "min-indent@1.0.1": {
+      "unplugged": true
+    },
+    "minimatch@10.2.5": {
+      "unplugged": true
+    },
+    "minipass@7.1.3": {
+      "unplugged": true
+    },
+    "minizlib@3.1.0": {
+      "unplugged": true
+    },
+    "mkdirp@1.0.4": {
+      "unplugged": true
+    },
+    "ms@2.0.0": {
+      "unplugged": true
+    },
+    "ms@2.1.3": {
+      "unplugged": true
+    },
+    "msgpackr@2.0.2": {
+      "unplugged": true
+    },
+    "msgpackr-extract@3.0.4": {
+      "unplugged": true
+    },
+    "multitars@1.0.0": {
+      "unplugged": true
+    },
+    "nanoid@3.3.12": {
+      "unplugged": true
+    },
+    "negotiator@0.6.3": {
+      "unplugged": true
+    },
+    "negotiator@0.6.4": {
+      "unplugged": true
+    },
+    "negotiator@1.0.0": {
+      "unplugged": true
+    },
+    "node-fetch@2.7.0": {
+      "unplugged": true
+    },
+    "node-forge@1.4.0": {
+      "unplugged": true
+    },
+    "node-gyp@12.4.0": {
+      "unplugged": true
+    },
+    "node-gyp-build-optional-packages@5.2.2": {
+      "unplugged": true
+    },
+    "node-int64@0.4.0": {
+      "unplugged": true
+    },
+    "node-releases@2.0.47": {
+      "unplugged": true
+    },
+    "nopt@9.0.0": {
+      "unplugged": true
+    },
+    "npm-package-arg@11.0.3": {
+      "unplugged": true
+    },
+    "nullthrows@1.1.1": {
+      "unplugged": true
+    },
+    "ob1@0.84.4": {
+      "unplugged": true
+    },
+    "object-assign@4.1.1": {
+      "unplugged": true
+    },
+    "on-finished@2.3.0": {
+      "unplugged": true
+    },
+    "on-finished@2.4.1": {
+      "unplugged": true
+    },
+    "on-headers@1.1.0": {
+      "unplugged": true
+    },
+    "onetime@2.0.1": {
+      "unplugged": true
+    },
+    "open@7.4.2": {
+      "unplugged": true
+    },
+    "ora@3.4.0": {
+      "unplugged": true
+    },
+    "parse-png@2.1.0": {
+      "unplugged": true
+    },
+    "parseurl@1.3.3": {
+      "unplugged": true
+    },
+    "path-key@3.1.1": {
+      "unplugged": true
+    },
+    "path-parse@1.0.7": {
+      "unplugged": true
+    },
+    "path-scurry@2.0.2": {
+      "unplugged": true
+    },
+    "pathe@1.1.2": {
+      "unplugged": true
+    },
+    "pathval@2.0.1": {
+      "unplugged": true
+    },
+    "picocolors@1.1.1": {
+      "unplugged": true
+    },
+    "picomatch@2.3.2": {
+      "unplugged": true
+    },
+    "picomatch@4.0.4": {
+      "unplugged": true
+    },
+    "plist@3.1.1": {
+      "unplugged": true
+    },
+    "pngjs@3.4.0": {
+      "unplugged": true
+    },
+    "postcss@8.5.15": {
+      "unplugged": true
+    },
+    "postcss-value-parser@4.2.0": {
+      "unplugged": true
+    },
+    "pretty-format@29.7.0": {
+      "unplugged": true
+    },
+    "proc-log@4.2.0": {
+      "unplugged": true
+    },
+    "proc-log@6.1.0": {
+      "unplugged": true
+    },
+    "progress@2.0.3": {
+      "unplugged": true
+    },
+    "promise@7.3.1": {
+      "unplugged": true
+    },
+    "promise@8.3.0": {
+      "unplugged": true
+    },
+    "prompts@2.4.2": {
+      "unplugged": true
+    },
+    "pure-rand@6.1.0": {
+      "unplugged": true
+    },
+    "pure-rand@8.4.0": {
+      "unplugged": true
+    },
+    "query-string@7.1.3": {
+      "unplugged": true
+    },
+    "queue@6.0.2": {
+      "unplugged": true
+    },
+    "range-parser@1.2.1": {
+      "unplugged": true
+    },
+    "react@19.2.3": {
+      "unplugged": true
+    },
+    "react-devtools-core@6.1.5": {
+      "unplugged": true
+    },
+    "react-dom@19.2.3": {
+      "unplugged": true
+    },
+    "react-fast-compare@3.2.2": {
+      "unplugged": true
+    },
+    "react-freeze@1.0.4": {
+      "unplugged": true
+    },
+    "react-is@18.3.1": {
+      "unplugged": true
+    },
+    "react-is@19.2.7": {
+      "unplugged": true
+    },
+    "react-native@0.85.3": {
+      "unplugged": true
+    },
+    "react-native-drawer-layout@4.2.4": {
+      "unplugged": true
+    },
+    "react-native-screens@4.25.2": {
+      "unplugged": true
+    },
+    "react-native-web@0.21.2": {
+      "unplugged": true
+    },
+    "react-refresh@0.14.2": {
+      "unplugged": true
+    },
+    "react-remove-scroll@2.7.2": {
+      "unplugged": true
+    },
+    "react-remove-scroll-bar@2.3.8": {
+      "unplugged": true
+    },
+    "react-style-singleton@2.2.3": {
+      "unplugged": true
+    },
+    "redent@3.0.0": {
+      "unplugged": true
+    },
+    "regenerate@1.4.2": {
+      "unplugged": true
+    },
+    "regenerate-unicode-properties@10.2.2": {
+      "unplugged": true
+    },
+    "regenerator-runtime@0.13.11": {
+      "unplugged": true
+    },
+    "regexpu-core@6.4.0": {
+      "unplugged": true
+    },
+    "regjsgen@0.8.0": {
+      "unplugged": true
+    },
+    "regjsparser@0.13.1": {
+      "unplugged": true
+    },
+    "require-directory@2.1.1": {
+      "unplugged": true
+    },
+    "resolve@1.22.12": {
+      "unplugged": true
+    },
+    "resolve-from@5.0.0": {
+      "unplugged": true
+    },
+    "resolve-workspace-root@2.0.1": {
+      "unplugged": true
+    },
+    "restore-cursor@2.0.0": {
+      "unplugged": true
+    },
+    "rollup@4.61.1": {
+      "unplugged": true
+    },
+    "safe-buffer@5.2.1": {
+      "unplugged": true
+    },
+    "sax@1.6.0": {
+      "unplugged": true
+    },
+    "scheduler@0.27.0": {
+      "unplugged": true
+    },
+    "semver@6.3.1": {
+      "unplugged": true
+    },
+    "semver@7.8.2": {
+      "unplugged": true
+    },
+    "send@0.19.2": {
+      "unplugged": true
+    },
+    "serialize-error@2.1.0": {
+      "unplugged": true
+    },
+    "serve-static@1.16.3": {
+      "unplugged": true
+    },
+    "server-only@0.0.1": {
+      "unplugged": true
+    },
+    "setimmediate@1.0.5": {
+      "unplugged": true
+    },
+    "setprototypeof@1.2.0": {
+      "unplugged": true
+    },
+    "sf-symbols-typescript@2.2.0": {
+      "unplugged": true
+    },
+    "shallowequal@1.1.0": {
+      "unplugged": true
+    },
+    "shebang-command@2.0.0": {
+      "unplugged": true
+    },
+    "shebang-regex@3.0.0": {
+      "unplugged": true
+    },
+    "shell-quote@1.8.4": {
+      "unplugged": true
+    },
+    "siginfo@2.0.0": {
+      "unplugged": true
+    },
+    "signal-exit@3.0.7": {
+      "unplugged": true
+    },
+    "simple-plist@1.4.0": {
+      "unplugged": true
+    },
+    "simple-swizzle@0.2.4": {
+      "unplugged": true
+    },
+    "sisteransi@1.0.5": {
+      "unplugged": true
+    },
+    "slugify@1.6.9": {
+      "unplugged": true
+    },
+    "source-map@0.5.7": {
+      "unplugged": true
+    },
+    "source-map@0.6.1": {
+      "unplugged": true
+    },
+    "source-map-js@1.2.1": {
+      "unplugged": true
+    },
+    "source-map-support@0.5.21": {
+      "unplugged": true
+    },
+    "split-on-first@1.1.0": {
+      "unplugged": true
+    },
+    "stackback@0.0.2": {
+      "unplugged": true
+    },
+    "stackframe@1.3.4": {
+      "unplugged": true
+    },
+    "stacktrace-parser@0.1.11": {
+      "unplugged": true
+    },
+    "statuses@1.5.0": {
+      "unplugged": true
+    },
+    "statuses@2.0.2": {
+      "unplugged": true
+    },
+    "std-env@3.10.0": {
+      "unplugged": true
+    },
+    "stream-buffers@2.2.0": {
+      "unplugged": true
+    },
+    "strict-uri-encode@2.0.0": {
+      "unplugged": true
+    },
+    "string-width@4.2.3": {
+      "unplugged": true
+    },
+    "strip-ansi@5.2.0": {
+      "unplugged": true
+    },
+    "strip-ansi@6.0.1": {
+      "unplugged": true
+    },
+    "strip-indent@3.0.0": {
+      "unplugged": true
+    },
+    "structured-headers@0.4.1": {
+      "unplugged": true
+    },
+    "styleq@0.1.3": {
+      "unplugged": true
+    },
+    "supports-color@5.5.0": {
+      "unplugged": true
+    },
+    "supports-color@7.2.0": {
+      "unplugged": true
+    },
+    "supports-color@8.1.1": {
+      "unplugged": true
+    },
+    "supports-hyperlinks@2.3.0": {
+      "unplugged": true
+    },
+    "supports-preserve-symlinks-flag@1.0.0": {
+      "unplugged": true
+    },
+    "tar@7.5.16": {
+      "unplugged": true
+    },
+    "terminal-link@2.1.1": {
+      "unplugged": true
+    },
+    "terser@5.48.0": {
+      "unplugged": true
+    },
+    "throat@5.0.0": {
+      "unplugged": true
+    },
+    "tinybench@2.9.0": {
+      "unplugged": true
+    },
+    "tinyexec@0.3.2": {
+      "unplugged": true
+    },
+    "tinyglobby@0.2.17": {
+      "unplugged": true
+    },
+    "tinypool@1.1.1": {
+      "unplugged": true
+    },
+    "tinyrainbow@1.2.0": {
+      "unplugged": true
+    },
+    "tinyspy@3.0.2": {
+      "unplugged": true
+    },
+    "tmpl@1.0.5": {
+      "unplugged": true
+    },
+    "to-regex-range@5.0.1": {
+      "unplugged": true
+    },
+    "toidentifier@1.0.1": {
+      "unplugged": true
+    },
+    "toqr@0.1.1": {
+      "unplugged": true
+    },
+    "tr46@0.0.3": {
+      "unplugged": true
+    },
+    "tslib@2.8.1": {
+      "unplugged": true
+    },
+    "type-fest@0.21.3": {
+      "unplugged": true
+    },
+    "type-fest@0.7.1": {
+      "unplugged": true
+    },
+    "typescript@5.9.3": {
+      "unplugged": true
+    },
+    "ua-parser-js@1.0.41": {
+      "unplugged": true
+    },
+    "undici@6.26.0": {
+      "unplugged": true
+    },
+    "undici-types@6.21.0": {
+      "unplugged": true
+    },
+    "undici-types@7.24.6": {
+      "unplugged": true
+    },
+    "unicode-canonical-property-names-ecmascript@2.0.1": {
+      "unplugged": true
+    },
+    "unicode-match-property-ecmascript@2.0.0": {
+      "unplugged": true
+    },
+    "unicode-match-property-value-ecmascript@2.2.1": {
+      "unplugged": true
+    },
+    "unicode-property-aliases-ecmascript@2.2.0": {
+      "unplugged": true
+    },
+    "unpipe@1.0.0": {
+      "unplugged": true
+    },
+    "update-browserslist-db@1.2.3": {
+      "unplugged": true
+    },
+    "use-callback-ref@1.3.3": {
+      "unplugged": true
+    },
+    "use-latest-callback@0.2.6": {
+      "unplugged": true
+    },
+    "use-sidecar@1.1.3": {
+      "unplugged": true
+    },
+    "utils-merge@1.0.1": {
+      "unplugged": true
+    },
+    "uuid@7.0.3": {
+      "unplugged": true
+    },
+    "validate-npm-package-name@5.0.1": {
+      "unplugged": true
+    },
+    "vary@1.1.2": {
+      "unplugged": true
+    },
+    "vaul@1.1.2": {
+      "unplugged": true
+    },
+    "vite@5.4.21": {
+      "unplugged": true
+    },
+    "vite-node@2.1.9": {
+      "unplugged": true
+    },
+    "vitest@2.1.9": {
+      "unplugged": true
+    },
+    "vlq@1.0.1": {
+      "unplugged": true
+    },
+    "walker@1.0.8": {
+      "unplugged": true
+    },
+    "warn-once@0.1.1": {
+      "unplugged": true
+    },
+    "wcwidth@1.0.1": {
+      "unplugged": true
+    },
+    "webidl-conversions@3.0.1": {
+      "unplugged": true
+    },
+    "whatwg-fetch@3.6.20": {
+      "unplugged": true
+    },
+    "whatwg-url@5.0.0": {
+      "unplugged": true
+    },
+    "whatwg-url-minimum@0.1.2": {
+      "unplugged": true
+    },
+    "which@2.0.2": {
+      "unplugged": true
+    },
+    "which@6.0.1": {
+      "unplugged": true
+    },
+    "why-is-node-running@2.3.0": {
+      "unplugged": true
+    },
+    "wrap-ansi@7.0.0": {
+      "unplugged": true
+    },
+    "ws@7.5.11": {
+      "unplugged": true
+    },
+    "ws@8.21.0": {
+      "unplugged": true
+    },
+    "xcode@3.0.1": {
+      "unplugged": true
+    },
+    "xml2js@0.6.0": {
+      "unplugged": true
+    },
+    "xmlbuilder@11.0.1": {
+      "unplugged": true
+    },
+    "xmlbuilder@15.1.1": {
+      "unplugged": true
+    },
+    "y18n@5.0.8": {
+      "unplugged": true
+    },
+    "yallist@3.1.1": {
+      "unplugged": true
+    },
+    "yallist@5.0.0": {
+      "unplugged": true
+    },
+    "yaml@2.9.0": {
+      "unplugged": true
+    },
+    "yargs@17.7.2": {
+      "unplugged": true
+    },
+    "yargs-parser@21.1.1": {
+      "unplugged": true
+    },
+    "zod@3.25.76": {
+      "unplugged": true
+    }
+  }
+}

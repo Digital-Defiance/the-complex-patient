@@ -1,0 +1,15 @@
+{
+  "name": "@complex-patient/insights",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Sandboxed analytics + PDF report",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@complex-patient/domain": "*"
+  }
+}

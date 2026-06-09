@@ -1,0 +1,28 @@
+{
+  "name": "@complex-patient/ui",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared components/hooks consumed by mobile + web, incl. the Zustand-style vault store mirroring decrypted Local_Vault partitions",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@complex-patient/crypto-engine": "workspace:*",
+    "@complex-patient/domain": "workspace:*",
+    "@complex-patient/key-store": "workspace:*",
+    "@complex-patient/local-vault": "workspace:*",
+    "@complex-patient/polypharmacy": "workspace:*",
+    "@complex-patient/symptom-journal": "workspace:*",
+    "@complex-patient/sync-engine": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@complex-patient/insights": "workspace:*",
+    "@types/react": "~19.2.14"
+  }
+}

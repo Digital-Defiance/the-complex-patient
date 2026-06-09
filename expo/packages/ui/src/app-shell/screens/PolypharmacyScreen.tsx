@@ -1,0 +1,505 @@
+/**
+ * @complex-patient/ui — PolypharmacyScreen
+ *
+ * Renders the adaptive polypharmacy view produced by `buildPolypharmacyView` in
+ * the exact order returned — no blocks omitted, reordered, or inserted. When
+ * zero medication profiles exist, displays an empty-medication-list message with
+ * no medication rows. Persists edits exclusively through `home.commit('medications', …)`.
+ * On commit failure, shows a "not saved" message and retains entered values.
+ *
+ * Requirements: 9.1, 9.2, 9.3, 9.6, 9.7
+ */
+
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, ScrollView, Pressable, TextInput, StyleSheet } from 'react-native';
+import { buildPolypharmacyView, type PolyView, type PolyViewBlock } from '@complex-patient/polypharmacy';
+import type { MedicationProfile } from '@complex-patient/domain';
+import { useAppHost } from '../app-host';
+import { usePartition } from '../hooks';
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+export interface PolypharmacyScreenProps {
+  /** Called when navigating back or to PRN screen. */
+  onNavigatePrn?: () => void;
+  /** Called when navigating back to home. */
+  onBack?: () => void;
+}
+
+// ---------------------------------------------------------------------------
+// Edit state for inline editing
+// ---------------------------------------------------------------------------
+
+interface EditState {
+  medicationId: string;
+  drugName: string;
+  dosage: string;
+  form: string;
+  prescribingPhysician: string;
+  conditionTreated: string;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function PolypharmacyScreen({ onNavigatePrn, onBack }: PolypharmacyScreenProps): React.ReactElement {
+  const { home } = useAppHost();
+
+  // If home is not available, render the data-unavailable fallback.
+  if (!home) {
+    return (
+      <View style={styles.container} testID="polypharmacy-screen">
+        <Text style={styles.errorText} accessibilityRole="alert" testID="polypharmacy-data-unavailable">
+          Data unavailable. Please try again later.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <PolypharmacyScreenInner home={home} onNavigatePrn={onNavigatePrn} onBack={onBack} />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inner component — safe to call hooks unconditionally since home is guaranteed.
+// ---------------------------------------------------------------------------
+
+interface InnerProps {
+  home: NonNullable<ReturnType<typeof useAppHost>['home']>;
+  onNavigatePrn?: () => void;
+  onBack?: () => void;
+}
+
+function PolypharmacyScreenInner({ home, onNavigatePrn, onBack }: InnerProps): React.ReactElement {
+  // Read medications exclusively through home.read via usePartition (Requirement 9.6, 14.1).
+  const records = usePartition<MedicationProfile>(home, 'medications');
+
+  // Build the adaptive view from the current medication records.
+  const polyView: PolyView = useMemo(() => buildPolypharmacyView(records), [records]);
+
+  // Edit state — retains values on commit failure (Requirement 9.7).
+  const [editing, setEditing] = useState<EditState | null>(null);
+  const [commitError, setCommitError] = useState<string | null>(null);
+
+  // Start editing a medication.
+  const handleEdit = useCallback((med: MedicationProfile) => {
+    setEditing({
+      medicationId: med.id,
+      drugName: med.drugName,
+      dosage: med.dosage,
+      form: med.form,
+      prescribingPhysician: med.prescribingPhysician,
+      conditionTreated: med.conditionTreated,
+    });
+    setCommitError(null);
+  }, []);
+
+  // Cancel editing.
+  const handleCancelEdit = useCallback(() => {
+    setEditing(null);
+    setCommitError(null);
+  }, []);
+
+  // Save edited medication — persist exclusively through home.commit (Requirement 9.6).
+  const handleSave = useCallback(async () => {
+    if (!editing) return;
+
+    const result = await home.commit<MedicationProfile>('medications', (current) =>
+      current.map((med) =>
+        med.id === editing.medicationId
+          ? {
+              ...med,
+              drugName: editing.drugName,
+              dosage: editing.dosage,
+              form: editing.form,
+              prescribingPhysician: editing.prescribingPhysician,
+              conditionTreated: editing.conditionTreated,
+              op_timestamp: new Date().toISOString(),
+            }
+          : med,
+      ),
+    );
+
+    if (result.ok) {
+      // Successful commit — clear edit state.
+      setEditing(null);
+      setCommitError(null);
+    } else {
+      // Requirement 9.7: on commit failure, show "not saved" message and retain values.
+      setCommitError('Changes were not saved. Please try again.');
+    }
+  }, [home, editing]);
+
+  // Update edit field.
+  const updateField = useCallback(
+    (field: keyof Omit<EditState, 'medicationId'>, value: string) => {
+      setEditing((prev) => (prev ? { ...prev, [field]: value } : null));
+    },
+    [],
+  );
+
+  // Requirement 9.3: zero profiles → empty-medication-list message, no rows.
+  if (polyView.layout === 'flat' && polyView.medications.length === 0) {
+    return (
+      <View style={styles.container} testID="polypharmacy-screen">
+        <View style={styles.headerRow}>
+          {onBack && (
+            <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" testID="polypharmacy-back">
+              <Text style={styles.backText}>← Back</Text>
+            </Pressable>
+          )}
+          <Text style={styles.title}>Medications</Text>
+        </View>
+        <Text style={styles.emptyMessage} testID="polypharmacy-empty-message">
+          No medications found. Add a medication to get started.
+        </Text>
+        {onNavigatePrn && (
+          <Pressable onPress={onNavigatePrn} accessibilityRole="button" testID="polypharmacy-nav-prn">
+            <Text style={styles.linkText}>PRN Quick Log</Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} testID="polypharmacy-screen">
+      <View style={styles.headerRow}>
+        {onBack && (
+          <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" testID="polypharmacy-back">
+            <Text style={styles.backText}>← Back</Text>
+          </Pressable>
+        )}
+        <Text style={styles.title}>Medications</Text>
+        {onNavigatePrn && (
+          <Pressable onPress={onNavigatePrn} accessibilityRole="button" testID="polypharmacy-nav-prn">
+            <Text style={styles.linkText}>PRN Quick Log</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Commit failure message (Requirement 9.7) */}
+      {commitError && (
+        <Text style={styles.errorText} accessibilityRole="alert" testID="polypharmacy-commit-error">
+          {commitError}
+        </Text>
+      )}
+
+      {/* Render the adaptive view blocks in exact order (Requirements 9.1, 9.2) */}
+      {polyView.layout === 'flat' ? (
+        <FlatMedicationList
+          medications={polyView.medications}
+          editing={editing}
+          onEdit={handleEdit}
+          onSave={handleSave}
+          onCancel={handleCancelEdit}
+          onUpdateField={updateField}
+        />
+      ) : (
+        <GroupedMedicationView
+          blocks={polyView.blocks}
+          asNeeded={polyView.asNeeded}
+          editing={editing}
+          onEdit={handleEdit}
+          onSave={handleSave}
+          onCancel={handleCancelEdit}
+          onUpdateField={updateField}
+        />
+      )}
+    </ScrollView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components: flat list
+// ---------------------------------------------------------------------------
+
+interface ListProps {
+  medications: MedicationProfile[];
+  editing: EditState | null;
+  onEdit: (med: MedicationProfile) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onUpdateField: (field: keyof Omit<EditState, 'medicationId'>, value: string) => void;
+}
+
+function FlatMedicationList({ medications, editing, onEdit, onSave, onCancel, onUpdateField }: ListProps): React.ReactElement {
+  return (
+    <View testID="polypharmacy-flat-list">
+      {medications.map((med) => (
+        <MedicationRow
+          key={med.id}
+          medication={med}
+          editing={editing}
+          onEdit={onEdit}
+          onSave={onSave}
+          onCancel={onCancel}
+          onUpdateField={onUpdateField}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components: grouped view
+// ---------------------------------------------------------------------------
+
+interface GroupedProps {
+  blocks: PolyViewBlock[];
+  asNeeded: MedicationProfile[];
+  editing: EditState | null;
+  onEdit: (med: MedicationProfile) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onUpdateField: (field: keyof Omit<EditState, 'medicationId'>, value: string) => void;
+}
+
+function GroupedMedicationView({ blocks, asNeeded, editing, onEdit, onSave, onCancel, onUpdateField }: GroupedProps): React.ReactElement {
+  return (
+    <View testID="polypharmacy-grouped-view">
+      {/* Render blocks in the exact order returned by buildPolypharmacyView (Requirement 9.2) */}
+      {blocks.map((block) => (
+        <View key={block.block} testID={`polypharmacy-block-${block.block}`}>
+          <Text style={styles.blockHeader}>{block.block}</Text>
+          {block.medications.map((med) => (
+            <MedicationRow
+              key={med.id}
+              medication={med}
+              editing={editing}
+              onEdit={onEdit}
+              onSave={onSave}
+              onCancel={onCancel}
+              onUpdateField={onUpdateField}
+            />
+          ))}
+        </View>
+      ))}
+      {/* As Needed section, positioned after blocks (Requirement 9.2) */}
+      {asNeeded.length > 0 && (
+        <View testID="polypharmacy-block-as-needed">
+          <Text style={styles.blockHeader}>As Needed</Text>
+          {asNeeded.map((med) => (
+            <MedicationRow
+              key={med.id}
+              medication={med}
+              editing={editing}
+              onEdit={onEdit}
+              onSave={onSave}
+              onCancel={onCancel}
+              onUpdateField={onUpdateField}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Medication row (display or edit mode)
+// ---------------------------------------------------------------------------
+
+interface MedicationRowProps {
+  medication: MedicationProfile;
+  editing: EditState | null;
+  onEdit: (med: MedicationProfile) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onUpdateField: (field: keyof Omit<EditState, 'medicationId'>, value: string) => void;
+}
+
+function MedicationRow({ medication, editing, onEdit, onSave, onCancel, onUpdateField }: MedicationRowProps): React.ReactElement {
+  const isEditing = editing?.medicationId === medication.id;
+
+  if (isEditing && editing) {
+    return (
+      <View style={styles.medicationRow} testID={`medication-row-${medication.id}`}>
+        <TextInput
+          style={styles.editInput}
+          value={editing.drugName}
+          onChangeText={(v: string) => onUpdateField('drugName', v)}
+          placeholder="Drug name"
+          accessibilityLabel="Drug name"
+          testID={`edit-drugName-${medication.id}`}
+        />
+        <TextInput
+          style={styles.editInput}
+          value={editing.dosage}
+          onChangeText={(v: string) => onUpdateField('dosage', v)}
+          placeholder="Dosage"
+          accessibilityLabel="Dosage"
+          testID={`edit-dosage-${medication.id}`}
+        />
+        <TextInput
+          style={styles.editInput}
+          value={editing.form}
+          onChangeText={(v: string) => onUpdateField('form', v)}
+          placeholder="Form"
+          accessibilityLabel="Form"
+          testID={`edit-form-${medication.id}`}
+        />
+        <TextInput
+          style={styles.editInput}
+          value={editing.prescribingPhysician}
+          onChangeText={(v: string) => onUpdateField('prescribingPhysician', v)}
+          placeholder="Prescribing physician"
+          accessibilityLabel="Prescribing physician"
+          testID={`edit-prescribingPhysician-${medication.id}`}
+        />
+        <TextInput
+          style={styles.editInput}
+          value={editing.conditionTreated}
+          onChangeText={(v: string) => onUpdateField('conditionTreated', v)}
+          placeholder="Condition treated"
+          accessibilityLabel="Condition treated"
+          testID={`edit-conditionTreated-${medication.id}`}
+        />
+        <View style={styles.editActions}>
+          <Pressable onPress={onSave} accessibilityRole="button" testID={`save-${medication.id}`}>
+            <Text style={styles.saveText}>Save</Text>
+          </Pressable>
+          <Pressable onPress={onCancel} accessibilityRole="button" testID={`cancel-${medication.id}`}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.medicationRow} testID={`medication-row-${medication.id}`}>
+      <View style={styles.medInfo}>
+        <Text style={styles.drugName} testID={`med-name-${medication.id}`}>
+          {medication.drugName}
+        </Text>
+        <Text style={styles.dosageText}>
+          {medication.dosage} — {medication.form}
+        </Text>
+        <Text style={styles.detailText}>
+          {medication.prescribingPhysician} • {medication.conditionTreated}
+        </Text>
+      </View>
+      <Pressable
+        onPress={() => onEdit(medication)}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${medication.drugName}`}
+        testID={`edit-btn-${medication.id}`}
+      >
+        <Text style={styles.editBtnText}>Edit</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#fff',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    flex: 1,
+  },
+  backText: {
+    fontSize: 16,
+    color: '#0066cc',
+  },
+  linkText: {
+    fontSize: 14,
+    color: '#0066cc',
+    fontWeight: '500',
+  },
+  emptyMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 48,
+  },
+  errorText: {
+    color: '#c00',
+    fontSize: 14,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  blockHeader: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+    paddingBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ddd',
+  },
+  medicationRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  medInfo: {
+    flex: 1,
+  },
+  drugName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  dosageText: {
+    fontSize: 14,
+    color: '#555',
+    marginTop: 2,
+  },
+  detailText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  editBtnText: {
+    fontSize: 14,
+    color: '#0066cc',
+    fontWeight: '500',
+  },
+  editInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 6,
+    fontSize: 14,
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  saveText: {
+    fontSize: 14,
+    color: '#0066cc',
+    fontWeight: '600',
+  },
+  cancelText: {
+    fontSize: 14,
+    color: '#666',
+  },
+});

@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "The Complex Patient",
+    "slug": "the-complex-patient",
+    "sdkVersion": "54.0.0",
+    "scheme": "thecomplexpatient",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "plugins": [
+      ["expo-router", { "root": "./apps/mobile/app" }],
+      "expo-secure-store"
+    ],
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "03afbce3-092b-4382-ba04-8a0b4b34eef9"
+      }
+    }
+  }
+}

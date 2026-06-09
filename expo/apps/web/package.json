@@ -1,0 +1,22 @@
+{
+  "name": "@complex-patient/web",
+  "version": "0.0.1",
+  "private": true,
+  "description": "React Native Web entry (HTTPS, window.crypto.subtle)",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "expo start --web",
+    "test": "vitest run",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@complex-patient/crypto-engine": "*",
+    "@complex-patient/domain": "*",
+    "@complex-patient/insights": "*",
+    "@complex-patient/key-store": "*",
+    "@complex-patient/local-vault": "*",
+    "@complex-patient/polypharmacy": "*",
+    "@complex-patient/sync-engine": "*",
+    "@complex-patient/ui": "*"
+  }
+}

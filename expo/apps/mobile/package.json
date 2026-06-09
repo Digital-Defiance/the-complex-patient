@@ -1,0 +1,25 @@
+{
+  "name": "@complex-patient/mobile",
+  "version": "0.0.1",
+  "private": true,
+  "description": "iOS + Android entry (Expo Router, expo-secure-store, expo-notifications)",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "expo start",
+    "test": "vitest run",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@complex-patient/crypto-engine": "*",
+    "@complex-patient/domain": "*",
+    "@complex-patient/insights": "*",
+    "@complex-patient/key-store": "*",
+    "@complex-patient/local-vault": "*",
+    "@complex-patient/polypharmacy": "*",
+    "@complex-patient/sync-engine": "*",
+    "@complex-patient/ui": "*",
+    "expo-local-authentication": "17.0.8",
+    "expo-notifications": "0.32.17",
+    "expo-secure-store": "15.0.8"
+  }
+}
