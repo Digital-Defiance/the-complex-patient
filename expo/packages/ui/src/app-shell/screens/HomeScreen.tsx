@@ -2,7 +2,7 @@
  * @complex-patient/ui — HomeScreen
  *
  * Rendered while the Home_Controller status is `ready`. Presents navigation
- * entries for the Polypharmacy, Symptom Journal, and Insights subsystems, plus
+ * entries for the Medications, Symptom Journal, and Insights subsystems, plus
  * a Sign Out button. Reads displayed data exclusively through `home.read` and
  * on read failure displays a data-unavailable message with no stale/partial PHI.
  *
@@ -19,7 +19,7 @@ import { useAppHost } from '../app-host';
  */
 export interface HomeScreenProps {
   /** Navigate to a subsystem by name. */
-  onNavigate: (subsystem: 'polypharmacy' | 'journal' | 'insights') => void;
+  onNavigate: (subsystem: 'medications' | 'journal' | 'insights') => void;
   /** Navigate to the sign-in screen after sign-out completes. */
   onSignedOut: () => void;
 }
@@ -106,12 +106,12 @@ export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.
       <View style={styles.navContainer}>
         <Pressable
           style={styles.navButton}
-          onPress={() => onNavigate('polypharmacy')}
+          onPress={() => onNavigate('medications')}
           accessibilityRole="button"
-          accessibilityLabel="Polypharmacy"
-          testID="home-nav-polypharmacy"
+          accessibilityLabel="Medications"
+          testID="home-nav-medications"
         >
-          <Text style={styles.navButtonText}>Polypharmacy</Text>
+          <Text style={styles.navButtonText}>Medications</Text>
           <Text style={styles.navButtonSubtext}>Manage medications &amp; PRN logs</Text>
         </Pressable>
 

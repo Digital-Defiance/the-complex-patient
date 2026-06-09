@@ -1141,6 +1141,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@complex-patient/medications@npm:*, @complex-patient/medications@workspace:*, @complex-patient/medications@workspace:packages/medications":
+  version: 0.0.0-use.local
+  resolution: "@complex-patient/medications@workspace:packages/medications"
+  dependencies:
+    "@complex-patient/crypto-engine": "workspace:*"
+    "@complex-patient/domain": "workspace:*"
+    "@complex-patient/local-vault": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
 "@complex-patient/mobile@workspace:apps/mobile":
   version: 0.0.0-use.local
   resolution: "@complex-patient/mobile@workspace:apps/mobile"
@@ -1150,22 +1160,12 @@ __metadata:
     "@complex-patient/insights": "npm:*"
     "@complex-patient/key-store": "npm:*"
     "@complex-patient/local-vault": "npm:*"
-    "@complex-patient/polypharmacy": "npm:*"
+    "@complex-patient/medications": "npm:*"
     "@complex-patient/sync-engine": "npm:*"
     "@complex-patient/ui": "npm:*"
     expo-local-authentication: "npm:17.0.8"
     expo-notifications: "npm:0.32.17"
     expo-secure-store: "npm:15.0.8"
-  languageName: unknown
-  linkType: soft
-
-"@complex-patient/polypharmacy@npm:*, @complex-patient/polypharmacy@workspace:*, @complex-patient/polypharmacy@workspace:packages/polypharmacy":
-  version: 0.0.0-use.local
-  resolution: "@complex-patient/polypharmacy@workspace:packages/polypharmacy"
-  dependencies:
-    "@complex-patient/crypto-engine": "workspace:*"
-    "@complex-patient/domain": "workspace:*"
-    "@complex-patient/local-vault": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -1196,7 +1196,7 @@ __metadata:
     "@complex-patient/insights": "workspace:*"
     "@complex-patient/key-store": "workspace:*"
     "@complex-patient/local-vault": "workspace:*"
-    "@complex-patient/polypharmacy": "workspace:*"
+    "@complex-patient/medications": "workspace:*"
     "@complex-patient/symptom-journal": "workspace:*"
     "@complex-patient/sync-engine": "workspace:*"
     "@types/react": "npm:~19.2.14"
@@ -1214,7 +1214,7 @@ __metadata:
     "@complex-patient/insights": "npm:*"
     "@complex-patient/key-store": "npm:*"
     "@complex-patient/local-vault": "npm:*"
-    "@complex-patient/polypharmacy": "npm:*"
+    "@complex-patient/medications": "npm:*"
     "@complex-patient/sync-engine": "npm:*"
     "@complex-patient/ui": "npm:*"
   languageName: unknown

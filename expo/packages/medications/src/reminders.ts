@@ -1,5 +1,5 @@
 /**
- * @complex-patient/polypharmacy — Medication reminders and dashboard indicators
+ * @complex-patient/medications — Medication reminders and dashboard indicators
  *
  * Implements the reminder dispatch flow that runs when a scheduled medication
  * time is reached (Requirement 12). The flow is parameterized by the platform

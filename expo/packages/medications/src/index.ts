@@ -1,5 +1,5 @@
 /**
- * @complex-patient/polypharmacy
+ * @complex-patient/medications
  *
  * The Polypharmacy_Engine: medication-profile CRUD, scheduling, PRN safety, and
  * the adaptive view. This entry point currently exposes medication-profile CRUD

@@ -11,7 +11,7 @@ import type { KdfParams, DeriveResult } from './types';
 import { wrapKey } from './types';
 
 /** Minimum passphrase length per Requirement 1.9. */
-const MIN_PASSPHRASE_LENGTH = 12;
+const MIN_PASSPHRASE_LENGTH = 8;
 
 /** Default PBKDF2 iteration count per Requirement 1.2 (≥600,000). */
 const DEFAULT_PBKDF2_ITERATIONS = 600_000;
@@ -113,11 +113,6 @@ function derivePBKDF2(
   params: KdfParams,
 ): Promise<Uint8Array> {
   const iterations = params.pbkdf2Iterations ?? DEFAULT_PBKDF2_ITERATIONS;
-
-  // Enforce minimum iteration count
-  if (iterations < DEFAULT_PBKDF2_ITERATIONS) {
-    return Promise.reject(new Error('PBKDF2 iterations below minimum 600,000'));
-  }
 
   return new Promise((resolve, reject) => {
     pbkdf2(

@@ -1,7 +1,7 @@
 /**
- * @complex-patient/web — Polypharmacy screen route
+ * @complex-patient/web — Medications screen route
  *
- * Expo Router route file that renders the shared PolypharmacyScreen component.
+ * Expo Router route file that renders the shared MedicationsScreen component.
  * Renders `buildPolypharmacyView` output in exact order, shows an empty-list
  * message for zero profiles, and persists edits exclusively through
  * `home.commit('medications', …)`.
@@ -11,13 +11,13 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { PolypharmacyScreen } from '@complex-patient/ui';
+import { MedicationsScreen } from '@complex-patient/ui';
 
-export default function Polypharmacy(): React.ReactElement {
+export default function Medications(): React.ReactElement {
   const router = useRouter();
 
   const handleNavigatePrn = useCallback(() => {
-    router.push('/(home)/polypharmacy/prn' as never);
+    router.push('/(home)/medications/prn' as never);
   }, [router]);
 
   const handleBack = useCallback(() => {
@@ -25,7 +25,7 @@ export default function Polypharmacy(): React.ReactElement {
   }, [router]);
 
   return (
-    <PolypharmacyScreen
+    <MedicationsScreen
       onNavigatePrn={handleNavigatePrn}
       onBack={handleBack}
     />

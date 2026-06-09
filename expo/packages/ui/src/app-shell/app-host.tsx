@@ -46,6 +46,8 @@ export interface AppHost {
   submitAge(input: { birthMonth: number; birthYear: number }): Promise<void>;
   /** Build the Home_Controller after eligibility; wraps secure-context + failure handling. */
   enterHome(): Promise<void>;
+  /** Force a re-read of the home controller status into navState. */
+  refreshHomeStatus(): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,16 +146,11 @@ export function AppHostProvider({ factory, children }: AppHostProviderProps): Re
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Subscribe to home controller status changes when it exists.
+  // Set the initial home status when home controller is created.
+  // Status updates are driven by explicit calls to refreshHomeStatus().
   useEffect(() => {
     if (!home) return;
-    // Poll the status initially and subscribe through the coordinator.
-    const syncSub = home.coordinator.syncStatus.subscribe(() => {
-      setNavState((prev) => ({ ...prev, home: home.getStatus() }));
-    });
-    // Also set the initial home status.
     setNavState((prev) => ({ ...prev, home: home.getStatus() }));
-    return () => { syncSub(); };
   }, [home]);
 
   // submitAge: route input through onboarding controller, update nav state.
@@ -176,17 +173,32 @@ export function AppHostProvider({ factory, children }: AppHostProviderProps): Re
       setHome(controller);
       setNavState((prev) => ({ ...prev, home: controller.getStatus() }));
     } catch (err: unknown) {
+      console.error('[AppHost] enterHome failed:', err);
       // Distinguish SecureContextRequiredError from other failures.
       if (err && typeof err === 'object' && 'name' in err && (err as { name: string }).name === 'SecureContextRequiredError') {
         setNavState((prev) => ({ ...prev, secureContextBlocked: true }));
       } else {
-        setNavState((prev) => ({ ...prev, compositionFailed: true }));
+        const msg = err instanceof Error ? err.message : String(err);
+        setNavState((prev) => ({ ...prev, compositionFailed: true, _errorMessage: msg }));
       }
     }
   }, [app]);
 
   // Compute the current route from the nav state.
   const route = resolveRoute(navState);
+
+  // refreshHomeStatus: force a re-read of the home controller status into navState.
+  // Needed after operations like signIn() that change status without emitting a
+  // store notification.
+  const refreshHomeStatus = useCallback(() => {
+    if (home) {
+      const status = home.getStatus();
+      console.log('[AppHost] refreshHomeStatus called, home.getStatus():', status);
+      setNavState((prev) => ({ ...prev, home: status }));
+    } else {
+      console.log('[AppHost] refreshHomeStatus called but home is null');
+    }
+  }, [home]);
 
   const value: AppHost = {
     onboarding: app.onboarding,
@@ -196,6 +208,7 @@ export function AppHostProvider({ factory, children }: AppHostProviderProps): Re
     startFailed,
     submitAge,
     enterHome,
+    refreshHomeStatus,
   };
 
   return (

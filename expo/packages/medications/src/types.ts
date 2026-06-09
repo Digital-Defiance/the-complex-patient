@@ -1,5 +1,5 @@
 /**
- * @complex-patient/polypharmacy — Type definitions
+ * @complex-patient/medications — Type definitions
  *
  * Dependency-injection seams and result types for the Polypharmacy_Engine
  * medication-profile CRUD layer (Requirements 10.1–10.6, 11.5).

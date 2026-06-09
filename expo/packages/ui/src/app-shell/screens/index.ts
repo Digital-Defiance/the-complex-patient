@@ -37,5 +37,5 @@ export { InsightsScreen, type InsightsScreenProps } from './InsightsScreen';
 export { PhysicianReportScreen, type PhysicianReportScreenProps } from './PhysicianReportScreen';
 export { SymptomJournalLogScreen, type SymptomJournalLogScreenProps } from './SymptomJournalLogScreen';
 export { FlareScreen, type FlareScreenProps } from './FlareScreen';
-export { PolypharmacyScreen, type PolypharmacyScreenProps } from './PolypharmacyScreen';
+export { MedicationsScreen, type MedicationsScreenProps } from './MedicationsScreen';
 export { PrnQuickLogScreen, type PrnQuickLogScreenProps } from './PrnQuickLogScreen';

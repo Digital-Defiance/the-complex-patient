@@ -1,5 +1,5 @@
 /**
- * @complex-patient/polypharmacy — Medication profile CRUD engine
+ * @complex-patient/medications — Medication profile CRUD engine
  *
  * Implements medication profile create/edit against the Local_Vault for the
  * Polypharmacy_Engine (Requirements 10.1–10.6, 11.5).
