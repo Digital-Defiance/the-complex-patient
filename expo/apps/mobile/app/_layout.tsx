@@ -32,7 +32,7 @@ import { createMobileApp } from '../src/entry';
  * environment / Expo Constants config. For the shell composition this is the
  * well-known origin the platform backend is deployed to.
  */
-const SYNC_BACKEND_BASE_URL = 'https://the-complex-patient.local';
+const SYNC_BACKEND_BASE_URL = 'https://thecomplexpatient.com';
 
 /**
  * In-memory SecureStore adapter for Expo Go (no native module available).

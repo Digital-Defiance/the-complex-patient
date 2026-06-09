@@ -20,7 +20,9 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "build:web": "EXPO_ROUTER_APP_ROOT=./apps/web/app npx expo export --platform web --output-dir dist/web",
+    "start:web": "EXPO_ROUTER_APP_ROOT=./apps/web/app npx expo start --web"
   },
   "devDependencies": {
     "@fast-check/vitest": "^0.1.3",
