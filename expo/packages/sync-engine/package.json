@@ -1,0 +1,17 @@
+{
+  "name": "@complex-patient/sync-engine",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Sync_Worker, offline queue, three-way merge",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@complex-patient/crypto-engine": "workspace:*",
+    "@complex-patient/domain": "workspace:*",
+    "@complex-patient/local-vault": "workspace:*"
+  }
+}

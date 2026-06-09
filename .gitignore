@@ -1,0 +1,61 @@
+# Dependencies
+**/node_modules/
+wp/complex-patient/vendor/
+
+# Yarn Berry (node-modules linker)
+expo/.yarn/cache/
+expo/.yarn/unplugged/
+expo/.yarn/install-state.gz
+# Keep .yarnrc.yml and .yarn/releases/ (if used) tracked
+
+# Expo
+expo/.expo/
+expo/dist/
+expo/web-build/
+
+# Metro
+/tmp/metro-*
+
+# Build artifacts
+expo/**/dist/
+expo/ios/
+expo/android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+*.pem
+
+# Testing
+expo/.yarn/__virtual__/
+wp/complex-patient/.phpunit.cache/
+coverage/
+
+# Kiro / internal tooling
+.cecli/
+
+# Debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+expo/_verify_metro.cjs
+
+# TypeScript
+*.tsbuildinfo

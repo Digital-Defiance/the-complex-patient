@@ -1,0 +1,12 @@
+{
+  "name": "@complex-patient/crypto-engine",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Isomorphic crypto: KDF, AES-256-GCM, runtime detection",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc"
+  }
+}

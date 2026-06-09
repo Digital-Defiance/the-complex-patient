@@ -1,0 +1,12 @@
+{
+  "name": "@complex-patient/domain",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Logical data models + validation (meds, symptoms, conditions, flares)",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc"
+  }
+}
