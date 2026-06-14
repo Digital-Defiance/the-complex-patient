@@ -31,10 +31,10 @@ import type { FieldError } from '@complex-patient/symptom-journal';
 
 /** Generate an arbitrary FieldError with a realistic field name and message. */
 const fieldErrorArb: fc.Arbitrary<FieldError> = fc.record({
-  field: fc.stringOf(fc.constantFrom(
+  field: fc.constantFrom(
     'symptomType', 'systemicLocation', 'severity', 'duration', 'duration.value',
     'duration.unit', 'notes', 'symptomIds', 'trigger', 'conditionIds', 'medicationIds',
-  ), { minLength: 1, maxLength: 1 }).map((s) => s),
+  ),
   message: fc.string({ minLength: 1, maxLength: 200 }),
 });
 
@@ -75,10 +75,7 @@ interface FormValues {
 const formValuesArb: fc.Arbitrary<FormValues> = fc.record({
   symptomType: fc.string({ minLength: 1, maxLength: 50 }),
   systemicLocation: fc.string({ minLength: 1, maxLength: 50 }),
-  severity: fc.stringOf(fc.constantFrom('1', '2', '3', '4', '5', '6', '7', '8', '9', '10'), {
-    minLength: 1,
-    maxLength: 1,
-  }).map((s) => s),
+  severity: fc.constantFrom('1', '2', '3', '4', '5', '6', '7', '8', '9', '10'),
   notes: fc.string({ minLength: 0, maxLength: 100 }),
 });
 

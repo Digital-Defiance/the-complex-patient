@@ -1,6 +1,21 @@
 # Deploying the Web App alongside WordPress
 
-The web app is the same client as the mobile app, rendered in a browser via React Native Web. It decrypts your vault data client-side using your passphrase — the server never sees plaintext.
+The web app is the same client as the mobile app, rendered in a browser via React Native Web. It decrypts vault data client-side using your passphrase — the server never sees plaintext.
+
+## Production layout
+
+| Surface | URL |
+|---------|-----|
+| WordPress site + sync API | `https://thecomplexpatient.com` |
+| Web app (static bundle) | `https://thecomplexpatient.com/secure` |
+
+The web client and WordPress share one domain. The app lives under `/secure`; sync calls go to the WordPress REST API at the site root:
+
+```
+https://thecomplexpatient.com/wp-json/complex-patient/v1/vault/{vault_type}
+```
+
+The Expo web build is configured with `baseUrl: /secure` in `expo/app.json` so assets and client-side routing resolve correctly under that path.
 
 ## Build
 
@@ -11,63 +26,64 @@ yarn build:web
 
 This creates `dist/web/` with static HTML/JS/CSS files.
 
-## Deploy to WordPress Server
+## Deploy to the WordPress host
 
-Upload the `dist/web/` contents to a subdirectory on your WordPress host:
+Upload the `dist/web/` contents to the `/secure/` directory on your WordPress server:
 
 ```bash
-# Example: deploy to yoursite.com/app/
-scp -r dist/web/* user@yourserver:/var/www/html/app/
+scp -r dist/web/* user@yourserver:/var/www/html/secure/
 ```
 
-Or use a subdomain like `app.thecomplexpatient.com` pointing to the same directory.
+Adjust the remote path to match your host's document root.
 
 ### WordPress .htaccess (Apache)
 
-If using Apache, add this to the `/app/` directory's `.htaccess` for client-side routing:
+Add or merge this into the `/secure/` directory's `.htaccess` for client-side routing:
 
 ```apache
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /app/
+  RewriteBase /secure/
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /app/index.html [L]
+  RewriteRule . /secure/index.html [L]
 </IfModule>
 ```
 
 ### Nginx config
 
 ```nginx
-location /app/ {
-  try_files $uri $uri/ /app/index.html;
+location /secure/ {
+  try_files $uri $uri/ /secure/index.html;
 }
 ```
 
 ## Configuration
 
-Before building, update the `SYNC_BACKEND_BASE_URL` in `apps/web/app/_layout.tsx` to point to your WordPress site's REST API:
+`SYNC_BACKEND_BASE_URL` in `apps/web/app/_layout.tsx` and `apps/mobile/app/_layout.tsx` must point at the **WordPress site root**, not the `/secure` app path:
 
 ```typescript
-const SYNC_BACKEND_BASE_URL = 'https://yoursite.com';
+const SYNC_BACKEND_BASE_URL = 'https://thecomplexpatient.com';
 ```
 
-The web app calls `https://yoursite.com/wp-json/complex-patient/v1/vault/{partition}` for sync.
+The web app calls `https://thecomplexpatient.com/wp-json/complex-patient/v1/vault/{partition}` for sync.
 
-## HTTPS Required
+For local development, point this at your local WordPress URL instead.
 
-The web app MUST be served over HTTPS (or localhost for dev). Client-side decryption uses `window.crypto.subtle` which browsers only expose in secure contexts.
+## HTTPS required
+
+The web app must be served over HTTPS (or localhost for dev). Client-side decryption uses `window.crypto.subtle`, which browsers only expose in secure contexts.
 
 ## How it works
 
-1. User visits `https://yoursite.com/app/`
+1. User visits `https://thecomplexpatient.com/secure`
 2. Static JS bundle loads in their browser
-3. User enters WordPress credentials → authenticates via Application Password
+3. User enters WordPress credentials → authenticates via Application Password or JWT
 4. User enters their passphrase → browser derives KEK via PBKDF2
-5. Browser fetches encrypted blobs from `/wp-json/complex-patient/v1/vault/*`
+5. Browser fetches encrypted blobs from `/wp-json/complex-patient/v1/vault/*` on the same origin
 6. Browser decrypts blobs locally using AES-256-GCM with the derived KEK
 7. Medications, symptoms, insights render in the browser
-8. All writes encrypt locally then sync the ciphertext blob back to WordPress
+8. All writes encrypt locally, then sync the ciphertext blob back to WordPress
 
 The WordPress server never has the passphrase, KEK, or plaintext data.

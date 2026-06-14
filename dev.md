@@ -38,9 +38,9 @@ Enter a name (e.g. "Complex Patient App") and click "Add New"
 Copy the generated password
 Update the app's backend URL:
 
-# In apps/mobile/app/_layout.tsx, change:
-const SYNC_BACKEND_BASE_URL = 'https://api.thecomplexpatient.com';
-# To your local WordPress URL:
+# In apps/mobile/app/_layout.tsx and apps/web/app/_layout.tsx:
+const SYNC_BACKEND_BASE_URL = 'https://thecomplexpatient.com';
+# For local WordPress:
 const SYNC_BACKEND_BASE_URL = 'http://your-local-wp.local';
 Sign in with your WordPress username + the application password from step 5.
 

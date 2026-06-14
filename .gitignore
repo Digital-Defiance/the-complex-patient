@@ -59,3 +59,10 @@ expo/_verify_metro.cjs
 
 # TypeScript
 *.tsbuildinfo
+
+# Jekyll / GitHub Pages
+docs/_site/
+docs/.jekyll-cache/
+docs/.sass-cache/
+docs/vendor/
+docs/Gemfile.lock

@@ -1,0 +1,30 @@
+title: The Complex Patient
+description: >-
+  Zero-knowledge, end-to-end encrypted health platform for complex and rare
+  disease patients — offline-first client with a blind WordPress sync backend.
+url: https://source.thecomplexpatient.com
+baseurl: ""
+lang: en
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+  syntax_highlighter: rouge
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+
+plugins:
+  - jekyll-seo-tag
+  - jekyll-github-metadata
+
+repository: Digital-Defiance/the-complex-patient
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default

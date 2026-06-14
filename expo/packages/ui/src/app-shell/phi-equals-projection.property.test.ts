@@ -25,8 +25,8 @@ import type { SyncStatusState, PartitionSyncStatus } from '../store/offline-sync
 /** Generate an arbitrary VaultRecord-shaped object. */
 const vaultRecordArb: fc.Arbitrary<VaultRecord> = fc.record({
   id: fc.uuid(),
-  op_timestamp: fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') })
-    .map((d) => d.toISOString()),
+  op_timestamp: fc.integer({ min: 1577836800000, max: 1924905600000 })
+    .map((ts) => new Date(ts).toISOString()),
   deleted: fc.option(fc.boolean(), { nil: undefined }),
 });
 

@@ -98,7 +98,7 @@ export async function submitPassphrase(
 
   // Load existing KDF material or generate new (first vault creation)
   const material = (await deps.loadKdfMaterial())
-    ?? { salt: await generateSalt(), params: { algorithm: 'PBKDF2' as const, pbkdf2Iterations: 10_000 } };
+    ?? { salt: await generateSalt(), params: { algorithm: 'PBKDF2' as const, pbkdf2Iterations: 600_000 } };
 
   // Derive KEK through the Crypto_Engine (on-device only)
   const derived = await deriveKEK(passphrase, material.salt, material.params);

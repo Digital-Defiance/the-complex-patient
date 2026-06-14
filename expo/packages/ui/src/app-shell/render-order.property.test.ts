@@ -115,8 +115,8 @@ const CONDITION_ID = 'cond-test';
 
 /** ISO timestamp arbitrary. */
 const timestampArb: fc.Arbitrary<string> = fc
-  .date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') })
-  .map((d) => d.toISOString());
+  .integer({ min: 1577836800000, max: 1924905600000 })
+  .map((ts) => new Date(ts).toISOString());
 
 /** Generate a SymptomEntry. */
 const symptomEntryArb: fc.Arbitrary<SymptomEntry> = fc.record({

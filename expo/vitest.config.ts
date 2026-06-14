@@ -9,5 +9,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
     },
+    server: {
+      deps: {
+        inline: ['react-native', '@react-navigation', 'react-native-gesture-handler', 'react-native-reanimated', 'react-native-screens', 'react-native-safe-area-context'],
+      },
+    },
+    alias: {
+      'react-native': new URL('./packages/ui/src/__mocks__/react-native.ts', import.meta.url).pathname,
+    },
   },
 });
