@@ -63,7 +63,8 @@ const vaultTypeArb: fc.Arbitrary<VaultType> = fc.constantFrom(
 /** Generate an arbitrary TestRecord with a unique id and value. */
 const testRecordArb: fc.Arbitrary<TestRecord> = fc.record({
   id: fc.uuid(),
-  op_timestamp: fc.date().map((d) => d.toISOString()),
+  op_timestamp: fc.integer({ min: 1577836800000, max: 1924905600000 })
+    .map((ts) => new Date(ts).toISOString()),
   value: fc.string({ minLength: 1, maxLength: 50 }),
 });
 

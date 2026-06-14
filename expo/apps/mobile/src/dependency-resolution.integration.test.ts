@@ -7,7 +7,7 @@
  * - Requirements 2.6, 2.7: app.json required fields and schema validation
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { resolve, join } from 'path';
 import { execSync } from 'child_process';
 
@@ -16,7 +16,6 @@ const WORKSPACE_ROOT = resolve(__dirname, '../../..');
 const ROOT_PKG_PATH = join(WORKSPACE_ROOT, 'package.json');
 const MOBILE_PKG_PATH = join(WORKSPACE_ROOT, 'apps/mobile/package.json');
 const APP_JSON_PATH = join(WORKSPACE_ROOT, 'app.json');
-const PNP_CJS_PATH = join(WORKSPACE_ROOT, '.pnp.cjs');
 const YARNRC_PATH = join(WORKSPACE_ROOT, '.yarnrc.yml');
 const NODE_MODULES_PATH = join(WORKSPACE_ROOT, 'node_modules');
 
@@ -70,28 +69,14 @@ describe('Dependency Resolution (Requirements 1.1, 1.2, 1.6)', () => {
     }
   });
 
-  describe('Yarn PnP is preserved (1.6)', () => {
-    it('.pnp.cjs exists at workspace root', () => {
-      expect(existsSync(PNP_CJS_PATH)).toBe(true);
-    });
-
-    it('.yarnrc.yml declares nodeLinker: pnp', () => {
+  describe('Yarn node-modules linker is configured (1.6)', () => {
+    it('.yarnrc.yml declares nodeLinker: node-modules', () => {
       const yarnrc = readFileSync(YARNRC_PATH, 'utf-8');
-      expect(yarnrc).toMatch(/nodeLinker:\s*pnp/);
+      expect(yarnrc).toMatch(/nodeLinker:\s*node-modules/);
     });
 
-    it('no package directories exist in root node_modules (PnP resolution only)', () => {
-      if (!existsSync(NODE_MODULES_PATH)) {
-        // No node_modules at all — perfect for PnP
-        return;
-      }
-      // If node_modules exists, it should only contain dotfiles (e.g. .vite cache)
-      const entries = readdirSync(NODE_MODULES_PATH);
-      const packageDirs = entries.filter((e) => !e.startsWith('.'));
-      expect(
-        packageDirs,
-        `root node_modules should have no package directories, found: ${packageDirs.join(', ')}`,
-      ).toEqual([]);
+    it('node_modules directory exists at workspace root', () => {
+      expect(existsSync(NODE_MODULES_PATH)).toBe(true);
     });
   });
 });
@@ -130,7 +115,10 @@ describe('app.json Schema Load (Requirements 2.6, 2.7)', () => {
 
     it('declares expo-router as a plugin', () => {
       expect(expoConfig.plugins).toBeDefined();
-      expect(expoConfig.plugins).toContain('expo-router');
+      const hasExpoRouter = expoConfig.plugins.some(
+        (p: string | [string, unknown]) => (Array.isArray(p) ? p[0] : p) === 'expo-router',
+      );
+      expect(hasExpoRouter).toBe(true);
     });
   });
 
