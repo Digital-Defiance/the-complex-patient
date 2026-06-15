@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Easy Links for Font Awesome
  * Plugin URI:  https://github.com/Digital-Defiance/the-complex-patient/tree/main/plugins/easy-links-fa
- * Description: A Gutenberg block that wraps a Font Awesome Icon in a link. Place the native Font Awesome Icon block inside and configure the link — all original icon options preserved.
+ * Description: Makes Font Awesome icons linkable and lets you manage the link in one place—especially useful where the editor only allows a single block and a standalone FA icon cannot be linked.
  * Version:     1.0.0
  * Author:      Digital Defiance
  * License:     GPL-2.0-or-later
