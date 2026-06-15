@@ -1,0 +1,23 @@
+/* Editor styles for Easy Links for Font Awesome */
+.wp-block-easy-links-fa {
+	position: relative;
+}
+
+.wp-block-easy-links-fa .easy-links-fa__inner {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.wp-block-easy-links-fa::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border: 1px dashed rgba(0, 124, 186, 0.4);
+	border-radius: 4px;
+	pointer-events: none;
+}
+
+.wp-block-easy-links-fa:hover::after {
+	border-color: rgba(0, 124, 186, 0.8);
+}
