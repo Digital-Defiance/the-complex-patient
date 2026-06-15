@@ -8,11 +8,15 @@ Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A Gutenberg block that wraps a Font Awesome Icon in a configurable link.
+A Gutenberg block that makes Font Awesome icons linkable and lets you manage the link in one place—especially useful where the editor only allows one block.
 
 == Description ==
 
-Easy Links for Font Awesome provides a block editor block that places the native Font Awesome Icon block inside a link wrapper. You get all the original icon options (picker, styling, animations, color, size) plus full link controls:
+Easy Links for Font Awesome provides a block editor block that places the native Font Awesome Icon block inside a link wrapper.
+
+This plugin was built for editor areas that only let you add a single block. If you insert a Font Awesome Icon block on its own in those spots, you often cannot make that icon a link. Easy Links for Font Awesome solves that by combining the icon and link into one block you can drop in directly, with all link settings managed in one place.
+
+You get all the original icon options (picker, styling, animations, color, size) plus full link controls:
 
 * URL with WordPress link search
 * Open in new tab
@@ -32,6 +36,10 @@ This plugin is not affiliated with or endorsed by Font Awesome.
 4. In the block editor, search for "Easy Links for Font Awesome" to insert the block.
 
 == Frequently Asked Questions ==
+
+= Why would I need this? =
+
+Some parts of the block editor only accept one block. In those places, adding a Font Awesome Icon block by itself usually does not give you a way to link it. This block wraps the native Font Awesome Icon block in link controls so you can add a linked icon and manage the link in one place.
 
 = How do I access all the settings? =
 

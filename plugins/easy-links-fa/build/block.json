@@ -6,7 +6,7 @@
   "title": "Easy Links for Font Awesome",
   "category": "design",
   "icon": "admin-links",
-  "description": "A Font Awesome icon wrapped in a link. Insert the native Font Awesome Icon block inside and configure the link.",
+  "description": "A linkable Font Awesome icon in one block—add the icon and manage the link in one place. Useful where the editor only allows one block and a standalone icon cannot be linked.",
   "keywords": [
     "icon",
     "link",
