@@ -1,0 +1,95 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "easy-links-fa/linked-icon",
+  "version": "1.0.0",
+  "title": "Easy Links for Font Awesome",
+  "category": "design",
+  "icon": "admin-links",
+  "description": "A Font Awesome icon wrapped in a link. Insert the native Font Awesome Icon block inside and configure the link.",
+  "keywords": [
+    "icon",
+    "link",
+    "font awesome",
+    "button"
+  ],
+  "attributes": {
+    "linkUrl": {
+      "type": "string",
+      "default": ""
+    },
+    "linkTarget": {
+      "type": "string",
+      "default": "_self"
+    },
+    "linkRel": {
+      "type": "string",
+      "default": ""
+    },
+    "linkTitle": {
+      "type": "string",
+      "default": ""
+    },
+    "linkAriaLabel": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "supports": {
+    "anchor": true,
+    "align": [
+      "left",
+      "center",
+      "right"
+    ],
+    "color": {
+      "text": true,
+      "background": true,
+      "gradients": true,
+      "__experimentalDefaultControls": {
+        "background": true,
+        "text": true
+      }
+    },
+    "typography": {
+      "fontSize": true,
+      "lineHeight": true,
+      "__experimentalFontFamily": true,
+      "__experimentalFontWeight": true,
+      "__experimentalFontStyle": true,
+      "__experimentalTextTransform": true,
+      "__experimentalTextDecoration": true,
+      "__experimentalLetterSpacing": true,
+      "__experimentalDefaultControls": {
+        "fontSize": true
+      }
+    },
+    "__experimentalBorder": {
+      "color": true,
+      "radius": true,
+      "style": true,
+      "width": true,
+      "__experimentalDefaultControls": {
+        "color": true,
+        "radius": true,
+        "style": true,
+        "width": true
+      }
+    },
+    "shadow": true,
+    "spacing": {
+      "margin": true,
+      "padding": true,
+      "__experimentalDefaultControls": {
+        "padding": true
+      }
+    },
+    "html": false,
+    "customClassName": true
+  },
+  "textdomain": "easy-links-fa",
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style.css",
+  "render": "file:./render.php"
+}
