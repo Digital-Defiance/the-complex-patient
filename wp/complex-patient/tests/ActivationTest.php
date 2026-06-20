@@ -75,21 +75,37 @@ final class ActivationTest extends TestCase
 
         // dbDelta requires two spaces between PRIMARY KEY and the definition.
         $this->assertStringContainsString('PRIMARY KEY  (id)', $sql);
+        // Field types must be lowercase for dbDelta.
+        $this->assertStringContainsString('bigint(20) unsigned', $sql);
+        $this->assertStringNotContainsString('BIGINT(20)', $sql);
         // Must be a CREATE TABLE statement (dbDelta create-if-absent, Req 9.1).
         $this->assertStringStartsWith('CREATE TABLE wp_complex_patient_vault', $sql);
+    }
+
+    public function testEnsureSchemaCreatesMissingTablesWithoutHalting(): void
+    {
+        $wpdb = new FakeWpdb();
+        $wpdb->dbDeltaCreatesTables = false;
+        $wpdb->directQueryCreatesTables = true;
+        $GLOBALS['wpdb'] = $wpdb;
+
+        Activation::ensureSchema();
+
+        $this->assertCount(2, $wpdb->dbDeltaCalls);
+        $this->assertSame([], $wpdb->droppedTables);
     }
 
     public function testActivateSucceedsWhenTableIsCreated(): void
     {
         $wpdb = new FakeWpdb();
-        $wpdb->tableExistsAfterDbDelta = true;
         $GLOBALS['wpdb'] = $wpdb;
 
         Activation::activate();
 
-        // Requirement 9.1: dbDelta is invoked to create the table.
-        $this->assertNotEmpty($wpdb->dbDeltaCalls);
+        // Requirement 9.1: dbDelta is invoked to create the vault and KDF tables.
+        $this->assertCount(2, $wpdb->dbDeltaCalls);
         $this->assertStringContainsString('wp_complex_patient_vault', $wpdb->dbDeltaCalls[0]);
+        $this->assertStringContainsString('wp_complex_patient_kdf', $wpdb->dbDeltaCalls[1]);
         // No partial-table cleanup needed on success.
         $this->assertSame([], $wpdb->droppedTables);
     }
@@ -97,7 +113,8 @@ final class ActivationTest extends TestCase
     public function testActivateHaltsAndDropsPartialTableOnFailure(): void
     {
         $wpdb = new FakeWpdb();
-        $wpdb->tableExistsAfterDbDelta = false; // simulate creation failure
+        $wpdb->dbDeltaCreatesTables = false;
+        $wpdb->directQueryCreatesTables = false;
         $wpdb->last_error = 'disk full';
         $GLOBALS['wpdb'] = $wpdb;
 
@@ -106,7 +123,7 @@ final class ActivationTest extends TestCase
             Activation::activate();
             $this->fail('Expected activation to halt with an exception.');
         } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('failed to create the vault table', $e->getMessage());
+            $this->assertStringContainsString('failed to create the table', $e->getMessage());
             $this->assertStringContainsString('disk full', $e->getMessage());
         }
 

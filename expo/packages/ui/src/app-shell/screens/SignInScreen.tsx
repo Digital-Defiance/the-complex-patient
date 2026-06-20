@@ -12,8 +12,8 @@
  * Requirements: 7.1, 8.2
  */
 
-import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAppHost } from '../app-host';
 import type { WordPressAuth } from '../../app';
 
@@ -23,19 +23,21 @@ export function SignInScreen(): React.ReactElement {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSignIn = () => {
+  const handleSignIn = useCallback(async () => {
     if (!home) return;
 
     const trimmedUsername = username.trim();
     const trimmedPassword = password.trim();
 
     if (!trimmedUsername || !trimmedPassword) {
-      setError('Please enter your username and password.');
+      setError('Please enter your username and application password.');
       return;
     }
 
     setError(null);
+    setLoading(true);
 
     const auth: WordPressAuth = {
       kind: 'application-password',
@@ -43,9 +45,23 @@ export function SignInScreen(): React.ReactElement {
       applicationPassword: trimmedPassword,
     };
 
-    home.signIn(auth);
-    refreshHomeStatus();
-  };
+    try {
+      const result = await home.signIn(auth);
+      if (!result.ok) {
+        if (result.reason === 'INVALID_CREDENTIALS') {
+          setError(
+            'WordPress rejected those credentials. Use an Application Password from your WordPress user profile — not your regular login password.',
+          );
+        } else {
+          setError('Could not reach the sync server. Check your network and backend URL.');
+        }
+        return;
+      }
+      refreshHomeStatus();
+    } finally {
+      setLoading(false);
+    }
+  }, [home, username, password, refreshHomeStatus]);
 
   return (
     <View
@@ -55,7 +71,7 @@ export function SignInScreen(): React.ReactElement {
     >
       <Text style={styles.title}>Sign In</Text>
       <Text style={styles.subtitle}>
-        Enter your credentials to access your vault.
+        Sign in with your WordPress username and an Application Password (Users → Profile → Application Passwords).
       </Text>
 
       {error && (
@@ -88,13 +104,20 @@ export function SignInScreen(): React.ReactElement {
       />
 
       <Pressable
-        style={styles.button}
-        onPress={handleSignIn}
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={() => {
+          void handleSignIn();
+        }}
+        disabled={loading}
         accessibilityRole="button"
         accessibilityLabel="Sign in"
         testID="sign-in-submit"
       >
-        <Text style={styles.buttonText}>Sign In</Text>
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Sign In</Text>
+        )}
       </Pressable>
     </View>
   );
@@ -148,6 +171,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
     color: '#fff',

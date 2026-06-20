@@ -44,7 +44,26 @@ if ( file_exists( $complex_patient_autoloader ) ) {
 }
 
 // Register the activation hook that creates the vault storage schema.
-register_activation_hook( __FILE__, array( '\\ComplexPatient\\Activation', 'activate' ) );
+require_once COMPLEX_PATIENT_PLUGIN_DIR . 'src/Activation.php';
+
+/**
+ * Plugin activation callback (named function — more reliable than a static
+ * class callback in some WordPress / Studio environments).
+ */
+function complex_patient_activate(): void {
+    \ComplexPatient\Activation::activate();
+}
+
+register_activation_hook( __FILE__, 'complex_patient_activate' );
+
+// Ensure tables exist on every load (covers failed activations and new tables).
+add_action(
+    'plugins_loaded',
+    static function () {
+        \ComplexPatient\Activation::ensureSchema();
+    },
+    5
+);
 
 // Register the blind-sync REST endpoints on rest_api_init (Requirement 6.5).
 // The controller wires the wpdb-backed repository to the auth middleware so
@@ -54,11 +73,18 @@ add_action(
     static function () {
         global $wpdb;
 
-        $controller = new \ComplexPatient\Rest\VaultController(
-            new \ComplexPatient\VaultRepository( $wpdb ),
-            new \ComplexPatient\Auth\AuthMiddleware()
-        );
+        $auth = new \ComplexPatient\Auth\AuthMiddleware();
 
-        $controller->registerRoutes();
+        $vaultController = new \ComplexPatient\Rest\VaultController(
+            new \ComplexPatient\VaultRepository( $wpdb ),
+            $auth
+        );
+        $vaultController->registerRoutes();
+
+        $kdfController = new \ComplexPatient\Rest\KdfMaterialController(
+            new \ComplexPatient\KdfMaterialRepository( $wpdb ),
+            $auth
+        );
+        $kdfController->registerRoutes();
     }
 );

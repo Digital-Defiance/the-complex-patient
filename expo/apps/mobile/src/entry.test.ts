@@ -62,7 +62,7 @@ describe('createMobileHome', () => {
     const controller = await buildController();
     expect(controller.getStatus()).toBe('signed-out');
 
-    controller.signIn({ kind: 'application-password', username: 'u', applicationPassword: 'p' });
+    await controller.signIn({ kind: 'application-password', username: 'u', applicationPassword: 'p' });
     expect(controller.getStatus()).toBe('locked');
 
     const result = await controller.unlockWithKek(KEY);
@@ -71,7 +71,7 @@ describe('createMobileHome', () => {
 
   it('supports offline-first CRUD identically to web (22.2)', async () => {
     const controller = await buildController();
-    controller.signIn({ kind: 'jwt', token: 'jwt' });
+    await controller.signIn({ kind: 'jwt', token: 'jwt' });
     await controller.unlockWithKek(KEY);
 
     const result = await controller.commit<MedRec>('medications', (cur) => [
@@ -120,6 +120,7 @@ describe('createMobileApp — age gate before vault (Requirement 23)', () => {
     biometrics,
     codec,
     fetch: vi.fn(async () => ({ status: 200, json: async () => ({ sync_version: 1 }) })),
+    vault: undefined as Awaited<ReturnType<typeof createLocalVault>> | undefined,
   });
 
   it('requires an ineligibility storage adapter (23.7)', () => {
@@ -127,7 +128,8 @@ describe('createMobileApp — age gate before vault (Requirement 23)', () => {
   });
 
   it('presents the age gate first and reaches home only after eligibility', async () => {
-    const app = createMobileApp({ ...baseOptions(), ineligibilityStorage: makeFlagStorage() });
+    const vault = await createLocalVault(new MemoryStorageBackend());
+    const app = createMobileApp({ ...baseOptions(), vault, ineligibilityStorage: makeFlagStorage() });
     expect(await app.onboarding.start()).toBe('age-gate');
 
     // Home construction is blocked until age eligibility is confirmed (23.1).

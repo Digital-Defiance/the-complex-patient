@@ -86,7 +86,11 @@ function createMockDeps(overrides?: {
   });
 
   return {
-    home: { unlockWithKek },
+    home: {
+      unlockWithKek,
+      fetchRemoteKdfMaterial: vi.fn(async () => null),
+      publishKdfMaterial: vi.fn(async () => {}),
+    },
     loadKdfMaterial: vi.fn(async () => overrides?.kdfMaterial ?? null),
     saveKdfMaterial: vi.fn(async () => {}),
   };

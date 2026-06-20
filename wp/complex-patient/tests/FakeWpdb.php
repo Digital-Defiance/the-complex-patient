@@ -8,12 +8,16 @@ namespace ComplexPatient\Tests;
  * In-memory test double for the WordPress $wpdb global.
  *
  * Records dbDelta and DROP TABLE interactions and lets a test control whether
- * the vault table is reported as existing after dbDelta runs, so activation
- * success and failure paths can be exercised without a database.
+ * table creation succeeds, so activation success and failure paths can be
+ * exercised without a database.
  */
 final class FakeWpdb extends \wpdb
 {
-    public bool $tableExistsAfterDbDelta = true;
+    /** When true, dbDelta is treated as having created the table. */
+    public bool $dbDeltaCreatesTables = true;
+
+    /** When true, a direct CREATE TABLE query succeeds. */
+    public bool $directQueryCreatesTables = true;
 
     /** @var list<string> */
     public array $dbDeltaCalls = [];
@@ -21,11 +25,25 @@ final class FakeWpdb extends \wpdb
     /** @var list<string> */
     public array $droppedTables = [];
 
+    /** @var list<string> */
+    public array $queryCalls = [];
+
+    /** @var list<string> */
+    private array $createdTables = [];
+
     public function get_var(string $query)
     {
-        // Emulate SHOW TABLES LIKE 'wp_complex_patient_vault'.
         if (str_contains($query, 'SHOW TABLES LIKE')) {
-            return $this->tableExistsAfterDbDelta ? $this->prefix . \ComplexPatient\Activation::TABLE_BASENAME : null;
+            if (! preg_match("/SHOW TABLES LIKE '([^']+)'/", $query, $matches)) {
+                return null;
+            }
+
+            $tableName = $matches[1];
+            if (in_array($tableName, $this->createdTables, true)) {
+                return $tableName;
+            }
+
+            return null;
         }
 
         return null;
@@ -33,11 +51,25 @@ final class FakeWpdb extends \wpdb
 
     public function query(string $query)
     {
+        $this->queryCalls[] = $query;
+
         if (str_starts_with($query, 'DROP TABLE')) {
-            // Record the unprefixed/prefixed table name that was dropped.
             if (preg_match('/DROP TABLE IF EXISTS\s+(\S+)/i', $query, $m)) {
                 $this->droppedTables[] = $m[1];
+                $this->createdTables = array_values(
+                    array_filter(
+                        $this->createdTables,
+                        static fn (string $table): bool => $table !== $m[1]
+                    )
+                );
             }
+        }
+
+        if (
+            $this->directQueryCreatesTables &&
+            preg_match('/CREATE TABLE\s+(\S+)\s/i', $query, $m)
+        ) {
+            $this->createdTables[] = $m[1];
         }
 
         return 0;
@@ -46,5 +78,12 @@ final class FakeWpdb extends \wpdb
     public function recordDbDelta(string $sql): void
     {
         $this->dbDeltaCalls[] = $sql;
+
+        if (
+            $this->dbDeltaCreatesTables &&
+            preg_match('/CREATE TABLE\s+(\S+)\s/i', $sql, $m)
+        ) {
+            $this->createdTables[] = $m[1];
+        }
     }
 }

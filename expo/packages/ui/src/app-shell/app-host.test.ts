@@ -68,7 +68,7 @@ function createMockHomeController(): HomeEntryController {
       notifyActivity: vi.fn(),
     } as unknown as HomeEntryController['lock'],
     getStatus: vi.fn(() => 'signed-out' as const),
-    signIn: vi.fn(),
+    signIn: vi.fn(async () => ({ ok: true as const })),
     signOut: vi.fn(async () => {}),
     unlockWithKek: vi.fn(async () => ({ ok: true as const, status: 'ready' as const })),
     unlock: vi.fn(async () => ({ ok: true as const, status: 'ready' as const })),
@@ -76,6 +76,8 @@ function createMockHomeController(): HomeEntryController {
     commit: vi.fn(async () => ({ ok: true, records: [] })),
     onConnectivityRestored: vi.fn(),
     notifyActivity: vi.fn(),
+    fetchRemoteKdfMaterial: vi.fn(async () => null),
+    publishKdfMaterial: vi.fn(async () => {}),
     dispose: vi.fn(),
   } as unknown as HomeEntryController;
 }

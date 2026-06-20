@@ -192,6 +192,19 @@ export function createOfflineSyncCoordinator(
       setStatus(vaultType, 'pending');
       return { status: 'pending', attempts: 0 };
     }
+
+    if (
+      (outcome.status === 'synced' || outcome.status === 'conflict-resolved') &&
+      typeof outcome.newVersion === 'number'
+    ) {
+      try {
+        await store.applySyncedVersion(vaultType, outcome.newVersion);
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        console.warn(`[OfflineSync] failed to apply synced version for ${vaultType}:`, message);
+      }
+    }
+
     setStatus(vaultType, statusForOutcome(outcome));
     return outcome;
   }

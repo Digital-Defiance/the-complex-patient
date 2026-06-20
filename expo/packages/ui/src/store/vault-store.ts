@@ -87,6 +87,12 @@ export interface VaultStore {
   ): Promise<CommitResult<T>>;
 
   /**
+   * After a successful background sync, align the local blob and projection with
+   * the server's optimistic-concurrency token so the next push succeeds.
+   */
+  applySyncedVersion(vaultType: VaultType, syncVersion: number): Promise<void>;
+
+  /**
    * Clear all PHI projections and discard the in-memory KEK together, on lock
    * or idle timeout (Requirements 3.6, 3.7).
    */
@@ -218,6 +224,45 @@ export function createVaultStore(deps: VaultStoreDeps): VaultStore {
     return { ok: true, records: nextRecords };
   }
 
+  async function applySyncedVersion(vaultType: VaultType, syncVersion: number): Promise<void> {
+    if (api.getState().status !== 'unlocked') {
+      return;
+    }
+
+    const blob = await vault.readPartition(vaultType);
+    if (blob === null) {
+      return;
+    }
+
+    if (blob.sync_version === syncVersion) {
+      api.setState((state) => ({
+        partitions: {
+          ...state.partitions,
+          [vaultType]: {
+            ...state.partitions[vaultType],
+            syncVersion,
+          },
+        },
+      }));
+      return;
+    }
+
+    await vault.writePartition(vaultType, {
+      ...blob,
+      sync_version: syncVersion,
+    });
+
+    api.setState((state) => ({
+      partitions: {
+        ...state.partitions,
+        [vaultType]: {
+          ...state.partitions[vaultType],
+          syncVersion,
+        },
+      },
+    }));
+  }
+
   function clear(): void {
     // Discard the in-memory KEK and wipe every PHI projection together
     // (Requirements 3.6, 3.7).
@@ -233,6 +278,7 @@ export function createVaultStore(deps: VaultStoreDeps): VaultStore {
     hydrate,
     getPartition,
     commit,
+    applySyncedVersion,
     clear,
   };
 }

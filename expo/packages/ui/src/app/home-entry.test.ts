@@ -93,7 +93,7 @@ describe('createHomeEntry — auth + unlock lifecycle (4.1, 22.1, 22.2)', () => 
   });
 
   it('becomes locked after sign-in, then ready after KEK unlock (3, 5.2)', async () => {
-    controller.signIn({ kind: 'jwt', token: 'jwt' });
+    await controller.signIn({ kind: 'jwt', token: 'jwt' });
     expect(controller.getStatus()).toBe('locked');
 
     const result = await controller.unlockWithKek(KEY);
@@ -102,7 +102,7 @@ describe('createHomeEntry — auth + unlock lifecycle (4.1, 22.1, 22.2)', () => 
   });
 
   it('sign-out locks the vault and clears the credential (3.6, 4.8)', async () => {
-    controller.signIn({ kind: 'jwt', token: 'jwt' });
+    await controller.signIn({ kind: 'jwt', token: 'jwt' });
     await controller.unlockWithKek(KEY);
     expect(controller.getStatus()).toBe('ready');
 
@@ -127,7 +127,7 @@ describe('createHomeEntry — offline-first feature surface (5.2, 5.3, 5.4)', ()
       syncWorker: worker,
       auth,
     });
-    controller.signIn({ kind: 'jwt', token: 'jwt' });
+    await controller.signIn({ kind: 'jwt', token: 'jwt' });
     await controller.unlockWithKek(KEY);
   });
 
@@ -166,7 +166,7 @@ describe('createHomeEntry — native parity via Secure Enclave key store (22.2, 
     });
     const controller = createHomeEntry({ keyStore, store, syncWorker: fakeWorker(), auth });
 
-    controller.signIn({ kind: 'application-password', username: 'u', applicationPassword: 'p' });
+    await controller.signIn({ kind: 'application-password', username: 'u', applicationPassword: 'p' });
     // First-time KEK establishment stores it in the enclave + hydrates.
     await controller.unlockWithKek(KEY);
     expect(controller.getStatus()).toBe('ready');

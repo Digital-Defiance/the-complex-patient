@@ -99,7 +99,9 @@ export interface MobileApp {
 export async function createMobileHome(
   options: MobileEntryOptions,
 ): Promise<HomeEntryController> {
-  const vault = options.vault ?? (await createLocalVault(new MemoryStorageBackend()));
+  const vault =
+    options.vault ??
+    (await createLocalVault(await import('../../platform-vault-storage').then((m) => m.createPlatformVaultStorageBackend())));
 
   // Shared idle auto-lock (300s) drives the lock binding (Requirement 3.7).
   let onIdle: () => void = () => {};
@@ -119,7 +121,7 @@ export async function createMobileHome(
   const http = createVaultHttpClient({ baseUrl: options.baseUrl, auth, fetch: options.fetch });
   const syncWorker = new SyncWorker({ http, vault });
 
-  const controller = createHomeEntry({ keyStore, store, syncWorker, auth, idle });
+  const controller = createHomeEntry({ keyStore, store, syncWorker, auth, idle, vault, vaultHttp: http });
 
   // Route the idle expiry through the controller's lock so PHI + KEK clear
   // together on the 300s timeout (Requirements 3.6, 3.7).

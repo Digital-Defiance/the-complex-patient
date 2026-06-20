@@ -21,9 +21,9 @@ vi.mock('react-native', () => ({
 }));
 
 describe('syncBackendUrlFromExpoHostUri', () => {
-  it('maps Expo LAN host to local sync backend on port 8080', async () => {
+  it('maps Expo LAN host to WordPress Studio on port 8881', async () => {
     const { syncBackendUrlFromExpoHostUri } = await import('./sync-backend-url');
-    expect(syncBackendUrlFromExpoHostUri('172.16.0.14:8081')).toBe('http://172.16.0.14:8080');
+    expect(syncBackendUrlFromExpoHostUri('172.16.0.14:8081')).toBe('http://172.16.0.14:8881');
   });
 
   it('returns null for loopback Expo hosts', async () => {
@@ -61,7 +61,7 @@ describe('resolveSyncBackendBaseUrl', () => {
     (globalThis as { __DEV__?: boolean }).__DEV__ = true;
     vi.stubEnv('EXPO_PUBLIC_SYNC_BACKEND_URL', '');
     const { resolveSyncBackendBaseUrl } = await import('./sync-backend-url');
-    expect(resolveSyncBackendBaseUrl()).toBe('http://172.16.0.14:8080');
+    expect(resolveSyncBackendBaseUrl()).toBe('http://172.16.0.14:8881');
   });
 
   it('uses local WordPress in development without Expo LAN host', async () => {
@@ -79,10 +79,34 @@ describe('resolveSyncBackendBaseUrl', () => {
     expect(resolveSyncBackendBaseUrl()).toBe(ANDROID_EMULATOR_SYNC_BACKEND_URL);
   });
 
-  it('uses production URL in release builds', async () => {
+  it('uses production URL in release builds on native', async () => {
     (globalThis as { __DEV__?: boolean }).__DEV__ = false;
     vi.stubEnv('EXPO_PUBLIC_SYNC_BACKEND_URL', '');
     const { resolveSyncBackendBaseUrl, PRODUCTION_SYNC_BACKEND_URL } = await import('./sync-backend-url');
     expect(resolveSyncBackendBaseUrl()).toBe(PRODUCTION_SYNC_BACKEND_URL);
+  });
+
+  it('uses local WordPress when web release build is opened on localhost', async () => {
+    mockPlatform.OS = 'web';
+    (globalThis as { __DEV__?: boolean }).__DEV__ = false;
+    vi.stubEnv('EXPO_PUBLIC_SYNC_BACKEND_URL', '');
+    vi.stubGlobal('window', { location: { hostname: 'localhost' } });
+    const { resolveSyncBackendBaseUrl, DEFAULT_LOCAL_SYNC_BACKEND_URL } = await import('./sync-backend-url');
+    expect(resolveSyncBackendBaseUrl()).toBe(DEFAULT_LOCAL_SYNC_BACKEND_URL);
+  });
+});
+
+describe('syncBackendUrlFromBrowserLocation', () => {
+  it('maps localhost to WordPress Studio', async () => {
+    const { syncBackendUrlFromBrowserLocation, DEFAULT_LOCAL_SYNC_BACKEND_URL } = await import(
+      './sync-backend-url'
+    );
+    expect(syncBackendUrlFromBrowserLocation('localhost')).toBe(DEFAULT_LOCAL_SYNC_BACKEND_URL);
+    expect(syncBackendUrlFromBrowserLocation('127.0.0.1')).toBe(DEFAULT_LOCAL_SYNC_BACKEND_URL);
+  });
+
+  it('maps LAN hosts to the same host on port 8881', async () => {
+    const { syncBackendUrlFromBrowserLocation } = await import('./sync-backend-url');
+    expect(syncBackendUrlFromBrowserLocation('172.16.0.14')).toBe('http://172.16.0.14:8881');
   });
 });

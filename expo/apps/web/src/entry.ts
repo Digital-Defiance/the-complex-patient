@@ -20,6 +20,7 @@
  */
 
 import { createLocalVault, MemoryStorageBackend, type LocalVault } from '@complex-patient/local-vault';
+import { createPlatformVaultStorageBackend } from '../../platform-vault-storage';
 import { encrypt, decrypt, detectRuntimeContext, selectProvider } from '@complex-patient/crypto-engine';
 import {
   IdleAutoLock,
@@ -103,7 +104,7 @@ export interface WebApp {
 export async function createWebHome(options: WebEntryOptions): Promise<HomeEntryController> {
   assertSecureContext(options.assumeSecureContext);
 
-  const vault = options.vault ?? (await createLocalVault(new MemoryStorageBackend()));
+  const vault = options.vault ?? (await createLocalVault(await createPlatformVaultStorageBackend()));
 
   // Shared idle auto-lock (300s) drives the lock binding (Requirement 3.7).
   let onIdle: () => void = () => {};
@@ -120,7 +121,7 @@ export async function createWebHome(options: WebEntryOptions): Promise<HomeEntry
   const http = createVaultHttpClient({ baseUrl: options.baseUrl, auth, fetch: options.fetch });
   const syncWorker = new SyncWorker({ http, vault });
 
-  const controller = createHomeEntry({ keyStore, store, syncWorker, auth, idle });
+  const controller = createHomeEntry({ keyStore, store, syncWorker, auth, idle, vault, vaultHttp: http });
 
   // Route the idle expiry through the controller's lock so PHI + KEK clear
   // together on the 300s timeout (Requirements 3.6, 3.7).

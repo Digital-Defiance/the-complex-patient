@@ -21,9 +21,17 @@
  * platform adapters and render the returned controller's state.
  */
 
-import type { CryptoKeyRef } from '@complex-patient/crypto-engine';
+import type { CryptoKeyRef, KdfParams } from '@complex-patient/crypto-engine';
+import type { LocalVault } from '@complex-patient/local-vault';
 import type { VaultRecord, VaultType } from '@complex-patient/domain';
 import type { SessionKeyStore } from '@complex-patient/key-store';
+import type { VaultHttpClientWithKdf } from './vault-http-client';
+import {
+  kdfMaterialFromPayload,
+  kdfMaterialToPayload,
+  type KdfMaterial,
+} from './kdf-material-sync';
+import { pullRemoteVaultPartitions } from './vault-pull';
 import {
   createOfflineSyncCoordinator,
   type OfflineSyncCoordinator,
@@ -51,6 +59,11 @@ export type HomeUnlockResult =
   | { ok: true; status: 'ready' }
   | { ok: false; reason: 'NOT_AUTHENTICATED' | 'PASSPHRASE_REQUIRED' | 'NO_KEY_STORED' | 'BIOMETRIC_FAILED' | 'BIOMETRIC_LOCKED_OUT' };
 
+/** Result of a WordPress sign-in attempt. */
+export type SignInResult =
+  | { ok: true }
+  | { ok: false; reason: 'INVALID_CREDENTIALS' | 'NETWORK_ERROR' };
+
 /**
  * Dependencies for {@link createHomeEntry}. Every collaborator is injected so
  * the same composition runs identically on native and web — the platform only
@@ -65,6 +78,10 @@ export interface HomeEntryDeps {
   syncWorker: SyncWorkerLike;
   /** Mutable WordPress credential holder (Requirement 4.1). */
   auth: MutableAuthProvider;
+  /** Encrypted Local_Vault backing store (for pull-before-hydrate). */
+  vault?: LocalVault;
+  /** Authenticated Sync_Backend client (KDF + partition GET). */
+  vaultHttp?: VaultHttpClientWithKdf;
   /** Optional shared idle auto-lock controller (Requirement 3.7). */
   idle?: IdleController;
 }
@@ -84,11 +101,11 @@ export interface HomeEntryController {
   getStatus(): HomeStatus;
 
   /**
-   * Record a successful WordPress sign-in (Requirement 4.1). Sets the
-   * credential used for every subsequent Sync_Backend request. Does NOT unlock
+   * Record a successful WordPress sign-in (Requirement 4.1). Validates the
+   * credential against the Sync_Backend before accepting it. Does NOT unlock
    * the vault — the KEK is established separately via {@link unlock}.
    */
-  signIn(auth: WordPressAuth): void;
+  signIn(auth: WordPressAuth): Promise<SignInResult>;
 
   /**
    * Sign out: clear the WordPress credential and lock the vault so no PHI or KEK
@@ -127,6 +144,12 @@ export interface HomeEntryController {
   /** Reset the idle countdown on user interaction (Requirement 3.7). */
   notifyActivity(): void;
 
+  /** Fetch shared KDF material from the Sync_Backend (non-secret). */
+  fetchRemoteKdfMaterial(): Promise<KdfMaterial | null>;
+
+  /** Publish local KDF material to the Sync_Backend (non-secret). */
+  publishKdfMaterial(material: KdfMaterial): Promise<void>;
+
   /** Tear down internal subscriptions. */
   dispose(): void;
 }
@@ -138,10 +161,55 @@ export interface HomeEntryController {
  * platforms (Requirement 22.2).
  */
 export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
-  const { keyStore, store, syncWorker, auth, idle } = deps;
+  const { keyStore, store, syncWorker, auth, idle, vault, vaultHttp } = deps;
 
   const coordinator = createOfflineSyncCoordinator({ store, syncWorker });
   const lock = bindStoreToLock({ store, keyStore, idle });
+
+  async function pullBeforeHydrate(): Promise<void> {
+    if (vault === undefined || vaultHttp === undefined || auth.getAuth() === null) {
+      return;
+    }
+    try {
+      await pullRemoteVaultPartitions({ vault, http: vaultHttp });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.warn('[HomeEntry] pull before hydrate failed:', message);
+    }
+  }
+
+  async function fetchRemoteKdfMaterial(): Promise<KdfMaterial | null> {
+    if (vaultHttp === undefined || auth.getAuth() === null) {
+      return null;
+    }
+    const response = await vaultHttp.getKdfMaterial();
+    if (response.status === 404) {
+      return null;
+    }
+    if (
+      response.status < 200 ||
+      response.status >= 300 ||
+      !response.salt_base64 ||
+      !response.params
+    ) {
+      return null;
+    }
+    return kdfMaterialFromPayload({
+      salt_base64: response.salt_base64,
+      params: response.params,
+    });
+  }
+
+  async function publishKdfMaterial(material: KdfMaterial): Promise<void> {
+    if (vaultHttp === undefined || auth.getAuth() === null) {
+      return;
+    }
+    const payload = kdfMaterialToPayload(material);
+    const response = await vaultHttp.putKdfMaterial(payload);
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`failed to publish KDF material (HTTP ${response.status})`);
+    }
+  }
 
   function getStatus(): HomeStatus {
     if (auth.getAuth() === null) {
@@ -150,8 +218,28 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     return store.isUnlocked() ? 'ready' : 'locked';
   }
 
-  function signIn(credential: WordPressAuth): void {
+  function signIn(credential: WordPressAuth): Promise<SignInResult> {
     auth.setAuth(credential);
+
+    if (vaultHttp === undefined) {
+      return Promise.resolve({ ok: true });
+    }
+
+    return vaultHttp
+      .getKdfMaterial()
+      .then((response) => {
+        if (response.status === 401 || response.status === 403) {
+          auth.setAuth(null);
+          return { ok: false as const, reason: 'INVALID_CREDENTIALS' as const };
+        }
+        return { ok: true as const };
+      })
+      .catch((cause) => {
+        auth.setAuth(null);
+        const message = cause instanceof Error ? cause.message : String(cause);
+        console.error('[HomeEntry] signIn validation failed:', message);
+        return { ok: false as const, reason: 'NETWORK_ERROR' as const };
+      });
   }
 
   async function signOut(): Promise<void> {
@@ -163,6 +251,7 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
 
   async function hydrateReady(kek: CryptoKeyRef): Promise<HomeUnlockResult> {
     try {
+      await pullBeforeHydrate();
       await store.hydrate(kek);
       lock.startIdleTimer();
       return { ok: true, status: 'ready' };
@@ -233,6 +322,8 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     commit,
     onConnectivityRestored,
     notifyActivity,
+    fetchRemoteKdfMaterial,
+    publishKdfMaterial,
     dispose,
   };
 }

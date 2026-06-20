@@ -24,6 +24,7 @@ export { createVaultHttpClient } from './vault-http-client';
 export type {
   HomeStatus,
   HomeUnlockResult,
+  SignInResult,
   HomeEntryDeps,
   HomeEntryController,
 } from './home-entry';
