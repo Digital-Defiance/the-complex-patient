@@ -74,7 +74,7 @@ describe('createWebHome — secure context (1.8)', () => {
 describe('createWebHome — auth + feature parity (4.1, 22.2)', () => {
   it('reaches ready after sign-in + KEK unlock and supports CRUD', async () => {
     const controller = await buildController();
-    controller.signIn({ kind: 'jwt', token: 'jwt' });
+    await controller.signIn({ kind: 'jwt', token: 'jwt' });
     expect(controller.getStatus()).toBe('locked');
 
     const result = await controller.unlockWithKek(KEY);
@@ -90,7 +90,7 @@ describe('createWebHome — auth + feature parity (4.1, 22.2)', () => {
 
   it('discards the KEK on lock so re-entry is required (3.6)', async () => {
     const controller = await buildController();
-    controller.signIn({ kind: 'jwt', token: 'jwt' });
+    await controller.signIn({ kind: 'jwt', token: 'jwt' });
     await controller.unlockWithKek(KEY);
     expect(controller.getStatus()).toBe('ready');
 
@@ -132,7 +132,8 @@ describe('createWebApp — age gate before vault (Requirement 23)', () => {
   });
 
   it('presents the age gate first and reaches home only after eligibility', async () => {
-    const app = createWebApp({ ...baseOptions(), ineligibilityStorage: makeFlagStorage() });
+    const vault = await createLocalVault(new MemoryStorageBackend());
+    const app = createWebApp({ ...baseOptions(), vault, ineligibilityStorage: makeFlagStorage() });
     expect(await app.onboarding.start()).toBe('age-gate');
 
     await expect(app.createHome()).rejects.toThrow(/eligib/i);

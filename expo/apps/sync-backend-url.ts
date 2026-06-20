@@ -3,11 +3,12 @@
  *
  * Priority:
  * 1. EXPO_PUBLIC_SYNC_BACKEND_URL (explicit override)
- * 2. __DEV__ + Expo dev host (physical device / LAN: 172.16.0.14:8081 → http://172.16.0.14:8080)
- * 3. __DEV__ → local WordPress (localhost; Android emulator uses 10.0.2.2)
- * 4. Production default
+ * 2. __DEV__ + Expo dev host (physical device / LAN: 172.16.0.14:8081 → http://172.16.0.14:8881)
+ * 3. __DEV__ → WordPress Studio (localhost:8881; Android emulator uses 10.0.2.2:8881)
+ * 4. Web opened on localhost / LAN → WordPress Studio on the same host (even in release builds)
+ * 5. Production default
  *
- * Note: Metro serves JS on :8081; local WordPress sync API is expected on :8080.
+ * Note: Metro serves JS on :8081; WordPress Studio serves the sync API on :8881.
  */
 
 import Constants from 'expo-constants';
@@ -15,8 +16,9 @@ import { Platform } from 'react-native';
 
 export const PRODUCTION_SYNC_BACKEND_URL = 'https://thecomplexpatient.com';
 export const DEFAULT_LOCAL_SYNC_BACKEND_URL = 'http://localhost:8881';
-export const ANDROID_EMULATOR_SYNC_BACKEND_URL = 'http://10.0.2.2:8080';
-export const DEFAULT_LOCAL_SYNC_BACKEND_PORT = 8080;
+export const DEFAULT_LOCAL_SYNC_BACKEND_PORT = 8881;
+/** Android emulator loopback to the host machine's localhost. */
+export const ANDROID_EMULATOR_SYNC_BACKEND_URL = `http://10.0.2.2:${DEFAULT_LOCAL_SYNC_BACKEND_PORT}`;
 
 /** Map Expo dev server host (e.g. `172.16.0.14:8081`) to the local sync backend origin. */
 export function syncBackendUrlFromExpoHostUri(
@@ -43,6 +45,51 @@ function getExpoDevHostUri(): string | null | undefined {
   );
 }
 
+/** RFC 1918 private IPv4 ranges used for on-LAN local WordPress during development. */
+function isPrivateLanHost(hostname: string): boolean {
+  const parts = hostname.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+
+  const [first, second] = parts;
+  if (first === 10) return true;
+  if (first === 172 && second >= 16 && second <= 31) return true;
+  if (first === 192 && second === 168) return true;
+  return false;
+}
+
+/**
+ * When the web bundle is served from localhost or a LAN IP, assume WordPress
+ * Studio on the same host (port 8881). This prevents a release-mode web build
+ * opened at http://localhost:8081 from syncing to production by mistake.
+ */
+export function syncBackendUrlFromBrowserLocation(
+  hostname: string | null | undefined,
+): string | null {
+  const host = hostname?.trim();
+  if (!host) {
+    return null;
+  }
+
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+    return DEFAULT_LOCAL_SYNC_BACKEND_URL;
+  }
+
+  if (isPrivateLanHost(host)) {
+    return `http://${host}:${DEFAULT_LOCAL_SYNC_BACKEND_PORT}`;
+  }
+
+  return null;
+}
+
+function resolveWebBrowserBackend(): string | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') {
+    return null;
+  }
+  return syncBackendUrlFromBrowserLocation(window.location.hostname);
+}
+
 export function resolveSyncBackendBaseUrl(): string {
   const configured = process.env.EXPO_PUBLIC_SYNC_BACKEND_URL?.trim();
   if (configured) {
@@ -59,6 +106,11 @@ export function resolveSyncBackendBaseUrl(): string {
       return ANDROID_EMULATOR_SYNC_BACKEND_URL;
     }
     return DEFAULT_LOCAL_SYNC_BACKEND_URL;
+  }
+
+  const fromBrowser = resolveWebBrowserBackend();
+  if (fromBrowser) {
+    return fromBrowser;
   }
 
   return PRODUCTION_SYNC_BACKEND_URL;

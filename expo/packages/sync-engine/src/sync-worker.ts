@@ -306,6 +306,7 @@ export class SyncWorker {
     };
 
     let attempts = 0;
+    let lastFailureStatus: number | null = null;
     while (attempts < this.maxAttempts) {
       attempts += 1;
       let response: VaultPushResponse | null = null;
@@ -315,6 +316,7 @@ export class SyncWorker {
         // Transient failure (e.g. network drop). Retain the blob unchanged and
         // retry until the attempt budget is exhausted.
         response = null;
+        lastFailureStatus = null;
       }
 
       if (response !== null) {
@@ -339,6 +341,8 @@ export class SyncWorker {
           }
           return outcome;
         }
+
+        lastFailureStatus = response.status;
       }
 
       // Otherwise: a retryable failure. Loop again until attempts are exhausted.
@@ -348,6 +352,16 @@ export class SyncWorker {
     // indication to the user (Requirement 5.8).
     this.pending.add(vaultType);
     this.onSyncPending?.(vaultType, attempts);
+    if (lastFailureStatus === 401 || lastFailureStatus === 403) {
+      console.error(
+        `[SyncWorker] push for ${vaultType} failed with HTTP ${lastFailureStatus}. ` +
+          'Check WordPress sign-in: use an Application Password from your user profile, not your login password.',
+      );
+    } else if (lastFailureStatus !== null) {
+      console.error(`[SyncWorker] push for ${vaultType} failed with HTTP ${lastFailureStatus}`);
+    } else {
+      console.error(`[SyncWorker] push for ${vaultType} failed after ${attempts} attempts (network error)`);
+    }
     return { status: 'pending', attempts };
   }
 

@@ -19,3 +19,5 @@ export { EncryptedLocalVault, createLocalVault } from './vault';
 
 export type { MemoryStorageBackendOptions } from './memory-backend';
 export { MemoryStorageBackend } from './memory-backend';
+export type { KeyValueStore } from './key-value-backend';
+export { KeyValueStorageBackend } from './key-value-backend';

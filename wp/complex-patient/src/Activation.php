@@ -24,11 +24,17 @@ final class Activation
     public const TABLE_BASENAME = 'complex_patient_vault';
 
     /**
+     * Unprefixed base name of the per-user KDF material table.
+     */
+    public const KDF_TABLE_BASENAME = 'complex_patient_kdf';
+
+    /**
      * Build the CREATE TABLE statement for the vault table.
      *
      * This is a pure function (no WordPress dependencies) so the schema can be
      * asserted in isolation. The statement is dbDelta-compatible: two spaces
-     * after PRIMARY KEY and field definitions on their own lines.
+     * after PRIMARY KEY, field types in lowercase, and field definitions on
+     * their own lines.
      *
      * @param string $tableName      Fully prefixed table name (e.g. wp_complex_patient_vault).
      * @param string $charsetCollate Result of wpdb::get_charset_collate(), may be empty.
@@ -38,17 +44,41 @@ final class Activation
         $suffix = '' === $charsetCollate ? '' : ' ' . $charsetCollate;
 
         return "CREATE TABLE {$tableName} (
-  id                BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-  wp_user_id        BIGINT(20) UNSIGNED NOT NULL,
-  vault_type        VARCHAR(64) NOT NULL,
-  iv                VARCHAR(32) NOT NULL,
-  auth_tag          VARCHAR(32) NOT NULL,
-  ciphertext        LONGBLOB NOT NULL,
-  sync_version      BIGINT(20) UNSIGNED NOT NULL DEFAULT 1,
-  client_updated_at DATETIME NULL,
-  server_updated_at DATETIME NOT NULL,
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  wp_user_id bigint(20) unsigned NOT NULL,
+  vault_type varchar(64) NOT NULL,
+  iv varchar(32) NOT NULL,
+  auth_tag varchar(32) NOT NULL,
+  ciphertext longblob NOT NULL,
+  sync_version bigint(20) unsigned NOT NULL DEFAULT 1,
+  client_updated_at datetime DEFAULT NULL,
+  server_updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY  (id),
   UNIQUE KEY uniq_user_vault (wp_user_id, vault_type)
+){$suffix};";
+    }
+
+    /**
+     * Build the CREATE TABLE statement for the KDF material table.
+     *
+     * Stores the non-secret salt and KDF parameters so every device for a
+     * WordPress user derives the same KEK from the Master_Passphrase.
+     *
+     * @param string $tableName      Fully prefixed table name.
+     * @param string $charsetCollate Result of wpdb::get_charset_collate(), may be empty.
+     */
+    public static function buildKdfSchemaSql(string $tableName, string $charsetCollate = ''): string
+    {
+        $suffix = '' === $charsetCollate ? '' : ' ' . $charsetCollate;
+
+        return "CREATE TABLE {$tableName} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  wp_user_id bigint(20) unsigned NOT NULL,
+  salt_base64 varchar(64) NOT NULL,
+  kdf_params_json text NOT NULL,
+  server_updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY  (id),
+  UNIQUE KEY uniq_user (wp_user_id)
 ){$suffix};";
     }
 
@@ -61,14 +91,45 @@ final class Activation
     }
 
     /**
-     * Plugin activation callback. Creates the vault table idempotently.
+     * Resolve the fully prefixed KDF material table name from the global $wpdb.
+     */
+    public static function kdfTableName(\wpdb $wpdb): string
+    {
+        return $wpdb->prefix . self::KDF_TABLE_BASENAME;
+    }
+
+    /**
+     * Plugin activation callback. Creates the vault and KDF tables idempotently.
      *
      * On creation failure the activation is halted: the error is surfaced and
      * no partial table is left behind.
      *
-     * @throws \RuntimeException When the table cannot be created.
+     * @throws \RuntimeException When a table cannot be created.
      */
     public static function activate(): void
+    {
+        self::installTables(true);
+    }
+
+    /**
+     * Ensure schema exists on every plugin load (covers Studio re-activations
+     * where dbDelta failed silently and upgrades that add new tables).
+     */
+    public static function ensureSchema(): void
+    {
+        try {
+            self::installTables(false);
+        } catch (\Throwable $exception) {
+            if (function_exists('error_log')) {
+                error_log('[Complex Patient] ensureSchema failed: ' . $exception->getMessage());
+            }
+        }
+    }
+
+    /**
+     * @throws \RuntimeException When $haltOnFailure is true and a table cannot be created.
+     */
+    private static function installTables(bool $haltOnFailure): void
     {
         global $wpdb;
 
@@ -76,30 +137,53 @@ final class Activation
             require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         }
 
-        $tableName = self::tableName($wpdb);
-        $sql       = self::buildSchemaSql($tableName, $wpdb->get_charset_collate());
+        $charsetCollate = $wpdb->get_charset_collate();
+        $tables         = [
+            self::tableName($wpdb)    => self::buildSchemaSql(self::tableName($wpdb), $charsetCollate),
+            self::kdfTableName($wpdb) => self::buildKdfSchemaSql(self::kdfTableName($wpdb), $charsetCollate),
+        ];
 
-        // dbDelta creates the table only if it does not already exist and
-        // applies non-destructive alterations otherwise (Requirement 9.1).
+        foreach ($tables as $tableName => $sql) {
+            self::ensureTable($wpdb, $tableName, $sql, $haltOnFailure);
+        }
+    }
+
+    /**
+     * Create or upgrade a single table, with a direct CREATE fallback when
+     * dbDelta fails silently (common with non-lowercase field types).
+     *
+     * @throws \RuntimeException When $haltOnFailure is true and creation fails.
+     */
+    private static function ensureTable(\wpdb $wpdb, string $tableName, string $sql, bool $haltOnFailure): void
+    {
         dbDelta($sql);
 
-        // Verify the table exists after dbDelta (Requirement 9.2). If creation
-        // failed, drop any partial remnant and halt activation with an error.
         if (! self::tableExists($wpdb, $tableName)) {
-            self::dropTable($wpdb, $tableName);
+            // dbDelta can fail without surfacing an error; attempt a direct CREATE.
+            $wpdb->query($sql);
+        }
 
-            $message = sprintf(
-                'The Complex Patient: failed to create the vault table "%s". %s',
-                $tableName,
-                '' !== (string) $wpdb->last_error ? $wpdb->last_error : 'Unknown database error.'
-            );
+        if (self::tableExists($wpdb, $tableName)) {
+            return;
+        }
 
+        self::dropTable($wpdb, $tableName);
+
+        $message = sprintf(
+            'The Complex Patient: failed to create the table "%s". %s',
+            $tableName,
+            '' !== (string) $wpdb->last_error ? $wpdb->last_error : 'Unknown database error.'
+        );
+
+        if ($haltOnFailure) {
             if (function_exists('wp_die')) {
                 wp_die(esc_html($message));
             }
 
             throw new \RuntimeException($message);
         }
+
+        throw new \RuntimeException($message);
     }
 
     /**
@@ -111,7 +195,11 @@ final class Activation
             $wpdb->prepare('SHOW TABLES LIKE %s', $tableName)
         );
 
-        return $found === $tableName;
+        if (! is_string($found) || '' === $found) {
+            return false;
+        }
+
+        return $found === $tableName || strcasecmp($found, $tableName) === 0;
     }
 
     /**

@@ -19,5 +19,6 @@ final class PluginBootstrapTest extends TestCase
         $this->assertSame('0.0.1', COMPLEX_PATIENT_VERSION);
         $this->assertTrue(defined('COMPLEX_PATIENT_PLUGIN_DIR'));
         $this->assertTrue(defined('COMPLEX_PATIENT_PLUGIN_URL'));
+        $this->assertTrue(function_exists('complex_patient_activate'));
     }
 }

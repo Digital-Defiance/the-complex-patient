@@ -20,6 +20,7 @@
  */
 
 import type { VaultType } from '@complex-patient/domain';
+import type { KdfParams } from '@complex-patient/crypto-engine';
 import type {
   VaultGetResponse,
   VaultHttpClient,
@@ -60,6 +61,25 @@ export interface VaultHttpClientDeps {
 /** The REST namespace for the blind vault endpoints (design.md → Sync_Backend). */
 const VAULT_PATH = 'wp-json/complex-patient/v1/vault';
 
+/** Response from GET /vault/kdf-material. */
+export interface KdfMaterialGetResponse {
+  status: number;
+  salt_base64?: string;
+  params?: KdfParams;
+}
+
+/** Payload for PUT /vault/kdf-material. */
+export interface KdfMaterialPutPayload {
+  salt_base64: string;
+  params: KdfParams;
+}
+
+/** Extended client surface including cross-device KDF material sync. */
+export interface VaultHttpClientWithKdf extends VaultHttpClient {
+  getKdfMaterial(): Promise<KdfMaterialGetResponse>;
+  putKdfMaterial(payload: KdfMaterialPutPayload): Promise<{ status: number }>;
+}
+
 /** Resolve the default transport from the host, if any. */
 function resolveFetch(provided?: FetchLike): FetchLike {
   if (provided) return provided;
@@ -78,13 +98,17 @@ function resolveFetch(provided?: FetchLike): FetchLike {
  * HTTPS for all Sync_Backend traffic (Requirement 22.1). Loopback `http` and, in
  * development only, private LAN IPs (e.g. `http://172.16.0.14:8080`) are permitted.
  */
-export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClient {
+export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClientWithKdf {
   const fetchImpl = resolveFetch(deps.fetch);
   const base = deps.baseUrl.replace(/\/+$/, '');
   assertSecureOrigin(base);
 
   function endpoint(vaultType: VaultType): string {
     return `${base}/${VAULT_PATH}/${encodeURIComponent(vaultType)}`;
+  }
+
+  function kdfEndpoint(): string {
+    return `${base}/${VAULT_PATH}/kdf-material`;
   }
 
   /** Build request headers, throwing when unauthenticated (Requirement 4.3). */
@@ -135,7 +159,34 @@ export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClien
     };
   }
 
-  return { postVault, getVault };
+  async function getKdfMaterial(): Promise<KdfMaterialGetResponse> {
+    const response = await fetchImpl(kdfEndpoint(), {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+    const json = await safeJson(response);
+    const record = isRecord(json) ? json : {};
+    const params = record.params;
+    return {
+      status: response.status,
+      salt_base64: readString(record, 'salt_base64'),
+      params:
+        isRecord(params) && typeof params.algorithm === 'string'
+          ? (params as KdfParams)
+          : undefined,
+    };
+  }
+
+  async function putKdfMaterial(payload: KdfMaterialPutPayload): Promise<{ status: number }> {
+    const response = await fetchImpl(kdfEndpoint(), {
+      method: 'PUT',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { status: response.status };
+  }
+
+  return { postVault, getVault, getKdfMaterial, putKdfMaterial };
 }
 
 /** Enforce HTTPS for the Sync_Backend origin (Requirement 22.1). */
