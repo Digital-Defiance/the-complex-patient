@@ -13,6 +13,8 @@
 
 import type { LifecycleAdapter } from '@complex-patient/key-store';
 
+import { createWebTabLifecycleAdapter } from '../../web-lifecycle';
+
 /**
  * Build the web tab-lifecycle adapter. Both `beforeunload` and `pagehide` are
  * registered because browsers fire them in different scenarios (navigation,
@@ -20,11 +22,5 @@ import type { LifecycleAdapter } from '@complex-patient/key-store';
  * KEK is discarded regardless of how the page goes away (Requirement 13.4).
  */
 export function createWebLifecycleAdapter(): LifecycleAdapter {
-  return {
-    onTabClose(handler: () => void): void {
-      // Either event discards the KEK from volatile RAM (3.6 / 13.4).
-      window.addEventListener('beforeunload', handler);
-      window.addEventListener('pagehide', handler);
-    },
-  };
+  return createWebTabLifecycleAdapter();
 }

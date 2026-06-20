@@ -17,16 +17,22 @@ export default function Home(): React.ReactElement {
   const router = useRouter();
 
   const handleNavigate = useCallback(
-    (subsystem: 'medications' | 'journal' | 'insights') => {
+    (subsystem: 'medications' | 'journal' | 'insights' | 'export' | 'import') => {
       switch (subsystem) {
         case 'medications':
           router.push('/(home)/medications' as never);
           break;
         case 'journal':
-          router.push('/(home)/journal/log' as never);
+          router.push('/(home)/journal' as never);
           break;
         case 'insights':
           router.push('/(home)/insights' as never);
+          break;
+        case 'export':
+          router.push('/(home)/export' as never);
+          break;
+        case 'import':
+          router.push('/(home)/import' as never);
           break;
       }
     },

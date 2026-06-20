@@ -13,7 +13,7 @@
 
 export type { MobileEntryOptions } from './entry';
 export { createMobileHome } from './entry';
-export { createKekCodec, nativeFlagStorage } from './adapters';
+export { createKekCodec, nativeFlagStorage, nativeKdfStorage } from './adapters';
 
 /**
  * Native key-store adapters (Requirements 3.3, 3.4): concrete

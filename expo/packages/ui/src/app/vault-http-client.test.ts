@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createVaultHttpClient, type FetchLike } from './vault-http-client';
 import { createAuthProvider } from './auth';
 
@@ -26,6 +26,11 @@ function okFetch(body: unknown, status = 200): FetchLike {
 
 describe('createVaultHttpClient — HTTPS enforcement (22.1)', () => {
   const auth = createAuthProvider({ kind: 'jwt', token: 't' });
+  const originalDev = (globalThis as { __DEV__?: boolean }).__DEV__;
+
+  afterEach(() => {
+    (globalThis as { __DEV__?: boolean }).__DEV__ = originalDev;
+  });
 
   it('rejects a non-HTTPS Sync_Backend origin', () => {
     expect(() =>
@@ -43,6 +48,20 @@ describe('createVaultHttpClient — HTTPS enforcement (22.1)', () => {
     expect(() =>
       createVaultHttpClient({ baseUrl: 'http://localhost:8080', auth, fetch: okFetch({}) }),
     ).not.toThrow();
+  });
+
+  it('permits http private LAN origins in development', () => {
+    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+    expect(() =>
+      createVaultHttpClient({ baseUrl: 'http://172.16.0.14:8080', auth, fetch: okFetch({}) }),
+    ).not.toThrow();
+  });
+
+  it('rejects http private LAN origins outside development', () => {
+    (globalThis as { __DEV__?: boolean }).__DEV__ = false;
+    expect(() =>
+      createVaultHttpClient({ baseUrl: 'http://172.16.0.14:8080', auth, fetch: okFetch({}) }),
+    ).toThrow(/https/i);
   });
 });
 

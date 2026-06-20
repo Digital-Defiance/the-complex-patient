@@ -10,6 +10,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@complex-patient/clinical-export": "workspace:*",
     "@complex-patient/crypto-engine": "workspace:*",
     "@complex-patient/domain": "workspace:*",
     "@complex-patient/key-store": "workspace:*",

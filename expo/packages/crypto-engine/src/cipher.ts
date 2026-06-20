@@ -44,6 +44,34 @@ function hasSubtleCrypto(): boolean {
   );
 }
 
+/** Node-only fallback (vitest/SSR). Hermes/RN must use SubtleCrypto instead. */
+function isNodeRuntime(): boolean {
+  return (
+    typeof process !== 'undefined' &&
+    typeof process.versions === 'object' &&
+    process.versions !== null &&
+    typeof process.versions.node === 'string'
+  );
+}
+
+function concatBytes(...parts: Uint8Array[]): Uint8Array {
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+function bytesFromBinaryLike(data: Uint8Array | ArrayBufferView): Uint8Array {
+  if (data instanceof Uint8Array) {
+    return data;
+  }
+  return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+}
+
 /** Generate a random IV using the best available CSPRNG. */
 function generateIV(): Uint8Array {
   if (typeof globalThis.crypto?.getRandomValues === 'function') {
@@ -179,18 +207,25 @@ export async function encrypt(
     };
   }
 
+  if (!isNodeRuntime()) {
+    throw new Error('AES-256-GCM requires SubtleCrypto; install crypto.subtle before encrypt()');
+  }
+
   // Node.js path: use node:crypto (vitest, SSR)
   const cipher = createCipheriv(ALGORITHM, keyBytes, iv, {
     authTagLength: AUTH_TAG_BYTE_LENGTH,
   });
 
-  const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  const authTag = cipher.getAuthTag();
+  const encrypted = concatBytes(
+    bytesFromBinaryLike(cipher.update(plaintext)),
+    bytesFromBinaryLike(cipher.final()),
+  );
+  const authTag = bytesFromBinaryLike(cipher.getAuthTag());
 
   return {
-    iv: Buffer.from(iv).toString('base64'),
-    authTag: Buffer.from(authTag).toString('base64'),
-    ciphertext: Buffer.from(encrypted).toString('base64'),
+    iv: toBase64(iv),
+    authTag: toBase64(authTag),
+    ciphertext: toBase64(encrypted),
   };
 }
 
@@ -255,17 +290,21 @@ export async function decrypt(
     }
   }
 
+  if (!isNodeRuntime()) {
+    return { ok: false, error: 'AUTH_TAG_FAILED' };
+  }
+
   // Node.js path
   try {
     const decipher = createDecipheriv(ALGORITHM, keyBytes, iv, {
       authTagLength: AUTH_TAG_BYTE_LENGTH,
     });
     decipher.setAuthTag(authTag);
-    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-    return {
-      ok: true,
-      plaintext: new Uint8Array(decrypted.buffer, decrypted.byteOffset, decrypted.byteLength),
-    };
+    const decrypted = concatBytes(
+      bytesFromBinaryLike(decipher.update(ciphertext)),
+      bytesFromBinaryLike(decipher.final()),
+    );
+    return { ok: true, plaintext: decrypted };
   } catch {
     return { ok: false, error: 'AUTH_TAG_FAILED' };
   }

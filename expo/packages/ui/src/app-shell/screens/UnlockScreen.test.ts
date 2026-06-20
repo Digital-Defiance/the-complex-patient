@@ -100,7 +100,7 @@ describe('submitPassphrase', () => {
   describe('Requirement 7.3: KEK forwarded to unlockWithKek', () => {
     it('calls unlockWithKek with the derived KEK when passphrase is valid length', async () => {
       const deps = createMockDeps({ unlockResult: { ok: true } });
-      const passphrase = 'validpass'; // 9 chars, within 8-128
+      const passphrase = 'validpassphrase'; // 15 chars, within 12-128
 
       const result = await submitPassphrase(deps, passphrase);
 
@@ -114,7 +114,7 @@ describe('submitPassphrase', () => {
 
     it('does NOT call unlockWithKek when passphrase is too short', async () => {
       const deps = createMockDeps();
-      const passphrase = 'short'; // 5 chars, below minimum 8
+      const passphrase = 'short'; // 5 chars, below minimum 12
 
       const result = await submitPassphrase(deps, passphrase);
 
@@ -132,9 +132,9 @@ describe('submitPassphrase', () => {
       expect(deps.home.unlockWithKek).not.toHaveBeenCalled();
     });
 
-    it('calls unlockWithKek for exactly 8-character passphrase (boundary)', async () => {
+    it('calls unlockWithKek for exactly 12-character passphrase (boundary)', async () => {
       const deps = createMockDeps({ unlockResult: { ok: true } });
-      const passphrase = 'abcdefgh'; // exactly 8 chars
+      const passphrase = 'abcdefgh1234'; // exactly 12 chars
 
       await submitPassphrase(deps, passphrase);
 

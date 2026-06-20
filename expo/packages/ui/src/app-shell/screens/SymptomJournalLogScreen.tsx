@@ -1,79 +1,115 @@
 /**
  * @complex-patient/ui — SymptomJournalLogScreen
- *
- * Renders the symptom journal log form. Routes symptom entries exclusively
- * through `createSymptomJournal` (no other path). On a returned FieldError,
- * displays it and retains entered values; clears the error on a successful
- * submission. Persists exclusively through `home.commit` and retains values
- * on commit failure.
- *
- * Requirements: 10.1, 10.5, 10.6, 10.7, 10.8
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
 import {
   createSymptomJournal,
   type SymptomJournal,
   type SymptomEntryInput,
-  type SymptomStore,
   type FieldError,
-  type SymptomEntry,
+  type TimeUnit,
 } from '@complex-patient/symptom-journal';
 import { useAppHost } from '../app-host';
+import { usePartition } from '../hooks';
+import { createHomeSymptomStore } from '../symptom-journal-stores';
+import {
+  DURATION_UNITS,
+  normalizeSymptomLabel,
+  resolveSymptomTypeMatch,
+  suggestSymptomTypes,
+  suggestSystemicLocations,
+} from '../symptom-journal-ui';
 
-/**
- * Props for the SymptomJournalLogScreen. The `onBack` callback is supplied by
- * the route file so the screen stays decoupled from the router.
- */
 export interface SymptomJournalLogScreenProps {
-  /** Navigate back to the previous screen. */
   onBack?: () => void;
+  onViewHistory?: () => void;
 }
 
-/**
- * Build a SymptomStore that delegates reads to `home.read('symptoms')` and
- * writes to `home.commit('symptoms', ...)`. This ensures persistence goes
- * exclusively through `home.commit` (Requirement 10.7).
- */
-function createHomeSymptomStore(home: NonNullable<ReturnType<typeof useAppHost>['home']>): SymptomStore {
-  return {
-    async readSymptoms(): Promise<SymptomEntry[]> {
-      return home.read<SymptomEntry>('symptoms').records;
-    },
-    async writeSymptoms(records: SymptomEntry[]): Promise<void> {
-      const result = await home.commit<SymptomEntry>('symptoms', () => records);
-      if (!result.ok) {
-        throw new Error(result.message);
-      }
-    },
-  };
+function SuggestionList({
+  suggestions,
+  onSelect,
+  testID,
+}: {
+  suggestions: string[];
+  onSelect: (value: string) => void;
+  testID: string;
+}): React.ReactElement | null {
+  if (suggestions.length === 0) return null;
+
+  return (
+    <View style={styles.suggestionList} testID={testID}>
+      {suggestions.map((suggestion) => (
+        <Pressable
+          key={suggestion}
+          style={styles.suggestionItem}
+          onPress={() => onSelect(suggestion)}
+          accessibilityRole="button"
+          testID={`${testID}-${suggestion.replace(/\s+/g, '-').toLowerCase()}`}
+        >
+          <Text style={styles.suggestionText}>{suggestion}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
 }
 
-export function SymptomJournalLogScreen({ onBack }: SymptomJournalLogScreenProps): React.ReactElement {
+export function SymptomJournalLogScreen({ onBack, onViewHistory }: SymptomJournalLogScreenProps): React.ReactElement {
   const { home } = useAppHost();
 
-  // Form state — retained on both field errors and commit failures.
+  if (!home) {
+    return (
+      <View style={styles.container} testID="journal-log-screen">
+        <Text style={styles.errorText} accessibilityRole="alert" testID="journal-log-unavailable">
+          Data unavailable. Please try again later.
+        </Text>
+      </View>
+    );
+  }
+
+  return <SymptomJournalLogScreenInner home={home} onBack={onBack} onViewHistory={onViewHistory} />;
+}
+
+function SymptomJournalLogScreenInner({
+  home,
+  onBack,
+  onViewHistory,
+}: {
+  home: NonNullable<ReturnType<typeof useAppHost>['home']>;
+  onBack?: () => void;
+  onViewHistory?: () => void;
+}): React.ReactElement {
+
   const [symptomType, setSymptomType] = useState('');
   const [systemicLocation, setSystemicLocation] = useState('');
   const [severity, setSeverity] = useState('');
   const [durationValue, setDurationValue] = useState('');
-  const [durationUnit, setDurationUnit] = useState('hours');
+  const [durationUnit, setDurationUnit] = useState<TimeUnit>('hours');
   const [notes, setNotes] = useState('');
 
-  // Error state — field errors from the journal engine.
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
-  // Commit failure state — from home.commit failing.
   const [commitError, setCommitError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Journal engine ref — created once per home controller.
   const journalRef = useRef<SymptomJournal | null>(null);
+
+  const existingSymptoms = usePartition(home, 'symptoms');
+
+  const typeSuggestions = useMemo(
+    () => suggestSymptomTypes(existingSymptoms, symptomType),
+    [existingSymptoms, symptomType],
+  );
+
+  const locationSuggestions = useMemo(
+    () => suggestSystemicLocations(existingSymptoms, symptomType, systemicLocation),
+    [existingSymptoms, symptomType, systemicLocation],
+  );
 
   const getJournal = useCallback((): SymptomJournal | null => {
     if (!home) return null;
     if (!journalRef.current) {
-      const store = createHomeSymptomStore(home);
-      journalRef.current = createSymptomJournal(store);
+      journalRef.current = createSymptomJournal(createHomeSymptomStore(home));
     }
     return journalRef.current;
   }, [home]);
@@ -82,9 +118,13 @@ export function SymptomJournalLogScreen({ onBack }: SymptomJournalLogScreenProps
     const journal = getJournal();
     if (!journal) return;
 
+    const matchedType = resolveSymptomTypeMatch(existingSymptoms, symptomType);
+    const normalizedType = matchedType ?? normalizeSymptomLabel(symptomType);
+    const normalizedLocation = normalizeSymptomLabel(systemicLocation);
+
     const input: SymptomEntryInput = {
-      symptomType,
-      systemicLocation,
+      symptomType: normalizedType,
+      systemicLocation: normalizedLocation,
       severity: severity !== '' ? Number(severity) : undefined,
       duration: {
         value: durationValue !== '' ? Number(durationValue) : undefined,
@@ -98,45 +138,43 @@ export function SymptomJournalLogScreen({ onBack }: SymptomJournalLogScreenProps
       const result = await journal.logSymptom(input);
 
       if (!result.ok) {
-        // Requirement 10.5: display the returned field error and retain entered values.
         setFieldErrors(result.errors);
         setCommitError(null);
+        setSuccessMessage(null);
         return;
       }
 
-      // Requirement 10.6: clear the displayed field error on successful submission.
       setFieldErrors([]);
       setCommitError(null);
+      setSuccessMessage(`Saved ${result.entry.symptomType}.`);
 
-      // Clear form on success.
       setSymptomType('');
       setSystemicLocation('');
       setSeverity('');
       setDurationValue('');
       setDurationUnit('hours');
       setNotes('');
-    } catch {
-      // Requirement 10.8: on commit failure, display persistence-failure message
-      // and retain entered values.
-      setCommitError('Symptom was not saved. Please try again.');
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Symptom was not saved. Please try again.';
+      setCommitError(message);
+      setSuccessMessage(null);
     }
-  }, [getJournal, symptomType, systemicLocation, severity, durationValue, durationUnit, notes]);
-
-  if (!home) {
-    return (
-      <View style={styles.container} testID="journal-log-screen">
-        <Text style={styles.errorText} accessibilityRole="alert" testID="journal-log-unavailable">
-          Data unavailable. Please try again later.
-        </Text>
-      </View>
-    );
-  }
+  }, [
+    durationUnit,
+    durationValue,
+    existingSymptoms,
+    getJournal,
+    notes,
+    severity,
+    symptomType,
+    systemicLocation,
+  ]);
 
   return (
     <ScrollView style={styles.container} testID="journal-log-screen">
       <Text style={styles.title}>Log Symptom</Text>
+      <Text style={styles.lead}>Matching is case-insensitive — pick a suggestion to reuse an existing symptom name.</Text>
 
-      {/* Field errors (Requirement 10.5) */}
       {fieldErrors.length > 0 && (
         <View testID="journal-log-field-errors" accessibilityRole="alert">
           {fieldErrors.map((err, i) => (
@@ -147,48 +185,77 @@ export function SymptomJournalLogScreen({ onBack }: SymptomJournalLogScreenProps
         </View>
       )}
 
-      {/* Commit failure (Requirement 10.8) */}
       {commitError && (
         <Text style={styles.errorText} accessibilityRole="alert" testID="journal-log-commit-error">
           {commitError}
         </Text>
       )}
 
-      {/* Symptom Type */}
+      {successMessage && (
+        <View style={styles.successBox} testID="journal-log-success">
+          <Text style={styles.successText}>{successMessage}</Text>
+          {onViewHistory && (
+            <Pressable
+              style={styles.linkButton}
+              onPress={onViewHistory}
+              accessibilityRole="button"
+              testID="journal-log-view-history"
+            >
+              <Text style={styles.linkButtonText}>View history</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
       <Text style={styles.label}>Symptom Type</Text>
       <TextInput
         style={styles.input}
         value={symptomType}
-        onChangeText={setSymptomType}
+        onChangeText={(value) => {
+          setSymptomType(value);
+          setSuccessMessage(null);
+        }}
         placeholder="e.g. Headache, Joint pain"
+        autoCapitalize="words"
         accessibilityLabel="Symptom type"
         testID="journal-log-symptom-type"
       />
+      <SuggestionList
+        suggestions={typeSuggestions}
+        onSelect={(value) => setSymptomType(value)}
+        testID="journal-log-type-suggestions"
+      />
 
-      {/* Systemic Location */}
       <Text style={styles.label}>Systemic Location</Text>
       <TextInput
         style={styles.input}
         value={systemicLocation}
-        onChangeText={setSystemicLocation}
+        onChangeText={(value) => {
+          setSystemicLocation(value);
+          setSuccessMessage(null);
+        }}
         placeholder="e.g. Head, Left knee"
+        autoCapitalize="words"
         accessibilityLabel="Systemic location"
         testID="journal-log-systemic-location"
       />
+      <SuggestionList
+        suggestions={locationSuggestions}
+        onSelect={(value) => setSystemicLocation(value)}
+        testID="journal-log-location-suggestions"
+      />
 
-      {/* Severity */}
       <Text style={styles.label}>Severity (1–10)</Text>
       <TextInput
         style={styles.input}
         value={severity}
         onChangeText={setSeverity}
         placeholder="1–10"
-        keyboardType="numeric"
+        keyboardType="number-pad"
         accessibilityLabel="Severity"
         testID="journal-log-severity"
       />
 
-      {/* Duration */}
       <Text style={styles.label}>Duration</Text>
       <View style={styles.durationRow}>
         <TextInput
@@ -196,21 +263,26 @@ export function SymptomJournalLogScreen({ onBack }: SymptomJournalLogScreenProps
           value={durationValue}
           onChangeText={setDurationValue}
           placeholder="Value"
-          keyboardType="numeric"
+          keyboardType="number-pad"
           accessibilityLabel="Duration value"
           testID="journal-log-duration-value"
         />
-        <TextInput
-          style={[styles.input, styles.durationInput]}
-          value={durationUnit}
-          onChangeText={setDurationUnit}
-          placeholder="Unit (minutes, hours, days, weeks)"
-          accessibilityLabel="Duration unit"
-          testID="journal-log-duration-unit"
-        />
+      </View>
+      <View style={styles.unitRow}>
+        {DURATION_UNITS.map((unit) => (
+          <Pressable
+            key={unit}
+            style={[styles.unitChip, durationUnit === unit && styles.unitChipSelected]}
+            onPress={() => setDurationUnit(unit)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: durationUnit === unit }}
+            testID={`journal-log-duration-unit-${unit}`}
+          >
+            <Text style={[styles.unitChipText, durationUnit === unit && styles.unitChipTextSelected]}>{unit}</Text>
+          </Pressable>
+        ))}
       </View>
 
-      {/* Notes */}
       <Text style={styles.label}>Notes</Text>
       <TextInput
         style={[styles.input, styles.notesInput]}
@@ -222,7 +294,6 @@ export function SymptomJournalLogScreen({ onBack }: SymptomJournalLogScreenProps
         testID="journal-log-notes"
       />
 
-      {/* Submit */}
       <Pressable
         style={styles.submitButton}
         onPress={handleSubmit}
@@ -233,15 +304,8 @@ export function SymptomJournalLogScreen({ onBack }: SymptomJournalLogScreenProps
         <Text style={styles.submitText}>Log Symptom</Text>
       </Pressable>
 
-      {/* Back */}
       {onBack && (
-        <Pressable
-          style={styles.backButton}
-          onPress={onBack}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          testID="journal-log-back"
-        >
+        <Pressable style={styles.backButton} onPress={onBack} accessibilityRole="button" testID="journal-log-back">
           <Text style={styles.backText}>Back</Text>
         </Pressable>
       )}
@@ -258,8 +322,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    marginBottom: 16,
+    marginBottom: 8,
     color: '#1a1a1a',
+  },
+  lead: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 16,
+    lineHeight: 20,
   },
   label: {
     fontSize: 14,
@@ -287,10 +357,78 @@ const styles = StyleSheet.create({
   durationInput: {
     flex: 1,
   },
+  unitRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  unitChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    backgroundColor: '#fafafa',
+  },
+  unitChipSelected: {
+    borderColor: '#0066cc',
+    backgroundColor: '#e8f0fe',
+  },
+  unitChipText: {
+    fontSize: 14,
+    color: '#444',
+    textTransform: 'capitalize',
+  },
+  unitChipTextSelected: {
+    color: '#0066cc',
+    fontWeight: '600',
+  },
+  suggestionList: {
+    marginTop: 4,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#d0e3f5',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#f8fbff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#d0e3f5',
+  },
+  suggestionText: {
+    fontSize: 15,
+    color: '#0066cc',
+  },
   errorText: {
     color: '#c00',
     fontSize: 14,
     marginBottom: 4,
+  },
+  successBox: {
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#eef8f0',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#b8dfc4',
+  },
+  successText: {
+    color: '#067a36',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  linkButton: {
+    alignSelf: 'flex-start',
+  },
+  linkButtonText: {
+    color: '#0066cc',
+    fontSize: 14,
+    fontWeight: '600',
   },
   submitButton: {
     marginTop: 24,

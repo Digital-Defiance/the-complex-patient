@@ -75,8 +75,8 @@ function resolveFetch(provided?: FetchLike): FetchLike {
  * Create an authenticated, blind {@link VaultHttpClient} for the Sync_Worker.
  *
  * @throws if `baseUrl` is not an absolute `https:` URL — the platform requires
- * HTTPS for all Sync_Backend traffic (Requirement 22.1). (Localhost over `http`
- * is permitted for development only.)
+ * HTTPS for all Sync_Backend traffic (Requirement 22.1). Loopback `http` and, in
+ * development only, private LAN IPs (e.g. `http://172.16.0.14:8080`) are permitted.
  */
 export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClient {
   const fetchImpl = resolveFetch(deps.fetch);
@@ -146,13 +146,34 @@ function assertSecureOrigin(baseUrl: string): void {
   } catch {
     throw new Error(`invalid Sync_Backend baseUrl: ${baseUrl}`);
   }
-  const isLocalhost =
-    url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
-  if (url.protocol !== 'https:' && !isLocalhost) {
+
+  const allowHttp =
+    isLoopbackHost(url.hostname) ||
+    (typeof __DEV__ !== 'undefined' && __DEV__ && isPrivateLanHost(url.hostname));
+
+  if (url.protocol !== 'https:' && !allowHttp) {
     throw new Error(
       `Sync_Backend baseUrl must use https (Requirement 22.1); got ${url.protocol}//${url.host}`,
     );
   }
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+
+/** RFC 1918 private IPv4 ranges used for on-LAN local WordPress during development. */
+function isPrivateLanHost(hostname: string): boolean {
+  const parts = hostname.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+
+  const [first, second] = parts;
+  if (first === 10) return true;
+  if (first === 172 && second >= 16 && second <= 31) return true;
+  if (first === 192 && second === 168) return true;
+  return false;
 }
 
 /** Tolerate empty / non-JSON bodies (e.g. a bare 401) without throwing. */

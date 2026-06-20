@@ -26,11 +26,11 @@ import { createLocalVault, MemoryStorageBackend, type LocalVault } from '@comple
 import { encrypt, decrypt } from '@complex-patient/crypto-engine';
 import {
   IdleAutoLock,
-  NativeSessionKeyStore,
   type BiometricAdapter,
   type KekCodec,
   type SecureStoreAdapter,
 } from '@complex-patient/key-store';
+import { createPlatformSessionKeyStore } from '../../session-key-store';
 import { SyncWorker } from '@complex-patient/sync-engine';
 import {
   createAgeGateOnboarding,
@@ -105,7 +105,7 @@ export async function createMobileHome(
   let onIdle: () => void = () => {};
   const idle = new IdleAutoLock(() => onIdle());
 
-  const keyStore = new NativeSessionKeyStore({
+  const keyStore = createPlatformSessionKeyStore({
     secureStore: options.secureStore,
     biometrics: options.biometrics,
     codec: options.codec,

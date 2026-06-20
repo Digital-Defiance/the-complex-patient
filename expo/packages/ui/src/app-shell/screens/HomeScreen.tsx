@@ -19,7 +19,7 @@ import { useAppHost } from '../app-host';
  */
 export interface HomeScreenProps {
   /** Navigate to a subsystem by name. */
-  onNavigate: (subsystem: 'medications' | 'journal' | 'insights') => void;
+  onNavigate: (subsystem: 'medications' | 'journal' | 'insights' | 'export' | 'import') => void;
   /** Navigate to the sign-in screen after sign-out completes. */
   onSignedOut: () => void;
 }
@@ -123,7 +123,7 @@ export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.
           testID="home-nav-journal"
         >
           <Text style={styles.navButtonText}>Symptom Journal</Text>
-          <Text style={styles.navButtonSubtext}>Log symptoms &amp; flare-ups</Text>
+          <Text style={styles.navButtonSubtext}>Log symptoms, view history, and flare-ups</Text>
         </Pressable>
 
         <Pressable
@@ -135,6 +135,28 @@ export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.
         >
           <Text style={styles.navButtonText}>Insights</Text>
           <Text style={styles.navButtonSubtext}>View correlations &amp; reports</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.navButton}
+          onPress={() => onNavigate('export')}
+          accessibilityRole="button"
+          accessibilityLabel="Clinical export"
+          testID="home-nav-export"
+        >
+          <Text style={styles.navButtonText}>Clinical Export</Text>
+          <Text style={styles.navButtonSubtext}>FHIR bundle in a password-protected zip</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.navButton}
+          onPress={() => onNavigate('import')}
+          accessibilityRole="button"
+          accessibilityLabel="Import clinical export"
+          testID="home-nav-import"
+        >
+          <Text style={styles.navButtonText}>Import Export</Text>
+          <Text style={styles.navButtonSubtext}>Preview a previously exported zip file</Text>
         </Pressable>
       </View>
 

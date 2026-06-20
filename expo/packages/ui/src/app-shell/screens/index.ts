@@ -35,7 +35,11 @@ export {
 } from './SyncStatusIndicator';
 export { InsightsScreen, type InsightsScreenProps } from './InsightsScreen';
 export { PhysicianReportScreen, type PhysicianReportScreenProps } from './PhysicianReportScreen';
+export { ExportScreen, type ExportScreenProps } from './ExportScreen';
+export { ImportScreen, type ImportScreenProps } from './ImportScreen';
 export { SymptomJournalLogScreen, type SymptomJournalLogScreenProps } from './SymptomJournalLogScreen';
+export { SymptomJournalHubScreen, type SymptomJournalHubScreenProps } from './SymptomJournalHubScreen';
+export { SymptomJournalHistoryScreen, type SymptomJournalHistoryScreenProps } from './SymptomJournalHistoryScreen';
 export { FlareScreen, type FlareScreenProps } from './FlareScreen';
 export { MedicationsScreen, type MedicationsScreenProps } from './MedicationsScreen';
 export { PrnQuickLogScreen, type PrnQuickLogScreenProps } from './PrnQuickLogScreen';

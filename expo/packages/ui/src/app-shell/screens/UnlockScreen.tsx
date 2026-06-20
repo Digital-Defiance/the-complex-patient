@@ -3,7 +3,7 @@
  *
  * Rendered while the Home_Controller status is `locked`. Presents a passphrase
  * input form that:
- * 1. Validates the 8–128 character length bound BEFORE any derivation (7.8).
+ * 1. Validates the 12–128 character length bound BEFORE any derivation (7.8).
  * 2. On valid length: generates a salt (first time) or loads stored KDF
  *    material, derives the KEK via `deriveKEK`, and calls `home.unlockWithKek`.
  * 3. On `ready` result → navigation to the authenticated home screen.
@@ -34,8 +34,8 @@ import { deriveKEK, generateSalt, type KdfParams, type CryptoKeyRef } from '@com
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Minimum passphrase length for UI validation (Requirement 7.8). */
-const PASSPHRASE_MIN = 8;
+/** Minimum passphrase length for UI validation (Requirement 1.9 / 7.8). */
+const PASSPHRASE_MIN = 12;
 /** Maximum passphrase length for UI validation (Requirement 7.8). */
 const PASSPHRASE_MAX = 128;
 
@@ -91,7 +91,7 @@ export async function submitPassphrase(
   deps: PassphraseScreenDeps,
   passphrase: string,
 ): Promise<PassphraseSubmitResult> {
-  // Requirement 7.8: enforce 8–128 length bound BEFORE any derivation
+  // Requirement 7.8: enforce 12–128 length bound BEFORE any derivation
   if (passphrase.length < PASSPHRASE_MIN || passphrase.length > PASSPHRASE_MAX) {
     return { ok: false, reason: 'LENGTH' };
   }
@@ -150,8 +150,12 @@ export async function submitBiometric(
 ): Promise<BiometricSubmitResult> {
   const res = await home.unlock();
   if (res.ok) return { ok: true };
-  // BIOMETRIC_FAILED / BIOMETRIC_LOCKED_OUT → present passphrase re-entry (7.5).
-  if (res.reason === 'BIOMETRIC_FAILED' || res.reason === 'BIOMETRIC_LOCKED_OUT') {
+  // No stored KEK yet, biometric failure, or session lockout → passphrase path (7.5).
+  if (
+    res.reason === 'NO_KEY_STORED' ||
+    res.reason === 'BIOMETRIC_FAILED' ||
+    res.reason === 'BIOMETRIC_LOCKED_OUT'
+  ) {
     return 'FALLBACK';
   }
   // Other non-ready → preserve locked state, stay on unlock screen (7.9).
@@ -211,6 +215,7 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   /**
    * Whether to show the passphrase input form. Initially hidden when biometric
    * is available (the user can attempt biometric first). Set to true on
@@ -223,33 +228,38 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
 
     setError(null);
     setLoading(true);
+    setLoadingMessage('Deriving encryption key… This can take up to a minute.');
 
     const { loadKdfMaterial, saveKdfMaterial } = createKdfMaterialStorage(kdfStorage);
 
-    const result = await submitPassphrase(
-      { home, loadKdfMaterial, saveKdfMaterial },
-      passphrase,
-    );
+    try {
+      const result = await submitPassphrase(
+        { home, loadKdfMaterial, saveKdfMaterial },
+        passphrase,
+      );
 
-    setLoading(false);
+      if (result.ok) {
+        refreshHomeStatus();
+        return;
+      }
 
-    if (result.ok) {
-      // On ready → tell AppHost to re-read the controller status so RouteWatcher navigates.
-      refreshHomeStatus();
-      return;
-    }
-
-    switch (result.reason) {
-      case 'LENGTH':
-        setError('Passphrase must be between 8 and 128 characters.');
-        break;
-      case 'DERIVATION_FAILED':
-        setError('Unable to derive key. Please try again.');
-        break;
-      case 'STILL_LOCKED':
-        // Requirement 7.9: preserve locked state and stay on unlock screen
-        setError('Unlock failed. Please check your passphrase and try again.');
-        break;
+      switch (result.reason) {
+        case 'LENGTH':
+          setError('Passphrase must be between 12 and 128 characters.');
+          break;
+        case 'DERIVATION_FAILED':
+          setError('Unable to derive key. Please try again.');
+          break;
+        case 'STILL_LOCKED':
+          setError('Unlock failed. Please check your passphrase and try again.');
+          break;
+      }
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Unlock failed unexpectedly.';
+      setError(message);
+    } finally {
+      setLoading(false);
+      setLoadingMessage(null);
     }
   }, [home, passphrase, kdfStorage, refreshHomeStatus]);
 
@@ -265,26 +275,28 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
 
     setError(null);
     setLoading(true);
+    setLoadingMessage('Unlocking…');
 
-    const result = await submitBiometric(home);
+    try {
+      const result = await submitBiometric(home);
 
-    setLoading(false);
+      if (result === 'FALLBACK') {
+        setShowPassphraseInput(true);
+        setError('Please enter your master passphrase to unlock.');
+        return;
+      }
 
-    if (result === 'FALLBACK') {
-      // Requirement 7.5: present the passphrase re-entry path and stay on unlock.
-      setShowPassphraseInput(true);
-      setError('Biometric authentication failed. Please enter your passphrase.');
-      return;
+      if (result.ok) {
+        refreshHomeStatus();
+        return;
+      }
+
+      setError('Unlock failed. Please try again.');
+    } finally {
+      setLoading(false);
+      setLoadingMessage(null);
     }
-
-    if (result.ok) {
-      // Requirement 7.9 success: navigate to home (handled by route resolver).
-      return;
-    }
-
-    // Other non-ready: preserve locked state and stay on unlock (7.9).
-    setError('Unlock failed. Please try again.');
-  }, [home]);
+  }, [home, refreshHomeStatus]);
 
   return (
     <View
@@ -302,6 +314,12 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
       {error && (
         <Text style={styles.error} accessibilityRole="alert" testID="unlock-error">
           {error}
+        </Text>
+      )}
+
+      {loadingMessage && (
+        <Text style={styles.loadingMessage} testID="unlock-loading-message">
+          {loadingMessage}
         </Text>
       )}
 
@@ -449,6 +467,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
     textAlign: 'center',
+  },
+  loadingMessage: {
+    color: '#555',
+    fontSize: 14,
+    marginBottom: 12,
+    textAlign: 'center',
+    maxWidth: 320,
   },
   input: {
     width: '100%',

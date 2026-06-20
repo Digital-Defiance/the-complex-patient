@@ -13,6 +13,7 @@ import type { KekCodec } from '@complex-patient/key-store';
 import type { DeviceFlagStorage } from '@complex-patient/ui';
 
 import * as SecureStore from 'expo-secure-store';
+import { createDeviceFlagStorage } from '../../device-flag-storage';
 
 // ---------------------------------------------------------------------------
 // KekCodec (Requirement 14.3) — used by the NativeSessionKeyStore
@@ -49,10 +50,13 @@ export function createKekCodec(): KekCodec {
  * `expo-secure-store`; both `getItemAsync` / `setItemAsync` satisfy the async
  * arm of {@link DeviceFlagStorage}.
  */
-export const nativeFlagStorage: DeviceFlagStorage = {
+export const nativeFlagStorage: DeviceFlagStorage = createDeviceFlagStorage({
   getItem: (key) => SecureStore.getItemAsync(key),
   setItem: (key, value) => SecureStore.setItemAsync(key, value),
-};
+});
+
+/** Non-secret KDF salt/params for unlock — same SecureStore backend as flags. */
+export const nativeKdfStorage = nativeFlagStorage;
 
 // ---------------------------------------------------------------------------
 // Portable Base64 (no Buffer / btoa dependency)

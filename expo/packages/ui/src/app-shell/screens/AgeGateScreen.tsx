@@ -22,13 +22,34 @@ import { useAppHost } from '../app-host';
 export function AgeGateScreen(): React.ReactElement {
   const { onboarding, enterHome, startFailed, submitAge } = useAppHost();
 
-  // Local UI state -------------------------------------------------------
   const [birthMonth, setBirthMonth] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const [reprompt, setReprompt] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Render: start() failure (Requirement 5.3) ----------------------------
+  const handleSubmit = useCallback(async () => {
+    setReprompt(false);
+    setSubmitting(true);
+
+    const month = parseInt(birthMonth, 10);
+    const year = parseInt(birthYear, 10);
+
+    try {
+      await submitAge({ birthMonth: month, birthYear: year });
+
+      const status = onboarding.getStatus();
+      if (status === 'age-gate') {
+        setReprompt(true);
+      } else if (status === 'eligible') {
+        await enterHome();
+      }
+    } catch {
+      setReprompt(true);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [birthMonth, birthYear, onboarding, enterHome, submitAge]);
+
   if (startFailed) {
     return (
       <View
@@ -47,37 +68,6 @@ export function AgeGateScreen(): React.ReactElement {
     );
   }
 
-  // Submit handler -------------------------------------------------------
-  const handleSubmit = useCallback(async () => {
-    setReprompt(false);
-    setSubmitting(true);
-
-    const month = parseInt(birthMonth, 10);
-    const year = parseInt(birthYear, 10);
-
-    try {
-      // Use the AppHost's submitAge which updates navState + calls the controller.
-      await submitAge({ birthMonth: month, birthYear: year });
-
-      // After submitAge, check the controller status for the result.
-      const status = onboarding.getStatus();
-      if (status === 'age-gate') {
-        // Still on age-gate means INVALID_AGE_INPUT — show re-prompt.
-        setReprompt(true);
-      } else if (status === 'eligible') {
-        // Eligible — build the Home_Controller.
-        await enterHome();
-      }
-      // If 'ineligible', the navState update in submitAge already triggers
-      // the route resolver to navigate away.
-    } catch {
-      setReprompt(true);
-    } finally {
-      setSubmitting(false);
-    }
-  }, [birthMonth, birthYear, onboarding, enterHome, submitAge]);
-
-  // Render: age-gate form (Requirements 5.4, 5.5, 5.6) ------------------
   return (
     <View style={styles.container} testID="age-gate-screen">
       <Text style={styles.title}>Age Verification</Text>

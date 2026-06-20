@@ -8,6 +8,8 @@
 
 import type { DeviceFlagStorage } from '@complex-patient/ui';
 
+import { createLocalStorageFlagStorage } from '../../device-flag-storage';
+
 // ---------------------------------------------------------------------------
 // Device ineligibility-flag storage (Requirement 14.3)
 // ---------------------------------------------------------------------------
@@ -18,9 +20,4 @@ import type { DeviceFlagStorage } from '@complex-patient/ui';
  * `localStorage`; its synchronous `getItem` / `setItem` satisfy the sync arm of
  * {@link DeviceFlagStorage}.
  */
-export const webFlagStorage: DeviceFlagStorage = {
-  getItem: (key) => window.localStorage.getItem(key),
-  setItem: (key, value) => {
-    window.localStorage.setItem(key, value);
-  },
-};
+export const webFlagStorage: DeviceFlagStorage = createLocalStorageFlagStorage();
