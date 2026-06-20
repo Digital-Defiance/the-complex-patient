@@ -162,17 +162,29 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
   }
 
   async function hydrateReady(kek: CryptoKeyRef): Promise<HomeUnlockResult> {
-    await store.hydrate(kek);
-    lock.startIdleTimer();
-    return { ok: true, status: 'ready' };
+    try {
+      await store.hydrate(kek);
+      lock.startIdleTimer();
+      return { ok: true, status: 'ready' };
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.error('[HomeEntry] hydrate failed:', message);
+      return { ok: false, reason: 'PASSPHRASE_REQUIRED' };
+    }
   }
 
   async function unlockWithKek(kek: CryptoKeyRef): Promise<HomeUnlockResult> {
     if (auth.getAuth() === null) {
       return { ok: false, reason: 'NOT_AUTHENTICATED' };
     }
-    await keyStore.store(kek);
-    return hydrateReady(kek);
+    try {
+      await keyStore.store(kek);
+      return await hydrateReady(kek);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.error('[HomeEntry] unlockWithKek failed:', message);
+      return { ok: false, reason: 'PASSPHRASE_REQUIRED' };
+    }
   }
 
   async function unlock(): Promise<HomeUnlockResult> {

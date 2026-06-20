@@ -11,26 +11,21 @@ import { Slot, useRouter, usePathname } from 'expo-router';
 import { AppHostProvider, useAppHost, type AppHostFactory } from '@complex-patient/ui';
 import { createWebApp } from '../src/entry';
 import { createWebLifecycleAdapter } from '../src/lifecycle-adapter';
+import { webFlagStorage } from '../src/adapters';
+import { resolveSyncBackendBaseUrl } from '../../sync-backend-url';
+import { isWithinHomeArea } from '../../home-route-guard';
 
 // ---------------------------------------------------------------------------
 // Web host factory
 // ---------------------------------------------------------------------------
 
-const SYNC_BACKEND_BASE_URL = 'https://thecomplexpatient.com';
-
-const inMemoryFlagStorage = (() => {
-  const store = new Map<string, string>();
-  return {
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => { store.set(key, value); },
-  };
-})();
+const SYNC_BACKEND_BASE_URL = resolveSyncBackendBaseUrl();
 
 const webFactory: AppHostFactory = {
   createApp() {
     return createWebApp({
       baseUrl: SYNC_BACKEND_BASE_URL,
-      ineligibilityStorage: inMemoryFlagStorage,
+      ineligibilityStorage: webFlagStorage,
       lifecycle: createWebLifecycleAdapter(),
     });
   },
@@ -63,7 +58,7 @@ function RouteWatcher(): null {
     const target = routeToPathname(route.name);
     if (!target) return;
 
-    if (route.name === 'home' && (pathname === '/' || pathname.includes('home') || pathname.includes('medications') || pathname.includes('journal') || pathname.includes('insights'))) {
+    if (route.name === 'home' && isWithinHomeArea(pathname)) {
       return;
     }
 

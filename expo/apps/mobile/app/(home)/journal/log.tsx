@@ -19,5 +19,10 @@ export default function JournalLog(): React.ReactElement {
     router.back();
   }, [router]);
 
-  return <SymptomJournalLogScreen onBack={handleBack} />;
+  return (
+    <SymptomJournalLogScreen
+      onBack={handleBack}
+      onViewHistory={() => router.push('/(home)/journal/history' as never)}
+    />
+  );
 }

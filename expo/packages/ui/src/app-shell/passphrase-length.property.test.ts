@@ -73,7 +73,7 @@ import { submitPassphrase, type PassphraseScreenDeps } from './screens/UnlockScr
 // Constants matching the implementation bounds
 // ---------------------------------------------------------------------------
 
-const PASSPHRASE_MIN = 8;
+const PASSPHRASE_MIN = 12;
 const PASSPHRASE_MAX = 128;
 
 // ---------------------------------------------------------------------------

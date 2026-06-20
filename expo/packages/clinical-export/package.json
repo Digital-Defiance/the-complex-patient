@@ -1,0 +1,16 @@
+{
+  "name": "@complex-patient/clinical-export",
+  "version": "0.0.1",
+  "private": true,
+  "description": "On-device FHIR R4 clinical export with password-protected ZIP packaging",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@complex-patient/domain": "workspace:*",
+    "@zip.js/zip.js": "2.7.57"
+  }
+}
