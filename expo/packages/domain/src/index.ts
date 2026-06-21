@@ -13,6 +13,12 @@ export type {
   PrnConfig,
   MedicationSchedule,
   MedicationProfile,
+  MedPillShape,
+  MedAppearance,
+  MedRefillTracking,
+  MedEventStatus,
+  MedEvent,
+  LogLocation,
   PrnLog,
 } from './medications';
 
@@ -24,6 +30,8 @@ export type {
   Association,
   FlareUp,
 } from './symptoms';
+
+export type { LocationTrailSample } from './location-trail';
 
 export type {
   ProfileFieldError,

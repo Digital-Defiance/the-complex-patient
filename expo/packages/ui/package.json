@@ -15,9 +15,11 @@
     "@complex-patient/domain": "workspace:*",
     "@complex-patient/key-store": "workspace:*",
     "@complex-patient/local-vault": "workspace:*",
+    "@complex-patient/med-visuals": "workspace:*",
     "@complex-patient/medications": "workspace:*",
     "@complex-patient/symptom-journal": "workspace:*",
-    "@complex-patient/sync-engine": "workspace:*"
+    "@complex-patient/sync-engine": "workspace:*",
+    "@complex-patient/weather": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18.0.0"

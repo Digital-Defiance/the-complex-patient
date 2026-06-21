@@ -8,8 +8,10 @@ import {
   buildFhirBundle,
   createClinicalExport,
   EXPORT_JSON_FILENAME,
+  EXPORT_MARKDOWN_FILENAME,
   assertNoVaultArtifacts,
   serializeFhirJson,
+  buildClinicalSummaryMarkdown,
   type ClinicalExportSource,
 } from './index';
 
@@ -108,8 +110,18 @@ describe('serializeFhirJson', () => {
   });
 });
 
+describe('buildClinicalSummaryMarkdown', () => {
+  it('includes active medications and PRN logs from sample source', () => {
+    const markdown = buildClinicalSummaryMarkdown(sampleSource, '2026-06-14T00:00:00.000Z');
+    expect(markdown).toContain('Ibuprofen');
+    expect(markdown).toContain('POTS');
+    expect(markdown).toContain('Headache');
+    expect(markdown).toContain('Heat exposure');
+  });
+});
+
 describe('createClinicalExport', () => {
-  it('packs FHIR JSON into a password-protected zip', async () => {
+  it('packs FHIR JSON and Markdown summary into a password-protected zip', async () => {
     const result = await createClinicalExport({
       source: sampleSource,
       zipPassword: 'test-export-password',
@@ -118,18 +130,29 @@ describe('createClinicalExport', () => {
 
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') return;
+    expect(result.markdown).toContain('# Clinical Summary');
+    expect(result.markdown).toContain('Ibuprofen');
 
     const reader = new ZipReader(new BlobReader(new Blob([result.zipBytes])));
     const entries = await reader.getEntries();
     expect(entries.some((entry) => entry.filename === EXPORT_JSON_FILENAME)).toBe(true);
+    expect(entries.some((entry) => entry.filename === EXPORT_MARKDOWN_FILENAME)).toBe(true);
 
     const jsonEntry = entries.find((entry) => entry.filename === EXPORT_JSON_FILENAME);
+    const markdownEntry = entries.find((entry) => entry.filename === EXPORT_MARKDOWN_FILENAME);
     expect(jsonEntry).toBeDefined();
-    if (!jsonEntry?.getData) return;
+    expect(markdownEntry).toBeDefined();
+    if (!jsonEntry?.getData || !markdownEntry?.getData) return;
 
     const textWriter = new TextWriter();
-    const extracted = await jsonEntry.getData(textWriter, { password: 'test-export-password' });
-    expect(extracted).toContain('"resourceType": "Bundle"');
+    const extractedJson = await jsonEntry.getData(textWriter, { password: 'test-export-password' });
+    expect(extractedJson).toContain('"resourceType":"Bundle"');
+
+    const extractedMarkdown = await markdownEntry.getData(new TextWriter(), {
+      password: 'test-export-password',
+    });
+    expect(extractedMarkdown).toContain('# Clinical Summary');
+    expect(extractedMarkdown).toContain('Headache');
     await reader.close();
   });
 
@@ -158,5 +181,22 @@ describe('createClinicalExport', () => {
   it('rejects empty zip password', async () => {
     const result = await createClinicalExport({ source: sampleSource, zipPassword: '   ' });
     expect(result.status).toBe('error');
+  });
+
+  it('reports staged progress while exporting', async () => {
+    const stages: string[] = [];
+    const result = await createClinicalExport({
+      source: sampleSource,
+      zipPassword: 'test-export-password',
+      onProgress: (progress) => {
+        stages.push(progress.stage);
+      },
+    });
+
+    expect(result.status).toBe('ok');
+    expect(stages).toContain('building-fhir');
+    expect(stages).toContain('serializing');
+    expect(stages).toContain('encrypting');
+    expect(stages.at(-1)).toBe('encrypting');
   });
 });

@@ -138,6 +138,7 @@ describe('applyClinicalImportMerge', () => {
       'conditions:0',
       'flares:0',
       'associations:0',
+      'locationTrail:0',
     ]);
     expect(result.totals.added).toBe(1);
   });

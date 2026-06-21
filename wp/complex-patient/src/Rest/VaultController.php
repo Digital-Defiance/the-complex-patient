@@ -60,6 +60,7 @@ final class VaultController
         'conditions',
         'flares',
         'associations',
+        'locationTrail',
     ];
 
     /**

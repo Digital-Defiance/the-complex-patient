@@ -9,9 +9,11 @@
  * Requirements: 9.4, 9.5, 9.6, 9.7
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import type { MedicationProfile, PrnLog, PrnConfig } from '@complex-patient/domain';
+import type { MedicationProfile, PrnLog, PrnConfig, VaultRecord } from '@complex-patient/domain';
+import { splitMedicationsPartition } from '@complex-patient/clinical-export';
+import { captureLogLocation } from '@complex-patient/weather';
 import {
   evaluatePrnQuickLog,
   computeTrailing24hCumulative,
@@ -19,6 +21,7 @@ import {
 } from '@complex-patient/medications';
 import { useAppHost } from '../app-host';
 import { usePartition } from '../hooks';
+import { useWeatherHost } from '../weather-host-context';
 import type { HomeEntryController } from '../../app/home-entry';
 
 // ---------------------------------------------------------------------------
@@ -109,14 +112,16 @@ interface InnerProps {
 }
 
 function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElement {
-  // Read PRN medications through usePartition (Requirement 8.6, 14.1).
-  const records = usePartition<MedicationProfile>(home, 'medications');
-  const prnMedications = records.filter(
+  const { location, preferences } = useWeatherHost();
+  const allRecords = usePartition<VaultRecord>(home, 'medications');
+  const { medications, prnLogs } = useMemo(
+    () => splitMedicationsPartition(allRecords),
+    [allRecords],
+  );
+  const prnMedications = medications.filter(
     (m) => m.prn !== undefined && m.active === true && m.deleted !== true,
   );
 
-  // All PRN logs for computing trailing 24h cumulative.
-  const [prnLogs, setPrnLogs] = useState<PrnLog[]>([]);
   // The last log attempt result (evaluation) displayed before accepting another.
   const [lastAttempt, setLastAttempt] = useState<LogAttemptState | null>(null);
   // Whether a log operation is in progress.
@@ -176,16 +181,22 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
         ...(evaluation.overrideFlag ? { override: true } : {}),
       };
 
+      const logLocation = await captureLogLocation({
+        preferences,
+        location,
+        capturedAt: takenAt,
+      });
+      if (logLocation) {
+        newLog.location = logLocation;
+      }
+
       try {
-        const result = await home.commit<MedicationProfile>(
+        const result = await home.commit<VaultRecord>(
           'medications',
-          (current) => current, // No profile mutation — PRN log only (Req 9.4).
+          (current) => [...current, newLog],
         );
 
         if (result.ok) {
-          // Update local PRN logs state with the new log.
-          setPrnLogs((prev) => [...prev, newLog]);
-
           setLastAttempt({
             medicationId: medication.id,
             drugName: medication.drugName,
@@ -203,7 +214,7 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
             evaluation,
             prn,
             persisted: false,
-            persistError: result.message ?? 'Change was not saved.',
+            persistError: result.message,
             overrideAcknowledged,
           });
         }
@@ -222,7 +233,7 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
         setIsLogging(false);
       }
     },
-    [home, prnLogs],
+    [home, location, preferences, prnLogs],
   );
 
   /**
@@ -301,11 +312,9 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
             testID={`prn-log-${med.id}`}
           >
             <Text style={styles.medName}>{med.drugName}</Text>
-            <Text style={styles.medDose}>
-              {med.prn!.doseAmount} {med.prn!.doseUnit}
-            </Text>
+            <Text style={styles.medDose}>{med.dosage}</Text>
             <Text style={styles.medLimit}>
-              24h limit: {med.prn!.safetyLimit24h} {med.prn!.doseUnit}
+              24h max: {med.prn!.safetyLimit24h} {med.prn!.doseUnit}
             </Text>
           </Pressable>
         ))}

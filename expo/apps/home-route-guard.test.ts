@@ -8,6 +8,8 @@ describe('isWithinHomeArea', () => {
     expect(isWithinHomeArea('/(home)/journal/log')).toBe(true);
     expect(isWithinHomeArea('/export')).toBe(true);
     expect(isWithinHomeArea('/(home)/import')).toBe(true);
+    expect(isWithinHomeArea('/(home)/settings')).toBe(true);
+    expect(isWithinHomeArea('/settings')).toBe(true);
   });
 
   it('blocks auth and onboarding routes', () => {

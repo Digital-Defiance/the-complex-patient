@@ -40,6 +40,7 @@ const vaultTypeArb: fc.Arbitrary<VaultType> = fc.constantFrom(
   'conditions',
   'flares',
   'associations',
+  'locationTrail',
 );
 
 /** Generate an arbitrary PartitionSyncStatus. */
@@ -63,6 +64,7 @@ function createFakeSyncStatusStore(): StoreApi<SyncStatusState> {
       conditions: 'idle',
       flares: 'idle',
       associations: 'idle',
+      locationTrail: 'idle',
     },
   };
 

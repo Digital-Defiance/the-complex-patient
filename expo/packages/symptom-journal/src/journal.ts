@@ -122,6 +122,7 @@ class SymptomJournalImpl implements SymptomJournal {
       },
       notes: typeof input.notes === 'string' ? input.notes : '',
       active: typeof input.active === 'boolean' ? input.active : true,
+      ...(input.location ? { location: input.location } : {}),
     };
 
     const existing = await this.store.readSymptoms();

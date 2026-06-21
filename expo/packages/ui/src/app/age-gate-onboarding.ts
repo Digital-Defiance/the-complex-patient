@@ -43,6 +43,10 @@ export interface IneligibilityFlagStore {
   isIneligible(): Promise<boolean>;
   /** Persist the terminal ineligibility flag (idempotent). */
   markIneligible(): Promise<void>;
+  /** Whether age eligibility was confirmed on this device (survives reload). */
+  isAgeEligible(): Promise<boolean>;
+  /** Persist age eligibility after a successful gate (idempotent). */
+  markAgeEligible(): Promise<void>;
 }
 
 /**
@@ -57,8 +61,11 @@ export interface DeviceFlagStorage {
 
 /** Storage key for the persisted ineligibility flag (outside the Local_Vault). */
 export const INELIGIBILITY_FLAG_KEY = 'complex-patient.age-ineligible';
+/** Storage key for persisted age-eligibility (outside the Local_Vault). */
+export const ELIGIBILITY_FLAG_KEY = 'complex-patient.age-eligible';
 /** Sentinel value written when the user is determined ineligible. */
 export const INELIGIBILITY_FLAG_VALUE = 'true';
+export const ELIGIBILITY_FLAG_VALUE = 'true';
 
 /**
  * Adapt a platform key-value store (expo-secure-store / AsyncStorage /
@@ -68,6 +75,7 @@ export const INELIGIBILITY_FLAG_VALUE = 'true';
 export function createDeviceIneligibilityFlagStore(
   storage: DeviceFlagStorage,
   key: string = INELIGIBILITY_FLAG_KEY,
+  eligibilityKey: string = ELIGIBILITY_FLAG_KEY,
 ): IneligibilityFlagStore {
   return {
     async isIneligible(): Promise<boolean> {
@@ -76,6 +84,13 @@ export function createDeviceIneligibilityFlagStore(
     },
     async markIneligible(): Promise<void> {
       await storage.setItem(key, INELIGIBILITY_FLAG_VALUE);
+    },
+    async isAgeEligible(): Promise<boolean> {
+      const value = await storage.getItem(eligibilityKey);
+      return value === ELIGIBILITY_FLAG_VALUE;
+    },
+    async markAgeEligible(): Promise<void> {
+      await storage.setItem(eligibilityKey, ELIGIBILITY_FLAG_VALUE);
     },
   };
 }
@@ -120,6 +135,12 @@ export interface AgeGateOnboardingDeps {
    * is deterministic.
    */
   now?: () => Date;
+  /**
+   * Optional device signal that age eligibility was already established on this
+   * device (e.g. an existing Local_Vault). Used to avoid re-prompting after a
+   * tab reload when the eligibility flag was never persisted.
+   */
+  inferAgeEligibleFromDevice?: () => Promise<boolean>;
 }
 
 /**
@@ -160,6 +181,7 @@ export function createAgeGateOnboarding(
 ): AgeGateOnboardingController {
   const { flagStore } = deps;
   const now = deps.now ?? (() => new Date());
+  const inferAgeEligibleFromDevice = deps.inferAgeEligibleFromDevice;
 
   let status: OnboardingStatus = 'checking';
 
@@ -172,6 +194,15 @@ export function createAgeGateOnboarding(
     // (Requirement 23.8). A set flag routes straight to the terminal screen.
     if (await flagStore.isIneligible()) {
       status = 'ineligible';
+      return status;
+    }
+    if (await flagStore.isAgeEligible()) {
+      status = 'eligible';
+      return status;
+    }
+    if (inferAgeEligibleFromDevice && (await inferAgeEligibleFromDevice())) {
+      await flagStore.markAgeEligible();
+      status = 'eligible';
       return status;
     }
     status = 'age-gate';
@@ -203,6 +234,7 @@ export function createAgeGateOnboarding(
 
     // Eligible → mark the session age-eligible; onboarding may proceed to
     // Master_Passphrase setup / KEK derivation (Requirement 23.4).
+    await flagStore.markAgeEligible();
     status = 'eligible';
     return { ok: true, eligible: true };
   }

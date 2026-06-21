@@ -1131,6 +1131,7 @@ __metadata:
   resolution: "@complex-patient/insights@workspace:packages/insights"
   dependencies:
     "@complex-patient/domain": "npm:*"
+    "@complex-patient/weather": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -1147,6 +1148,17 @@ __metadata:
   resolution: "@complex-patient/local-vault@workspace:packages/local-vault"
   dependencies:
     "@complex-patient/domain": "workspace:*"
+  languageName: unknown
+  linkType: soft
+
+"@complex-patient/med-visuals@workspace:*, @complex-patient/med-visuals@workspace:packages/med-visuals":
+  version: 0.0.0-use.local
+  resolution: "@complex-patient/med-visuals@workspace:packages/med-visuals"
+  dependencies:
+    "@complex-patient/domain": "workspace:*"
+  peerDependencies:
+    react: ">=18.0.0"
+    react-native: ">=0.70.0"
   languageName: unknown
   linkType: soft
 
@@ -1172,6 +1184,7 @@ __metadata:
     "@complex-patient/medications": "npm:*"
     "@complex-patient/sync-engine": "npm:*"
     "@complex-patient/ui": "npm:*"
+    "@complex-patient/weather": "npm:*"
     expo-document-picker: "npm:~14.0.8"
     expo-file-system: "npm:~19.0.23"
     expo-local-authentication: "npm:17.0.8"
@@ -1209,12 +1222,22 @@ __metadata:
     "@complex-patient/insights": "workspace:*"
     "@complex-patient/key-store": "workspace:*"
     "@complex-patient/local-vault": "workspace:*"
+    "@complex-patient/med-visuals": "workspace:*"
     "@complex-patient/medications": "workspace:*"
     "@complex-patient/symptom-journal": "workspace:*"
     "@complex-patient/sync-engine": "workspace:*"
+    "@complex-patient/weather": "workspace:*"
     "@types/react": "npm:~19.2.14"
   peerDependencies:
     react: ">=18.0.0"
+  languageName: unknown
+  linkType: soft
+
+"@complex-patient/weather@npm:*, @complex-patient/weather@workspace:*, @complex-patient/weather@workspace:packages/weather":
+  version: 0.0.0-use.local
+  resolution: "@complex-patient/weather@workspace:packages/weather"
+  dependencies:
+    "@complex-patient/domain": "workspace:*"
   languageName: unknown
   linkType: soft
 
@@ -1230,6 +1253,7 @@ __metadata:
     "@complex-patient/medications": "npm:*"
     "@complex-patient/sync-engine": "npm:*"
     "@complex-patient/ui": "npm:*"
+    "@complex-patient/weather": "npm:*"
   languageName: unknown
   linkType: soft
 
@@ -4061,6 +4085,7 @@ __metadata:
     expo-file-system: "npm:~19.0.23"
     expo-linking: "npm:8.0.12"
     expo-local-authentication: "npm:17.0.8"
+    expo-location: "npm:~19.0.8"
     expo-notifications: "npm:0.32.17"
     expo-router: "npm:6.0.24"
     expo-secure-store: "npm:15.0.8"
@@ -5986,6 +6011,15 @@ __metadata:
   peerDependencies:
     expo: "*"
   checksum: 10c0/e12bb0b98633cbf7f5203439281d5fbd2f70df71c9ad7a92d2fdadb4fc26378ebfe0a5c7ef6eba6f1674268fc863b18a051d4187f6f785c075c08c1b3133f8cb
+  languageName: node
+  linkType: hard
+
+"expo-location@npm:~19.0.8":
+  version: 19.0.8
+  resolution: "expo-location@npm:19.0.8"
+  peerDependencies:
+    expo: "*"
+  checksum: 10c0/9549ed00d75a7d7780e16a70a9b6703a8aae8f6f2ffbe9f6ab41ef155444f4157cd26b32b1eb051e3a8a6b5b2071b555398e5d672435f240d2c2891fab041da5
   languageName: node
   linkType: hard
 

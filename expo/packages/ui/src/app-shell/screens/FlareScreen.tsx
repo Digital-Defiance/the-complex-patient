@@ -13,6 +13,8 @@ import {
 } from '@complex-patient/symptom-journal';
 import { useAppHost } from '../app-host';
 import { usePartition } from '../hooks';
+import { useWeatherHost } from '../weather-host-context';
+import { captureJournalLocation } from '../journal-location';
 import {
   createHomeFlareLookups,
   createHomeFlareStore,
@@ -52,6 +54,7 @@ function FlareScreenInner({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const journalRef = useRef<FlareJournal | null>(null);
+  const weatherHost = useWeatherHost();
   const symptomRecords = usePartition<SymptomEntry>(home, 'symptoms');
 
   const activeSymptoms = useMemo(
@@ -89,6 +92,12 @@ function FlareScreenInner({
       trigger: trigger.trim(),
     };
 
+    const capturedAt = new Date().toISOString();
+    const logLocation = await captureJournalLocation(weatherHost, capturedAt);
+    if (logLocation) {
+      input.location = logLocation;
+    }
+
     try {
       const result = await journal.logFlare(input);
 
@@ -109,7 +118,7 @@ function FlareScreenInner({
       setCommitError(message);
       setSuccessMessage(null);
     }
-  }, [getJournal, selectedIds, trigger]);
+  }, [getJournal, selectedIds, trigger, weatherHost]);
 
   const canSubmit = selectedIds.length >= 2;
 

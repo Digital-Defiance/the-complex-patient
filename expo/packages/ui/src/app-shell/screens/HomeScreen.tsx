@@ -10,7 +10,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { PASSKEY_SETUP_SESSION_KEY } from '@complex-patient/key-store';
 import { useAppHost } from '../app-host';
 
 /**
@@ -19,7 +20,7 @@ import { useAppHost } from '../app-host';
  */
 export interface HomeScreenProps {
   /** Navigate to a subsystem by name. */
-  onNavigate: (subsystem: 'medications' | 'journal' | 'insights' | 'export' | 'import') => void;
+  onNavigate: (subsystem: 'medications' | 'journal' | 'insights' | 'export' | 'import' | 'settings') => void;
   /** Navigate to the sign-in screen after sign-out completes. */
   onSignedOut: () => void;
 }
@@ -39,6 +40,57 @@ export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.
 
   const [summary, setSummary] = useState<HomeSummary | null>(null);
   const [readError, setReadError] = useState(false);
+  const [passkeyBannerVisible, setPasskeyBannerVisible] = useState(false);
+  const [passkeySetupLoading, setPasskeySetupLoading] = useState(false);
+  const [passkeySetupError, setPasskeySetupError] = useState<string | null>(null);
+  const [passkeySetupSuccess, setPasskeySetupSuccess] = useState(false);
+  const [passkeyPromptHighlight, setPasskeyPromptHighlight] = useState(false);
+
+  const handleEnablePasskey = useCallback(async () => {
+    if (!home?.enablePasskeyUnlock) {
+      setPasskeySetupError('Passkey unlock is not available in this app build.');
+      return;
+    }
+
+    setPasskeySetupLoading(true);
+    setPasskeySetupError(null);
+    setPasskeySetupSuccess(false);
+
+    try {
+      const result = await home.enablePasskeyUnlock();
+      if (result.ok) {
+        setPasskeyBannerVisible(false);
+        setPasskeyPromptHighlight(false);
+        setPasskeySetupSuccess(true);
+        return;
+      }
+
+      setPasskeySetupError(result.message);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Passkey setup failed.';
+      setPasskeySetupError(message);
+    } finally {
+      setPasskeySetupLoading(false);
+    }
+  }, [home]);
+
+  useEffect(() => {
+    if (!home?.isPasskeyUnlockAvailable?.() || home?.hasPasskeyUnlock?.()) {
+      setPasskeyBannerVisible(false);
+      setPasskeyPromptHighlight(false);
+      return;
+    }
+
+    setPasskeyBannerVisible(true);
+
+    const offered =
+      typeof globalThis.sessionStorage !== 'undefined' &&
+      globalThis.sessionStorage.getItem(PASSKEY_SETUP_SESSION_KEY) === '1';
+    if (offered) {
+      globalThis.sessionStorage.removeItem(PASSKEY_SETUP_SESSION_KEY);
+      setPasskeyPromptHighlight(true);
+    }
+  }, [home]);
 
   // Read displayed data exclusively through home.read (Requirement 8.6).
   // On failure, show data-unavailable and render no stale/partial PHI (Requirement 8.8).
@@ -85,6 +137,46 @@ export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.
     <View style={styles.container} accessibilityRole="none" accessibilityLabel="Home">
       <Text style={styles.title}>Home</Text>
 
+      {passkeySetupSuccess && (
+        <Text style={styles.passkeySuccessText} testID="home-passkey-setup-success">
+          Passkey saved. Next time you return, use passkey unlock instead of your passphrase.
+        </Text>
+      )}
+
+      {passkeyBannerVisible && (
+        <View
+          style={[styles.passkeyBanner, passkeyPromptHighlight && styles.passkeyBannerHighlight]}
+          testID="home-passkey-setup-banner"
+        >
+          <Text style={styles.passkeyBannerTitle}>
+            {passkeyPromptHighlight ? 'Save passkey for faster unlock?' : 'Faster unlock on this browser'}
+          </Text>
+          <Text style={styles.passkeyBannerText}>
+            When you switch tabs, your vault locks for security. Save a passkey to unlock instantly
+            without re-entering your master passphrase or waiting for key derivation.
+          </Text>
+          {passkeySetupError && (
+            <Text style={styles.passkeyBannerError} accessibilityRole="alert" testID="home-passkey-setup-error">
+              {passkeySetupError}
+            </Text>
+          )}
+          <Pressable
+            style={[styles.passkeyBannerButton, passkeySetupLoading && styles.buttonDisabled]}
+            onPress={handleEnablePasskey}
+            disabled={passkeySetupLoading}
+            accessibilityRole="button"
+            accessibilityLabel="Save passkey for faster unlock"
+            testID="home-passkey-setup-button"
+          >
+            {passkeySetupLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.passkeyBannerButtonText}>Save passkey</Text>
+            )}
+          </Pressable>
+        </View>
+      )}
+
       {readError && (
         <Text style={styles.errorText} accessibilityRole="alert" testID="home-data-unavailable">
           Data unavailable. Please try again later.
@@ -112,7 +204,7 @@ export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.
           testID="home-nav-medications"
         >
           <Text style={styles.navButtonText}>Medications</Text>
-          <Text style={styles.navButtonSubtext}>Manage medications &amp; PRN logs</Text>
+          <Text style={styles.navButtonSubtext}>Today queue, cabinet, schedules &amp; PRN logs</Text>
         </Pressable>
 
         <Pressable
@@ -158,6 +250,17 @@ export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.
           <Text style={styles.navButtonText}>Import Export</Text>
           <Text style={styles.navButtonSubtext}>Preview a previously exported zip file</Text>
         </Pressable>
+
+        <Pressable
+          style={styles.navButton}
+          onPress={() => onNavigate('settings')}
+          accessibilityRole="button"
+          accessibilityLabel="Weather and location settings"
+          testID="home-nav-settings"
+        >
+          <Text style={styles.navButtonText}>Weather &amp; Location</Text>
+          <Text style={styles.navButtonSubtext}>Optional location on med logs and chart overlays</Text>
+        </Pressable>
       </View>
 
       {/* Sign Out button (Requirement 8.5) */}
@@ -185,6 +288,63 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 16,
     color: '#1a1a1a',
+  },
+  passkeyBanner: {
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#f0f7ff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#b8d4f0',
+  },
+  passkeyBannerHighlight: {
+    borderColor: '#0066cc',
+    borderWidth: 2,
+    backgroundColor: '#e8f2ff',
+  },
+  passkeyBannerError: {
+    color: '#b00020',
+    fontSize: 14,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  passkeySuccessText: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
+    color: '#1b5e20',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  passkeyBannerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#004488',
+    marginBottom: 8,
+  },
+  passkeyBannerText: {
+    fontSize: 14,
+    color: '#444',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  passkeyBannerButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#0066cc',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  passkeyBannerButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   errorText: {
     color: '#c00',

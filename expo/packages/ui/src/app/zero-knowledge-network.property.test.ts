@@ -358,7 +358,14 @@ const scenarioArb: fc.Arbitrary<GeneratedScenario> = fc.record({
 });
 
 /** The five PHI partitions written through the vault store, in commit order. */
-const PARTITIONS: VaultType[] = ['medications', 'symptoms', 'conditions', 'flares', 'associations'];
+const PARTITIONS: VaultType[] = [
+  'medications',
+  'symptoms',
+  'conditions',
+  'flares',
+  'associations',
+  'locationTrail',
+];
 
 /**
  * Collect EVERY plaintext PHI string token plus sensitive inputs (passphrase,

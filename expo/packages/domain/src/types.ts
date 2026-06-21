@@ -17,7 +17,8 @@ export type VaultType =
   | 'symptoms'
   | 'conditions'
   | 'flares'
-  | 'associations';
+  | 'associations'
+  | 'locationTrail';
 
 /**
  * Base interface for all vault records.

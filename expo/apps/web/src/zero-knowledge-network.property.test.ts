@@ -182,7 +182,14 @@ const phiArb: fc.Arbitrary<GeneratedPhi> = fc.record({
 });
 
 /** The five PHI partitions written through the vault store, in commit order. */
-const PARTITIONS: VaultType[] = ['medications', 'symptoms', 'conditions', 'flares', 'associations'];
+const PARTITIONS: VaultType[] = [
+  'medications',
+  'symptoms',
+  'conditions',
+  'flares',
+  'associations',
+  'locationTrail',
+];
 
 /**
  * Collect EVERY plaintext PHI string token present anywhere in the dataset, so

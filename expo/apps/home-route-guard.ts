@@ -9,6 +9,7 @@ export const HOME_AREA_PATH_SEGMENTS = [
   'insights',
   'export',
   'import',
+  'settings',
 ] as const;
 
 /** True when the current pathname is an authenticated home subtree route. */

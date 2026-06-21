@@ -21,6 +21,12 @@ import type { VaultStore } from './vault-store';
  */
 export interface LockableKeyStore {
   lock(): Promise<void>;
+  /** Reset the key-store idle countdown on user interaction. */
+  notifyActivity?(): void;
+  /** Pause idle auto-lock during long-running local operations. */
+  suspendIdle?(): void;
+  /** Resume idle auto-lock after a suspended operation completes. */
+  resumeIdle?(): void;
 }
 
 /**
@@ -32,6 +38,8 @@ export interface IdleController {
   start(): void;
   stop(): void;
   notifyActivity(): void;
+  suspend?(): void;
+  resume?(): void;
 }
 
 /** Dependencies for {@link bindStoreToLock}. */
@@ -54,6 +62,10 @@ export interface LockBinding {
   startIdleTimer(): void;
   /** Reset the idle countdown on user interaction (Requirement 3.7). */
   notifyActivity(): void;
+  /** Pause idle auto-lock during long-running local operations. */
+  suspendIdle(): void;
+  /** Resume idle auto-lock after a suspended operation completes. */
+  resumeIdle(): void;
 }
 
 /**
@@ -82,7 +94,18 @@ export function bindStoreToLock(deps: LockBindingDeps): LockBinding {
 
   function notifyActivity(): void {
     idle?.notifyActivity();
+    keyStore.notifyActivity?.();
   }
 
-  return { lock, startIdleTimer, notifyActivity };
+  function suspendIdle(): void {
+    idle?.suspend?.();
+    keyStore.suspendIdle?.();
+  }
+
+  function resumeIdle(): void {
+    idle?.resume?.();
+    keyStore.resumeIdle?.();
+  }
+
+  return { lock, startIdleTimer, notifyActivity, suspendIdle, resumeIdle };
 }

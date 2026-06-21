@@ -13,5 +13,5 @@
 
 export type { WebEntryOptions } from './entry';
 export { createWebHome, SecureContextRequiredError } from './entry';
-export { webFlagStorage } from './adapters';
+export { webFlagStorage, createWebPasskeyStorage } from './adapters';
 export { createWebLifecycleAdapter } from './lifecycle-adapter';

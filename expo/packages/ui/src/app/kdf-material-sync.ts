@@ -18,12 +18,36 @@ export interface ResolveKdfMaterialDeps {
   saveLocal(material: KdfMaterial): Promise<void>;
   fetchRemote?(): Promise<KdfMaterial | null>;
   publishRemote?(material: KdfMaterial): Promise<void>;
+  /** When set, refuse to mint fresh KDF material if encrypted vault data already exists. */
+  hasExistingVaultData?(): Promise<boolean>;
+}
+
+export class KdfMaterialMissingError extends Error {
+  constructor() {
+    super('KDF material is missing but encrypted vault data exists on this device.');
+    this.name = 'KdfMaterialMissingError';
+  }
 }
 
 const DEFAULT_PBKDF2_PARAMS: KdfParams = {
   algorithm: 'PBKDF2',
   pbkdf2Iterations: 600_000,
 };
+
+/** Normalize persisted KDF params so numeric fields are numbers, not strings. */
+export function normalizeKdfParams(params: KdfParams): KdfParams {
+  if (params.algorithm === 'PBKDF2') {
+    const raw = params.pbkdf2Iterations;
+    const pbkdf2Iterations =
+      typeof raw === 'number'
+        ? raw
+        : typeof raw === 'string' && /^\d+$/.test(raw)
+          ? Number.parseInt(raw, 10)
+          : DEFAULT_PBKDF2_PARAMS.pbkdf2Iterations;
+    return { algorithm: 'PBKDF2', pbkdf2Iterations };
+  }
+  return params;
+}
 
 function saltsEqual(left: Uint8Array, right: Uint8Array): boolean {
   if (left.length !== right.length) {
@@ -54,6 +78,14 @@ export async function resolveKdfMaterial(deps: ResolveKdfMaterialDeps): Promise<
   }
 
   if (remote && local && !saltsEqual(local.salt, remote.salt)) {
+    if (deps.hasExistingVaultData && (await deps.hasExistingVaultData())) {
+      try {
+        await deps.publishRemote?.(local);
+      } catch {
+        // Best effort: keep unlocking with the local salt that matches this vault.
+      }
+      return local;
+    }
     await deps.saveLocal(remote);
     return remote;
   }
@@ -74,6 +106,10 @@ export async function resolveKdfMaterial(deps: ResolveKdfMaterialDeps): Promise<
 
   if (local) {
     return local;
+  }
+
+  if (deps.hasExistingVaultData && (await deps.hasExistingVaultData())) {
+    throw new KdfMaterialMissingError();
   }
 
   const created: KdfMaterial = {
@@ -149,6 +185,6 @@ export function kdfMaterialFromPayload(payload: {
 }): KdfMaterial {
   return {
     salt: bytesFromBase64(payload.salt_base64),
-    params: payload.params,
+    params: normalizeKdfParams(payload.params),
   };
 }

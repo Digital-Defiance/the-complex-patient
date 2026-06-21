@@ -12,9 +12,26 @@ import type { VaultRecord } from './types';
 export type Weekday = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 
 /**
- * Time-of-day blocks for the adaptive polypharmacy view (14.1, 14.3).
+ * Time-of-day blocks for the adaptive medications view (14.1, 14.3).
  */
 export type TimeBlock = 'Morning' | 'Midday' | 'Evening' | 'Night/Bedtime';
+
+/** Parametric pill shape for the medications cabinet and today queue. */
+export type MedPillShape = 'capsule' | 'round' | 'oval' | 'tablet';
+
+/** User-selected pill appearance (no external image assets). */
+export interface MedAppearance {
+  shape: MedPillShape;
+  colorPrimary: string;
+  colorSecondary?: string;
+}
+
+/** Optional refill tracking on a medication profile. */
+export interface MedRefillTracking {
+  quantityOnHand?: number;
+  /** Alert when quantityOnHand falls to or below this value. */
+  lowStockThreshold?: number;
+}
 
 /**
  * A single phase of a tapering schedule.
@@ -46,7 +63,7 @@ export interface PrnConfig {
  * - taper: multi-week tapering up to 52 weeks (11.2, 11.4)
  */
 export type MedicationSchedule =
-  | { kind: 'prn' }
+  | { kind: 'prn'; times?: string[] }
   | { kind: 'weekly'; daysOfWeek: Weekday[]; times: string[] }
   | { kind: 'alternating'; startDate: string; times: string[] }
   | { kind: 'rotating-interval'; everyNDays: number; times: string[] }
@@ -55,18 +72,48 @@ export type MedicationSchedule =
 /**
  * A full medication profile record stored in the medications vault partition.
  *
- * All five text fields (drugName, dosage, form, prescribingPhysician, conditionTreated)
- * must be non-empty and ≤200 characters (10.1, 10.2).
+ * drugName, dosage, and form are required (non-empty, ≤200 characters).
+ * prescribingPhysician and conditionTreated are optional (≤200 characters when provided).
  */
 export interface MedicationProfile extends VaultRecord {
   drugName: string;
   dosage: string;
   form: string;
+  /** Optional — may be empty when unknown or self-managed. */
   prescribingPhysician: string;
+  /** Optional — may be empty when unknown or self-managed. */
   conditionTreated: string;
   active: boolean;
   schedule: MedicationSchedule;
   prn?: PrnConfig;
+  appearance?: MedAppearance;
+  refill?: MedRefillTracking;
+  /** Optional NDC or barcode string (manual entry; scan can populate later). */
+  productCode?: string;
+}
+
+export type MedEventStatus = 'pending' | 'taken' | 'skipped' | 'snoozed';
+
+/**
+ * Scheduled dose adherence record — stored in the medications vault partition.
+ */
+export interface MedEvent extends VaultRecord {
+  medicationId: string;
+  scheduledAt: string;
+  takenAt: string | null;
+  status?: MedEventStatus;
+  skippedReason?: string;
+  snoozedUntil?: string;
+}
+
+/**
+ * Optional approximate location captured when logging a PRN dose (rounded WGS84).
+ * Stored in the encrypted vault and synced cross-device; used for weather overlays.
+ */
+export interface LogLocation {
+  latitude: number;
+  longitude: number;
+  capturedAt: string;
 }
 
 /**
@@ -78,4 +125,5 @@ export interface PrnLog extends VaultRecord {
   amount: number;
   takenAt: string;
   override?: boolean;
+  location?: LogLocation;
 }

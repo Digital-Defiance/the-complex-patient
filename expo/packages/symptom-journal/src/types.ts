@@ -9,7 +9,7 @@
  * Requirements: 15.1, 15.2, 15.6
  */
 
-import type { Association, FlareUp, SymptomDraft, SymptomEntry, TimeUnit } from '@complex-patient/domain';
+import type { Association, FlareUp, LogLocation, SymptomDraft, SymptomEntry, TimeUnit } from '@complex-patient/domain';
 import type { FieldError } from '@complex-patient/domain';
 
 /**
@@ -25,6 +25,8 @@ export interface SymptomEntryInput {
   notes?: unknown;
   /** Whether the symptom is currently active (eligible for flare selection, 17.1). Defaults to true. */
   active?: unknown;
+  /** Optional approximate GPS when logging (opt-in). */
+  location?: LogLocation;
 }
 
 /**
@@ -178,6 +180,8 @@ export interface FlareUpInput {
   symptomIds?: unknown;
   /** The suspected environmental or physiological trigger (≤500 chars, 17.2). */
   trigger?: unknown;
+  /** Optional approximate GPS when logging (opt-in). */
+  location?: LogLocation;
 }
 
 /**

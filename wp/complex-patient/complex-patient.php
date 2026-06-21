@@ -75,16 +75,16 @@ add_action(
 
         $auth = new \ComplexPatient\Auth\AuthMiddleware();
 
-        $vaultController = new \ComplexPatient\Rest\VaultController(
-            new \ComplexPatient\VaultRepository( $wpdb ),
-            $auth
-        );
-        $vaultController->registerRoutes();
-
         $kdfController = new \ComplexPatient\Rest\KdfMaterialController(
             new \ComplexPatient\KdfMaterialRepository( $wpdb ),
             $auth
         );
         $kdfController->registerRoutes();
+
+        $vaultController = new \ComplexPatient\Rest\VaultController(
+            new \ComplexPatient\VaultRepository( $wpdb ),
+            $auth
+        );
+        $vaultController->registerRoutes();
     }
 );

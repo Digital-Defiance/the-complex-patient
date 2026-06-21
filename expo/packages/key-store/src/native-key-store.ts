@@ -34,6 +34,8 @@ export interface NativeKeyStoreDeps {
   biometrics: BiometricAdapter;
   codec: KekCodec;
   idleOptions?: IdleAutoLockOptions;
+  /** Shared idle controller from the home entry wiring. */
+  sharedIdle?: IdleAutoLock;
 }
 
 export class NativeSessionKeyStore implements SessionKeyStore {
@@ -41,6 +43,7 @@ export class NativeSessionKeyStore implements SessionKeyStore {
   private readonly biometrics: BiometricAdapter;
   private readonly codec: KekCodec;
   private readonly idle: IdleAutoLock;
+  private readonly ownsIdle: boolean;
 
   /** In-memory KEK; null while locked (Requirements 3.7, 3.8). */
   private kek: CryptoKeyRef | null = null;
@@ -53,7 +56,13 @@ export class NativeSessionKeyStore implements SessionKeyStore {
     this.secureStore = deps.secureStore;
     this.biometrics = deps.biometrics;
     this.codec = deps.codec;
-    this.idle = new IdleAutoLock(() => this.onIdleLock(), deps.idleOptions);
+    if (deps.sharedIdle) {
+      this.idle = deps.sharedIdle;
+      this.ownsIdle = false;
+    } else {
+      this.idle = new IdleAutoLock(() => this.onIdleLock(), deps.idleOptions);
+      this.ownsIdle = true;
+    }
   }
 
   /**
@@ -127,13 +136,26 @@ export class NativeSessionKeyStore implements SessionKeyStore {
     this.idle.notifyActivity();
   }
 
+  /** Pause idle auto-lock during long-running local operations. */
+  suspendIdle(): void {
+    this.idle.suspend();
+  }
+
+  /** Resume idle auto-lock after a suspended operation completes. */
+  resumeIdle(): void {
+    this.idle.resume();
+  }
+
   /** Read the released KEK while unlocked; null once locked (3.8). */
   getKek(): CryptoKeyRef | null {
     return this.kek;
   }
 
-  /** Idle expiry: discard the KEK and lock the vault (Requirements 3.7, 3.8). */
+  /** Idle expiry when this store owns its idle timer (standalone / tests). */
   private onIdleLock(): void {
+    if (!this.ownsIdle) {
+      return;
+    }
     this.kek = null;
   }
 }

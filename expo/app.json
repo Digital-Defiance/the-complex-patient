@@ -11,7 +11,14 @@
     ],
     "plugins": [
       ["expo-router", { "root": "./apps/mobile/app" }],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow The Complex Patient to attach approximate location when you log health events (optional).",
+          "locationAlwaysAndWhenInUsePermission": "Allow background location trail samples so weather overlays can reflect where you were (optional)."
+        }
+      ]
     ],
     "web": {
       "bundler": "metro",

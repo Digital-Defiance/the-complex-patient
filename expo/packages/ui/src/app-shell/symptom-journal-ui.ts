@@ -183,6 +183,150 @@ export interface SeverityTrendDay {
   symptomCount: number;
 }
 
+export interface SeverityTrendDayWithWeather extends SeverityTrendDay {
+  meanPressureHpa: number | null;
+  meanHumidityPct: number | null;
+  meanTemperatureC: number | null;
+  totalPrecipitationMm: number | null;
+  pressureDelta24h: number | null;
+  meanHeatIndexC: number | null;
+  rapidPressureDrop: boolean;
+}
+
+export type WeatherTrendOverlayId =
+  | 'pressureDelta24h'
+  | 'humidity'
+  | 'temperature'
+  | 'precipitation'
+  | 'heatIndex';
+
+export const WEATHER_TREND_OVERLAYS: readonly {
+  id: WeatherTrendOverlayId;
+  label: string;
+  legend: string;
+}[] = [
+  {
+    id: 'pressureDelta24h',
+    label: 'Pressure Δ',
+    legend: 'Teal/gray band = 24h mean pressure change (hPa)',
+  },
+  { id: 'humidity', label: 'Humidity', legend: 'Purple band = mean relative humidity (%)' },
+  { id: 'temperature', label: 'Temp', legend: 'Orange band = mean temperature (°C)' },
+  { id: 'precipitation', label: 'Rain', legend: 'Blue band = daily precipitation (mm)' },
+  { id: 'heatIndex', label: 'Heat', legend: 'Red band = mean heat index (°C)' },
+] as const;
+
+export const WEATHER_OVERLAY_COLORS: Record<WeatherTrendOverlayId, string> = {
+  pressureDelta24h: '#0d9488',
+  humidity: '#9333ea',
+  temperature: '#ea580c',
+  precipitation: '#2563eb',
+  heatIndex: '#dc2626',
+};
+
+export function weatherOverlayValue(
+  day: SeverityTrendDayWithWeather,
+  overlayId: WeatherTrendOverlayId,
+): number | null {
+  switch (overlayId) {
+    case 'pressureDelta24h':
+      return day.pressureDelta24h;
+    case 'humidity':
+      return day.meanHumidityPct;
+    case 'temperature':
+      return day.meanTemperatureC;
+    case 'precipitation':
+      return day.totalPrecipitationMm;
+    case 'heatIndex':
+      return day.meanHeatIndexC;
+    default:
+      return null;
+  }
+}
+
+/** Scale overlay values across the trend window into band heights (px). */
+export function weatherOverlayBandHeight(
+  value: number,
+  overlayId: WeatherTrendOverlayId,
+  range: { min: number; max: number },
+  maxHeight = 10,
+): number {
+  const minHeight = 3;
+  switch (overlayId) {
+    case 'pressureDelta24h':
+      return Math.min(maxHeight, Math.max(minHeight, Math.abs(value) / 2));
+    case 'humidity':
+      return Math.min(maxHeight, Math.max(minHeight, (value / 100) * maxHeight));
+    case 'temperature':
+    case 'precipitation':
+    case 'heatIndex': {
+      const span = range.max - range.min;
+      if (span <= 0) {
+        return minHeight;
+      }
+      const ratio = (value - range.min) / span;
+      return Math.min(maxHeight, Math.max(minHeight, minHeight + ratio * (maxHeight - minHeight)));
+    }
+    default:
+      return minHeight;
+  }
+}
+
+export function weatherOverlayRange(
+  trend: readonly SeverityTrendDayWithWeather[],
+  overlayId: WeatherTrendOverlayId,
+): { min: number; max: number } {
+  const values = trend
+    .map((day) => weatherOverlayValue(day, overlayId))
+    .filter((value): value is number => value !== null);
+  if (values.length === 0) {
+    return { min: 0, max: 0 };
+  }
+  return { min: Math.min(...values), max: Math.max(...values) };
+}
+
+export function trendHasWeatherData(trend: readonly SeverityTrendDayWithWeather[]): boolean {
+  return trend.some(
+    (day) =>
+      day.meanPressureHpa !== null ||
+      day.meanHumidityPct !== null ||
+      day.meanTemperatureC !== null ||
+      day.totalPrecipitationMm !== null ||
+      day.pressureDelta24h !== null ||
+      day.meanHeatIndexC !== null,
+  );
+}
+
+/** Align Open-Meteo daily aggregates onto the severity trend days. */
+export function mergeWeatherIntoTrend(
+  trend: readonly SeverityTrendDay[],
+  weatherDays: readonly {
+    day: string;
+    meanPressureHpa: number | null;
+    meanHumidityPct: number | null;
+    meanTemperatureC: number | null;
+    totalPrecipitationMm: number | null;
+    pressureDelta24h: number | null;
+    meanHeatIndexC?: number | null;
+    rapidPressureDrop?: boolean;
+  }[],
+): SeverityTrendDayWithWeather[] {
+  const weatherByDay = new Map(weatherDays.map((day) => [day.day, day]));
+  return trend.map((day) => {
+    const weather = weatherByDay.get(day.day);
+    return {
+      ...day,
+      meanPressureHpa: weather?.meanPressureHpa ?? null,
+      meanHumidityPct: weather?.meanHumidityPct ?? null,
+      meanTemperatureC: weather?.meanTemperatureC ?? null,
+      totalPrecipitationMm: weather?.totalPrecipitationMm ?? null,
+      pressureDelta24h: weather?.pressureDelta24h ?? null,
+      meanHeatIndexC: weather?.meanHeatIndexC ?? null,
+      rapidPressureDrop: weather?.rapidPressureDrop ?? false,
+    };
+  });
+}
+
 /**
  * Daily max symptom severity and flare counts for a trailing window.
  * Used for the simple bar chart on the journal history screen.

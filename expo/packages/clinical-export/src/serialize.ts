@@ -5,5 +5,6 @@
 import type { FhirBundle } from './types';
 
 export function serializeFhirJson(bundle: FhirBundle): string {
-  return `${JSON.stringify(bundle, null, 2)}\n`;
+  // Compact JSON keeps the encrypted archive smaller and encrypts faster on web.
+  return `${JSON.stringify(bundle)}\n`;
 }

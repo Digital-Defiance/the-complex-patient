@@ -183,4 +183,28 @@ describe('IdleAutoLock', () => {
     scheduler2.fire();
     expect(native.isUnlocked()).toBe(false);
   });
+
+  it('does not fire while suspended', () => {
+    const scheduler = makeManualScheduler();
+    const onLock = vi.fn();
+    const idle = new IdleAutoLock(onLock, { scheduler });
+
+    idle.start();
+    idle.suspend();
+    scheduler.fire();
+    expect(onLock).not.toHaveBeenCalled();
+    expect(idle.isRunning()).toBe(true);
+  });
+
+  it('resumes the countdown after suspend', () => {
+    const scheduler = makeManualScheduler();
+    const onLock = vi.fn();
+    const idle = new IdleAutoLock(onLock, { scheduler });
+
+    idle.start();
+    idle.suspend();
+    idle.resume();
+    scheduler.fire();
+    expect(onLock).toHaveBeenCalledTimes(1);
+  });
 });

@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   createAgeGateOnboarding,
   createDeviceIneligibilityFlagStore,
+  ELIGIBILITY_FLAG_KEY,
+  ELIGIBILITY_FLAG_VALUE,
   INELIGIBILITY_FLAG_KEY,
   INELIGIBILITY_FLAG_VALUE,
   type DeviceFlagStorage,
@@ -46,6 +48,14 @@ describe('createDeviceIneligibilityFlagStore (Requirements 23.7, 23.8)', () => {
     await flagStore.markIneligible();
     expect(storage.store[INELIGIBILITY_FLAG_KEY]).toBe(INELIGIBILITY_FLAG_VALUE);
     expect(await flagStore.isIneligible()).toBe(true);
+  });
+
+  it('persists age eligibility across launches', async () => {
+    const storage = makeStorage();
+    const flagStore = createDeviceIneligibilityFlagStore(storage);
+    await flagStore.markAgeEligible();
+    expect(storage.store[ELIGIBILITY_FLAG_KEY]).toBe(ELIGIBILITY_FLAG_VALUE);
+    expect(await flagStore.isAgeEligible()).toBe(true);
   });
 
   it('reads a pre-existing persisted flag (survives across launches)', async () => {
@@ -184,7 +194,7 @@ describe('createAgeGateOnboarding — eligible progression (Requirement 23.4)', 
     expect(onboarding.isEligible()).toBe(true);
   });
 
-  it('does not persist any flag for an eligible user', async () => {
+  it('persists eligibility flag without storing birth month/year', async () => {
     const storage = makeStorage();
     const onboarding = createAgeGateOnboarding({
       flagStore: createDeviceIneligibilityFlagStore(storage),
@@ -193,6 +203,28 @@ describe('createAgeGateOnboarding — eligible progression (Requirement 23.4)', 
     await onboarding.start();
     await onboarding.submitAge({ birthMonth: 1, birthYear: 2000 });
     expect(INELIGIBILITY_FLAG_KEY in storage.store).toBe(false);
+    expect(storage.store[ELIGIBILITY_FLAG_KEY]).toBe(ELIGIBILITY_FLAG_VALUE);
+  });
+
+  it('skips the age screen when eligibility was confirmed on a prior launch', async () => {
+    const storage = makeStorage({ [ELIGIBILITY_FLAG_KEY]: ELIGIBILITY_FLAG_VALUE });
+    const onboarding = createAgeGateOnboarding({
+      flagStore: createDeviceIneligibilityFlagStore(storage),
+      now: () => NOW,
+    });
+    await expect(onboarding.start()).resolves.toBe('eligible');
+    expect(onboarding.isEligible()).toBe(true);
+  });
+
+  it('infers eligibility from an existing device vault when the flag is missing', async () => {
+    const storage = makeStorage();
+    const onboarding = createAgeGateOnboarding({
+      flagStore: createDeviceIneligibilityFlagStore(storage),
+      now: () => NOW,
+      inferAgeEligibleFromDevice: async () => true,
+    });
+    await expect(onboarding.start()).resolves.toBe('eligible');
+    expect(storage.store[ELIGIBILITY_FLAG_KEY]).toBe(ELIGIBILITY_FLAG_VALUE);
   });
 
   it('blocks an eligible submission after the flow is already terminal (no resurrection)', async () => {
@@ -200,6 +232,8 @@ describe('createAgeGateOnboarding — eligible progression (Requirement 23.4)', 
     const flagStore: IneligibilityFlagStore = {
       isIneligible: async () => true,
       markIneligible: async () => {},
+      isAgeEligible: async () => false,
+      markAgeEligible: async () => {},
     };
     const onboarding = createAgeGateOnboarding({ flagStore, now: () => NOW });
     await onboarding.start();

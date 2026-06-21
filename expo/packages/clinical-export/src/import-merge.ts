@@ -68,6 +68,7 @@ export function prepareClinicalImportMerge(
     conditions: current.conditions,
     flares: current.flares,
     associations: current.associations,
+    locationTrail: current.locationTrail ?? [],
   };
 
   const partitions = {} as Record<VaultType, PartitionMergeResult>;
@@ -116,7 +117,14 @@ export async function applyClinicalImportMerge(
   }
 
   const prepared = prepareClinicalImportMerge(parsed.source, current);
-  const vaultTypes: VaultType[] = ['medications', 'symptoms', 'conditions', 'flares', 'associations'];
+  const vaultTypes: VaultType[] = [
+    'medications',
+    'symptoms',
+    'conditions',
+    'flares',
+    'associations',
+    'locationTrail',
+  ];
 
   for (const vaultType of vaultTypes) {
     const nextRecords = prepared.partitions[vaultType].records;

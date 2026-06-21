@@ -20,6 +20,8 @@ export type {
   VaultHttpClientDeps,
 } from './vault-http-client';
 export { createVaultHttpClient } from './vault-http-client';
+export { createSyncWorker } from './sync-worker';
+export type { ActiveKekSource, CreateSyncWorkerDeps } from './sync-worker';
 
 export type {
   HomeStatus,

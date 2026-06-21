@@ -18,6 +18,7 @@
     "@complex-patient/medications": "*",
     "@complex-patient/sync-engine": "*",
     "@complex-patient/ui": "*",
+    "@complex-patient/weather": "*",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.23",
     "expo-local-authentication": "17.0.8",

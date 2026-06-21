@@ -60,7 +60,7 @@ export class LocalVaultError extends Error {
  * The storage key namespace separating live partition blobs from the
  * last-common-synced base blobs used by the three-way merge (Requirement 8.5).
  */
-export type StorageNamespace = 'partition' | 'base';
+export type StorageNamespace = 'partition' | 'base' | 'quarantine';
 
 /**
  * Low-level encrypted key/value store abstraction.
@@ -84,10 +84,12 @@ export interface StorageBackend {
   /** Read the raw stored string for a key, or `null` if absent. */
   getItem(key: string): Promise<string | null>;
 
-  /**
-   * Atomically persist the raw string for a key. Implementations MUST commit
+  /** Atomically persist the raw string for a key. Implementations MUST commit
    * durably before resolving so the write is readable on the next read without
    * a network round-trip (Requirement 5.4).
    */
   setItem(key: string, value: string): Promise<void>;
+
+  /** Remove a persisted key. Used when clearing an undecryptable partition. */
+  removeItem(key: string): Promise<void>;
 }

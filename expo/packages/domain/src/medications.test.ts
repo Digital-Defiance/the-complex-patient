@@ -123,7 +123,7 @@ describe('validateMedicationProfile', () => {
     }
   });
 
-  it('reports multiple invalid fields simultaneously', () => {
+  it('reports multiple invalid required fields simultaneously', () => {
     const result = validateMedicationProfile({
       drugName: '',
       dosage: '',
@@ -133,15 +133,23 @@ describe('validateMedicationProfile', () => {
     });
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.errors).toHaveLength(3);
+      expect(result.errors).toHaveLength(2);
       const fields = result.errors.map((e) => e.field);
       expect(fields).toContain('drugName');
       expect(fields).toContain('dosage');
-      expect(fields).toContain('prescribingPhysician');
     }
   });
 
-  it('rejects all five fields when all are empty', () => {
+  it('accepts empty optional prescriber and condition fields', () => {
+    const result = validateMedicationProfile({
+      ...validInput,
+      prescribingPhysician: '',
+      conditionTreated: '',
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects all required fields when drugName, dosage, and form are empty', () => {
     const result = validateMedicationProfile({
       drugName: '',
       dosage: '',
@@ -151,7 +159,7 @@ describe('validateMedicationProfile', () => {
     });
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.errors).toHaveLength(5);
+      expect(result.errors).toHaveLength(3);
     }
   });
 });

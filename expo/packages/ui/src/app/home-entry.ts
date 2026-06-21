@@ -22,6 +22,7 @@
  */
 
 import type { CryptoKeyRef, KdfParams } from '@complex-patient/crypto-engine';
+import { decrypt } from '@complex-patient/crypto-engine';
 import type { LocalVault } from '@complex-patient/local-vault';
 import type { VaultRecord, VaultType } from '@complex-patient/domain';
 import type { SessionKeyStore } from '@complex-patient/key-store';
@@ -31,7 +32,7 @@ import {
   kdfMaterialToPayload,
   type KdfMaterial,
 } from './kdf-material-sync';
-import { pullRemoteVaultPartitions } from './vault-pull';
+import { pullRemoteVaultPartitions, recoverVaultPartitionsFromRemote, parseHydrateFailurePartition } from './vault-pull';
 import {
   createOfflineSyncCoordinator,
   type OfflineSyncCoordinator,
@@ -39,7 +40,7 @@ import {
 } from '../store/offline-sync';
 import { bindStoreToLock, type IdleController, type LockBinding } from '../store/lock-binding';
 import type { CommitResult, VaultStore } from '../store/vault-store';
-import type { PartitionProjection } from '../store/types';
+import { PHI_VAULT_TYPES, type PartitionProjection } from '../store/types';
 import type { MutableAuthProvider, WordPressAuth } from './auth';
 
 /**
@@ -56,8 +57,26 @@ export type HomeStatus = 'signed-out' | 'locked' | 'ready';
 
 /** Result of an unlock attempt surfaced to the entry-point UI. */
 export type HomeUnlockResult =
-  | { ok: true; status: 'ready' }
-  | { ok: false; reason: 'NOT_AUTHENTICATED' | 'PASSPHRASE_REQUIRED' | 'NO_KEY_STORED' | 'BIOMETRIC_FAILED' | 'BIOMETRIC_LOCKED_OUT' };
+  | { ok: true; status: 'ready'; quarantinedPartitions?: VaultType[] }
+  | {
+      ok: false;
+      reason:
+        | 'NOT_AUTHENTICATED'
+        | 'PASSPHRASE_REQUIRED'
+        | 'NO_KEY_STORED'
+        | 'BIOMETRIC_FAILED'
+        | 'BIOMETRIC_LOCKED_OUT'
+        | 'CORRUPT_PARTITION';
+      partition?: VaultType;
+    };
+
+/** Partitions that may be auto-quarantined during unlock recovery. Core PHI requires consent. */
+const AUTO_QUARANTINE_PARTITIONS: ReadonlySet<VaultType> = new Set(['locationTrail']);
+
+export interface UnlockWithKekOptions {
+  /** Quarantine these partitions before hydrate (explicit user consent). */
+  quarantinePartitions?: VaultType[];
+}
 
 /** Result of a WordPress sign-in attempt. */
 export type SignInResult =
@@ -118,7 +137,7 @@ export interface HomeEntryController {
    * passphrase re-entry). Stores it in the platform key store and hydrates the
    * decrypted projection so the home can render (Requirements 5.1, 5.2).
    */
-  unlockWithKek(kek: CryptoKeyRef): Promise<HomeUnlockResult>;
+  unlockWithKek(kek: CryptoKeyRef, options?: UnlockWithKekOptions): Promise<HomeUnlockResult>;
 
   /**
    * Attempt to unlock via the platform key store challenge (biometric on
@@ -144,11 +163,26 @@ export interface HomeEntryController {
   /** Reset the idle countdown on user interaction (Requirement 3.7). */
   notifyActivity(): void;
 
+  /**
+   * Subscribe to {@link HomeStatus} transitions (unlock, idle lock, sign-out).
+   * Used by the shell to route away from PHI screens when the vault locks.
+   */
+  subscribeStatus(listener: (status: HomeStatus) => void): () => void;
+
   /** Fetch shared KDF material from the Sync_Backend (non-secret). */
   fetchRemoteKdfMaterial(): Promise<KdfMaterial | null>;
 
   /** Publish local KDF material to the Sync_Backend (non-secret). */
   publishKdfMaterial(material: KdfMaterial): Promise<void>;
+
+  /** Web-only: whether passkey fast unlock is supported in this browser. */
+  isPasskeyUnlockAvailable?(): boolean;
+
+  /** Web-only: whether a passkey-wrapped KEK is stored on this device. */
+  hasPasskeyUnlock?(): boolean;
+
+  /** Web-only: register or refresh passkey unlock after a passphrase unlock. */
+  enablePasskeyUnlock?(): Promise<{ ok: true } | { ok: false; message: string }>;
 
   /** Tear down internal subscriptions. */
   dispose(): void;
@@ -166,12 +200,17 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
   const coordinator = createOfflineSyncCoordinator({ store, syncWorker });
   const lock = bindStoreToLock({ store, keyStore, idle });
 
-  async function pullBeforeHydrate(): Promise<void> {
+  async function pullBeforeHydrate(kek: CryptoKeyRef): Promise<void> {
     if (vault === undefined || vaultHttp === undefined || auth.getAuth() === null) {
       return;
     }
     try {
-      await pullRemoteVaultPartitions({ vault, http: vaultHttp });
+      await pullRemoteVaultPartitions({
+        vault,
+        http: vaultHttp,
+        onlyIfLocalMissing: true,
+        verifyDecrypt: { kek, crypto: { decrypt } },
+      });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       console.warn('[HomeEntry] pull before hydrate failed:', message);
@@ -218,8 +257,35 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     return store.isUnlocked() ? 'ready' : 'locked';
   }
 
+  const statusListeners = new Set<(status: HomeStatus) => void>();
+  let lastEmittedStatus: HomeStatus | null = null;
+
+  function emitStatusIfChanged(): void {
+    const next = getStatus();
+    if (next === lastEmittedStatus) {
+      return;
+    }
+    lastEmittedStatus = next;
+    for (const listener of statusListeners) {
+      listener(next);
+    }
+  }
+
+  function subscribeStatus(listener: (status: HomeStatus) => void): () => void {
+    statusListeners.add(listener);
+    listener(getStatus());
+    return () => {
+      statusListeners.delete(listener);
+    };
+  }
+
+  store.subscribe(() => {
+    emitStatusIfChanged();
+  });
+
   function signIn(credential: WordPressAuth): Promise<SignInResult> {
     auth.setAuth(credential);
+    emitStatusIfChanged();
 
     if (vaultHttp === undefined) {
       return Promise.resolve({ ok: true });
@@ -230,12 +296,15 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
       .then((response) => {
         if (response.status === 401 || response.status === 403) {
           auth.setAuth(null);
+          emitStatusIfChanged();
           return { ok: false as const, reason: 'INVALID_CREDENTIALS' as const };
         }
+        emitStatusIfChanged();
         return { ok: true as const };
       })
       .catch((cause) => {
         auth.setAuth(null);
+        emitStatusIfChanged();
         const message = cause instanceof Error ? cause.message : String(cause);
         console.error('[HomeEntry] signIn validation failed:', message);
         return { ok: false as const, reason: 'NETWORK_ERROR' as const };
@@ -247,29 +316,110 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     // backend credential (Requirements 3.6, 4.8).
     await lock.lock();
     auth.setAuth(null);
+    emitStatusIfChanged();
   }
 
-  async function hydrateReady(kek: CryptoKeyRef): Promise<HomeUnlockResult> {
+  async function hydrateWithPartitionRescue(
+    kek: CryptoKeyRef,
+    preQuarantine: VaultType[] = [],
+  ): Promise<HomeUnlockResult> {
+    const quarantinedPartitions: VaultType[] = [];
+
+    if (vault !== undefined) {
+      for (const vaultType of preQuarantine) {
+        if (!PHI_VAULT_TYPES.includes(vaultType)) {
+          continue;
+        }
+        console.warn(`[HomeEntry] quarantining partition before hydrate: ${vaultType}`);
+        await vault.quarantinePartition(vaultType);
+        quarantinedPartitions.push(vaultType);
+      }
+    }
+
+    for (let attempt = 0; attempt < PHI_VAULT_TYPES.length; attempt += 1) {
+      try {
+        await store.hydrate(kek);
+        lock.startIdleTimer();
+        coordinator.onConnectivityRestored();
+        if (quarantinedPartitions.length > 0) {
+          console.warn(
+            '[HomeEntry] unlocked after quarantining undecryptable partitions:',
+            quarantinedPartitions.join(', '),
+          );
+        }
+        return {
+          ok: true,
+          status: 'ready',
+          quarantinedPartitions: quarantinedPartitions.length > 0 ? quarantinedPartitions : undefined,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const partitionName = parseHydrateFailurePartition(message);
+        if (!partitionName || vault === undefined) {
+          throw error;
+        }
+        if (!PHI_VAULT_TYPES.includes(partitionName as VaultType)) {
+          throw error;
+        }
+        const vaultType = partitionName as VaultType;
+        if (quarantinedPartitions.includes(vaultType)) {
+          throw error;
+        }
+        if (!AUTO_QUARANTINE_PARTITIONS.has(vaultType)) {
+          return { ok: false, reason: 'CORRUPT_PARTITION', partition: vaultType };
+        }
+        console.warn(`[HomeEntry] quarantining optional undecryptable partition: ${vaultType}`);
+        await vault.quarantinePartition(vaultType);
+        quarantinedPartitions.push(vaultType);
+      }
+    }
+
+    throw new Error('hydrate failed after quarantining all corrupt partitions');
+  }
+
+  async function hydrateReady(kek: CryptoKeyRef, preQuarantine: VaultType[] = []): Promise<HomeUnlockResult> {
     try {
-      await pullBeforeHydrate();
-      await store.hydrate(kek);
-      lock.startIdleTimer();
-      return { ok: true, status: 'ready' };
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
+      await pullBeforeHydrate(kek);
+      return await hydrateWithPartitionRescue(kek, preQuarantine);
+    } catch (firstError) {
+      if (vault !== undefined && vaultHttp !== undefined) {
+        try {
+          console.warn('[HomeEntry] local hydrate failed; attempting remote recovery…');
+          await recoverVaultPartitionsFromRemote({
+            vault,
+            http: vaultHttp,
+            verifyDecrypt: { kek, crypto: { decrypt } },
+          });
+          return await hydrateWithPartitionRescue(kek, preQuarantine);
+        } catch (retryError) {
+          const message = retryError instanceof Error ? retryError.message : String(retryError);
+          console.error('[HomeEntry] hydrate failed after remote recovery:', message);
+          return { ok: false, reason: 'PASSPHRASE_REQUIRED' };
+        }
+      }
+
+      const message = firstError instanceof Error ? firstError.message : String(firstError);
       console.error('[HomeEntry] hydrate failed:', message);
       return { ok: false, reason: 'PASSPHRASE_REQUIRED' };
     }
   }
 
-  async function unlockWithKek(kek: CryptoKeyRef): Promise<HomeUnlockResult> {
+  async function unlockWithKek(
+    kek: CryptoKeyRef,
+    options?: UnlockWithKekOptions,
+  ): Promise<HomeUnlockResult> {
     if (auth.getAuth() === null) {
       return { ok: false, reason: 'NOT_AUTHENTICATED' };
     }
     try {
       await keyStore.store(kek);
-      return await hydrateReady(kek);
+      const result = await hydrateReady(kek, options?.quarantinePartitions ?? []);
+      if (!result.ok) {
+        await keyStore.lock();
+      }
+      return result;
     } catch (cause) {
+      await keyStore.lock().catch(() => {});
       const message = cause instanceof Error ? cause.message : String(cause);
       console.error('[HomeEntry] unlockWithKek failed:', message);
       return { ok: false, reason: 'PASSPHRASE_REQUIRED' };
@@ -306,6 +456,29 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     lock.notifyActivity();
   }
 
+  type PasskeyCapableKeyStore = SessionKeyStore & {
+    isPasskeyUnlockAvailable?: () => boolean;
+    hasPasskeyUnlock?: () => boolean;
+    enablePasskeyUnlock?: () => Promise<{ ok: true } | { ok: false; message: string }>;
+  };
+
+  const passkeyKeyStore = keyStore as PasskeyCapableKeyStore;
+
+  function isPasskeyUnlockAvailable(): boolean {
+    return passkeyKeyStore.isPasskeyUnlockAvailable?.() ?? false;
+  }
+
+  function hasPasskeyUnlock(): boolean {
+    return passkeyKeyStore.hasPasskeyUnlock?.() ?? false;
+  }
+
+  async function enablePasskeyUnlock(): Promise<{ ok: true } | { ok: false; message: string }> {
+    if (!passkeyKeyStore.enablePasskeyUnlock) {
+      return { ok: false, message: 'Passkey unlock is not available on this platform.' };
+    }
+    return passkeyKeyStore.enablePasskeyUnlock();
+  }
+
   function dispose(): void {
     coordinator.dispose();
   }
@@ -322,8 +495,12 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     commit,
     onConnectivityRestored,
     notifyActivity,
+    subscribeStatus,
     fetchRemoteKdfMaterial,
     publishKdfMaterial,
+    isPasskeyUnlockAvailable,
+    hasPasskeyUnlock,
+    enablePasskeyUnlock,
     dispose,
   };
 }

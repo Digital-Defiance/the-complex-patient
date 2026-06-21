@@ -17,6 +17,7 @@
     "@complex-patient/local-vault": "*",
     "@complex-patient/medications": "*",
     "@complex-patient/sync-engine": "*",
-    "@complex-patient/ui": "*"
+    "@complex-patient/ui": "*",
+    "@complex-patient/weather": "*"
   }
 }

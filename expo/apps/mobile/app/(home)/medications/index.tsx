@@ -1,33 +1,18 @@
-/**
- * @complex-patient/mobile — Medications screen route
- *
- * Expo Router route file that renders the shared MedicationsScreen component.
- * Renders `buildPolypharmacyView` output in exact order, shows an empty-list
- * message for zero profiles, and persists edits exclusively through
- * `home.commit('medications', …)`.
- *
- * Requirements: 9.1, 9.2, 9.3, 9.6, 9.7
- */
-
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { MedicationsScreen } from '@complex-patient/ui';
+import { MedicationsHubScreen } from '@complex-patient/ui';
 
-export default function Medications(): React.ReactElement {
+export default function MedicationsHubRoute(): React.ReactElement {
   const router = useRouter();
 
-  const handleNavigatePrn = useCallback(() => {
-    router.push('/(home)/medications/prn' as never);
-  }, [router]);
-
-  const handleBack = useCallback(() => {
-    router.back();
-  }, [router]);
-
   return (
-    <MedicationsScreen
-      onNavigatePrn={handleNavigatePrn}
-      onBack={handleBack}
+    <MedicationsHubScreen
+      onBack={() => router.back()}
+      onToday={() => router.push('/(home)/medications/today' as never)}
+      onCabinet={() => router.push('/(home)/medications/cabinet' as never)}
+      onHistory={() => router.push('/(home)/medications/history' as never)}
+      onPrn={() => router.push('/(home)/medications/prn' as never)}
+      onAdd={() => router.push('/(home)/medications/add' as never)}
     />
   );
 }

@@ -282,6 +282,56 @@ describe('Requirement 3.6 — web volatile-only retention', () => {
     expect(store.getKek()).toBeNull();
   });
 
+  it('auto-wires passkey unlock in browser runtimes', async () => {
+    const priorWindow = globalThis.window;
+    const priorLocalStorage = globalThis.localStorage;
+    const storage = new Map<string, string>();
+
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { location: { hostname: 'localhost' } },
+    });
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          storage.set(key, value);
+        },
+        removeItem: (key: string) => {
+          storage.delete(key);
+        },
+      },
+    });
+
+    try {
+      const store = new WebSessionKeyStore();
+      await store.store(KEK);
+      const result = await store.enablePasskeyUnlock();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.message).not.toBe('Passkey unlock is not configured.');
+      }
+    } finally {
+      if (priorWindow === undefined) {
+        Reflect.deleteProperty(globalThis, 'window');
+      } else {
+        Object.defineProperty(globalThis, 'window', {
+          configurable: true,
+          value: priorWindow,
+        });
+      }
+      if (priorLocalStorage === undefined) {
+        Reflect.deleteProperty(globalThis, 'localStorage');
+      } else {
+        Object.defineProperty(globalThis, 'localStorage', {
+          configurable: true,
+          value: priorLocalStorage,
+        });
+      }
+    }
+  });
+
   it('releases the resident KEK while in RAM and blocks once discarded', async () => {
     const store = new WebSessionKeyStore();
     await store.store(KEK);
