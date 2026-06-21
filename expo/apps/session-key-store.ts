@@ -10,6 +10,7 @@ import {
   NativeSessionKeyStore,
   WebSessionKeyStore,
   type BiometricAdapter,
+  type IdleAutoLock,
   type KekCodec,
   type SecureStoreAdapter,
   type SessionKeyStore,
@@ -20,11 +21,20 @@ export interface NativeSessionKeyStoreDeps {
   secureStore: SecureStoreAdapter;
   biometrics: BiometricAdapter;
   codec: KekCodec;
+  sharedIdle?: IdleAutoLock;
 }
 
 export function createPlatformSessionKeyStore(deps: NativeSessionKeyStoreDeps): SessionKeyStore {
   if (Platform.OS === 'web') {
-    return new WebSessionKeyStore({ lifecycle: createWebTabLifecycleAdapter() });
+    return new WebSessionKeyStore({
+      lifecycle: createWebTabLifecycleAdapter(),
+      sharedIdle: deps.sharedIdle,
+    });
   }
-  return new NativeSessionKeyStore(deps);
+  return new NativeSessionKeyStore({
+    secureStore: deps.secureStore,
+    biometrics: deps.biometrics,
+    codec: deps.codec,
+    sharedIdle: deps.sharedIdle,
+  });
 }

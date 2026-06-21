@@ -28,10 +28,12 @@ describe('Boundary: Medication profile field length (Req 10.2)', () => {
     conditionTreated: 'POTS',
   };
 
-  describe('exact boundary at 200 characters per individual field', () => {
-    const fields = ['drugName', 'dosage', 'form', 'prescribingPhysician', 'conditionTreated'] as const;
+  const requiredFields = ['drugName', 'dosage', 'form'] as const;
+  const optionalFields = ['prescribingPhysician', 'conditionTreated'] as const;
+  const allFields = [...requiredFields, ...optionalFields] as const;
 
-    for (const field of fields) {
+  describe('exact boundary at 200 characters per individual field', () => {
+    for (const field of allFields) {
       it(`accepts ${field} at exactly 200 chars`, () => {
         const result = validateMedicationProfile({ ...baseProfile, [field]: 'a'.repeat(200) });
         expect(result.valid).toBe(true);
@@ -50,13 +52,22 @@ describe('Boundary: Medication profile field length (Req 10.2)', () => {
         const result = validateMedicationProfile({ ...baseProfile, [field]: 'x' });
         expect(result.valid).toBe(true);
       });
+    }
 
+    for (const field of requiredFields) {
       it(`rejects ${field} when empty string (0 chars)`, () => {
         const result = validateMedicationProfile({ ...baseProfile, [field]: '' });
         expect(result.valid).toBe(false);
         if (!result.valid) {
           expect(result.errors[0].field).toBe(field);
         }
+      });
+    }
+
+    for (const field of optionalFields) {
+      it(`accepts empty ${field}`, () => {
+        const result = validateMedicationProfile({ ...baseProfile, [field]: '' });
+        expect(result.valid).toBe(true);
       });
     }
   });
@@ -388,7 +399,7 @@ describe('Boundary: Trigger length (Req 17.2)', () => {
 
 describe('Per-field error reporting: all invalid fields reported simultaneously (Req 10.2, 15.3)', () => {
   describe('Medication profile - reports ALL invalid fields at once', () => {
-    it('reports all 5 fields when all are empty', () => {
+    it('reports all required fields when drugName, dosage, and form are empty', () => {
       const result = validateMedicationProfile({
         drugName: '',
         dosage: '',
@@ -398,13 +409,11 @@ describe('Per-field error reporting: all invalid fields reported simultaneously 
       });
       expect(result.valid).toBe(false);
       if (!result.valid) {
-        expect(result.errors).toHaveLength(5);
+        expect(result.errors).toHaveLength(3);
         const fields = result.errors.map((e) => e.field);
         expect(fields).toContain('drugName');
         expect(fields).toContain('dosage');
         expect(fields).toContain('form');
-        expect(fields).toContain('prescribingPhysician');
-        expect(fields).toContain('conditionTreated');
       }
     });
 
@@ -538,19 +547,15 @@ describe('Rejection of whole records: no partial data accepted (Req 10.2, 15.3)'
       // The validation result is { valid: false } — nothing is partially accepted
     });
 
-    it('returns valid: false (not partial acceptance) even with 4 of 5 fields valid', () => {
+    it('returns valid: true when only optional fields are empty', () => {
       const result = validateMedicationProfile({
         drugName: 'Good',
         dosage: 'Good',
         form: 'Good',
         prescribingPhysician: 'Good',
-        conditionTreated: '', // only this is invalid
+        conditionTreated: '',
       });
-      expect(result.valid).toBe(false);
-      if (!result.valid) {
-        expect(result.errors).toHaveLength(1);
-        expect(result.errors[0].field).toBe('conditionTreated');
-      }
+      expect(result.valid).toBe(true);
     });
   });
 

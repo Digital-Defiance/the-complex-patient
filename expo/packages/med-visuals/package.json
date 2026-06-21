@@ -1,0 +1,19 @@
+{
+  "name": "@complex-patient/med-visuals",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Parametric pill icons for the medications UI",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@complex-patient/domain": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-native": ">=0.70.0"
+  }
+}

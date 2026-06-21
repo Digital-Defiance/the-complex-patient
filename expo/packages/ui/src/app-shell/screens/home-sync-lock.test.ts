@@ -77,6 +77,7 @@ function createMockSyncStatusStore(initialPartitions?: Partial<Record<VaultType,
     conditions: 'idle',
     flares: 'idle',
     associations: 'idle',
+    locationTrail: 'idle',
   };
   let state: SyncStatusState = {
     partitions: { ...defaultPartitions, ...initialPartitions },
@@ -115,6 +116,7 @@ function createMockHomeController(opts: {
   const { initialStatus = 'ready', readThrows = false } = opts;
   let status: HomeStatus = initialStatus;
   const syncStatusStore = createMockSyncStatusStore();
+  const statusSubscribers = new Set<(s: HomeStatus) => void>();
 
   const controller = {
     coordinator: {
@@ -144,6 +146,13 @@ function createMockHomeController(opts: {
     commit: vi.fn(async () => ({ ok: true, records: [] })),
     onConnectivityRestored: vi.fn(),
     notifyActivity: vi.fn(),
+    subscribeStatus: vi.fn((listener: (s: HomeStatus) => void) => {
+      statusSubscribers.add(listener);
+      listener(status);
+      return () => {
+        statusSubscribers.delete(listener);
+      };
+    }),
     fetchRemoteKdfMaterial: vi.fn(async () => null),
     publishKdfMaterial: vi.fn(async () => {}),
     dispose: vi.fn(),
@@ -152,6 +161,9 @@ function createMockHomeController(opts: {
     _triggerLocked() {
       status = 'locked';
       syncStatusStore._setPartitions({});
+      for (const listener of statusSubscribers) {
+        listener(status);
+      }
     },
   } as unknown as HomeEntryController & {
     _setStatus: (s: HomeStatus) => void;
@@ -711,6 +723,7 @@ describe('aggregateSyncStatus — total, injective mapping (Requirements 12.1, 1
         conditions: 'idle',
         flares: 'idle',
         associations: 'idle',
+        locationTrail: 'idle',
       },
     };
     expect(aggregateSyncStatus(state)).toBe('idle');
@@ -724,6 +737,7 @@ describe('aggregateSyncStatus — total, injective mapping (Requirements 12.1, 1
         conditions: 'idle',
         flares: 'idle',
         associations: 'idle',
+        locationTrail: 'idle',
       },
     };
     expect(aggregateSyncStatus(state)).toBe('syncing');
@@ -737,6 +751,7 @@ describe('aggregateSyncStatus — total, injective mapping (Requirements 12.1, 1
         conditions: 'idle',
         flares: 'idle',
         associations: 'idle',
+        locationTrail: 'idle',
       },
     };
     expect(aggregateSyncStatus(state)).toBe('pending');
@@ -750,6 +765,7 @@ describe('aggregateSyncStatus — total, injective mapping (Requirements 12.1, 1
         conditions: 'syncing',
         flares: 'idle',
         associations: 'idle',
+        locationTrail: 'idle',
       },
     };
     expect(aggregateSyncStatus(state)).toBe('conflict');
@@ -776,6 +792,7 @@ describe('aggregateSyncStatus — total, injective mapping (Requirements 12.1, 1
         conditions: 'pending',
         flares: 'syncing',
         associations: 'idle',
+        locationTrail: 'idle',
       },
     };
     expect(aggregateSyncStatus(state)).toBe('pending');

@@ -1,16 +1,9 @@
 /**
  * @complex-patient/key-store — Web Session Key Store
  *
- * The Web_Client retains the KEK only in volatile RAM and never writes it to
- * any persistent storage (Requirement 3.5). On tab close/reload the KEK is
- * discarded and the vault locks (Requirement 3.6). The shared 300s idle timer
- * discards the in-memory KEK and locks the vault (Requirement 3.7). While
- * locked, the KEK is unavailable until the Master_Passphrase is re-entered to
- * re-derive and re-`store` it (Requirements 3.6, 3.8).
- *
- * Because there is no secure persistence on web, `unlock()` cannot recover a
- * discarded KEK; it always signals `PASSPHRASE_REQUIRED` unless the KEK is
- * still resident in memory.
+ * The Web_Client retains the KEK only in volatile RAM during a tab session.
+ * Optional passkey unlock stores a PRF-wrapped KEK in localStorage so returning
+ * users can skip PBKDF2 re-derivation after tab reload (Requirement 3.6).
  */
 
 import type { CryptoKeyRef } from '@complex-patient/crypto-engine';
@@ -20,21 +13,52 @@ import type {
   SessionKeyStore,
   UnlockResult,
 } from './types';
+import {
+  clearPasskeyUnlock,
+  formatPasskeyUnlockError,
+  hasStoredPasskeyUnlock,
+  isPasskeyUnlockSupported,
+  registerPasskeyUnlock,
+  refreshPasskeyUnlockWrap,
+  resolveBrowserPasskeyUnlockDeps,
+  unlockKekWithPasskey,
+  type PasskeyUnlockStorage,
+} from './web-passkey-unlock';
+
+export interface WebPasskeyUnlockDeps {
+  storage: PasskeyUnlockStorage;
+  getRpId?: () => string;
+}
 
 export interface WebKeyStoreDeps {
   /** Optional hook to discard the KEK on tab close/reload (Requirement 3.6). */
   lifecycle?: LifecycleAdapter;
   idleOptions?: IdleAutoLockOptions;
+  /**
+   * Shared idle controller from the home entry wiring. When set, the home
+   * controller owns idle expiry (lock clears PHI + KEK together).
+   */
+  sharedIdle?: IdleAutoLock;
+  /** Optional passkey-backed fast unlock for returning browser sessions. */
+  passkeyUnlock?: WebPasskeyUnlockDeps;
 }
 
 export class WebSessionKeyStore implements SessionKeyStore {
-  /** Volatile, RAM-only KEK; never persisted (Requirement 3.5). */
+  /** Volatile, RAM-only KEK; never persisted in plaintext (Requirement 3.5). */
   private kek: CryptoKeyRef | null = null;
   private readonly idle: IdleAutoLock;
+  private readonly ownsIdle: boolean;
+  private readonly passkeyUnlock?: WebPasskeyUnlockDeps;
 
   constructor(deps: WebKeyStoreDeps = {}) {
-    this.idle = new IdleAutoLock(() => this.onIdleLock(), deps.idleOptions);
-    // Discard the KEK and lock when the tab closes or reloads (3.6).
+    this.passkeyUnlock = deps.passkeyUnlock ?? resolveBrowserPasskeyUnlockDeps();
+    if (deps.sharedIdle) {
+      this.idle = deps.sharedIdle;
+      this.ownsIdle = false;
+    } else {
+      this.idle = new IdleAutoLock(() => this.onIdleLock(), deps.idleOptions);
+      this.ownsIdle = true;
+    }
     deps.lifecycle?.onTabClose(() => {
       this.kek = null;
       this.idle.stop();
@@ -51,15 +75,30 @@ export class WebSessionKeyStore implements SessionKeyStore {
   }
 
   /**
-   * If the KEK is still resident in RAM, release it; otherwise the user must
-   * re-enter the Master_Passphrase to re-derive it — there is no persistent
-   * key store on web (Requirements 3.5, 3.6, 3.8).
+   * Release the KEK from RAM, or from passkey-wrapped local storage when the
+   * tab was reloaded. Falls back to passphrase re-derivation otherwise.
    */
   async unlock(): Promise<UnlockResult> {
     if (this.kek !== null) {
       this.idle.start();
       return { ok: true, kek: this.kek };
     }
+
+    if (this.passkeyUnlock && hasStoredPasskeyUnlock(this.passkeyUnlock.storage)) {
+      try {
+        const kek = await unlockKekWithPasskey(this.passkeyUnlock);
+        this.kek = kek;
+        this.idle.start();
+        return { ok: true, kek };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message === 'PASSKEY_CANCELLED' || message === 'PASSKEY_PRF_UNAVAILABLE') {
+          return { ok: false, reason: 'BIOMETRIC_FAILED' };
+        }
+        return { ok: false, reason: 'PASSPHRASE_REQUIRED' };
+      }
+    }
+
     return { ok: false, reason: 'PASSPHRASE_REQUIRED' };
   }
 
@@ -73,18 +112,64 @@ export class WebSessionKeyStore implements SessionKeyStore {
     return this.kek !== null;
   }
 
-  /** Reset the idle countdown on user interaction (Requirement 3.7). */
   notifyActivity(): void {
     this.idle.notifyActivity();
   }
 
-  /** Read the resident KEK while unlocked; null once locked (3.8). */
+  suspendIdle(): void {
+    this.idle.suspend();
+  }
+
+  resumeIdle(): void {
+    this.idle.resume();
+  }
+
   getKek(): CryptoKeyRef | null {
     return this.kek;
   }
 
-  /** Idle expiry: discard the KEK and lock the vault (Requirements 3.7, 3.8). */
+  isPasskeyUnlockAvailable(): boolean {
+    return isPasskeyUnlockSupported() && this.passkeyUnlock !== undefined;
+  }
+
+  hasPasskeyUnlock(): boolean {
+    return this.passkeyUnlock ? hasStoredPasskeyUnlock(this.passkeyUnlock.storage) : false;
+  }
+
+  async enablePasskeyUnlock(): Promise<{ ok: true } | { ok: false; message: string }> {
+    if (!this.passkeyUnlock) {
+      return { ok: false, message: 'Passkey unlock is not configured.' };
+    }
+    if (!this.isPasskeyUnlockAvailable()) {
+      return { ok: false, message: 'Passkeys are not supported in this browser.' };
+    }
+    if (this.kek === null) {
+      return { ok: false, message: 'Unlock with your passphrase first.' };
+    }
+
+    try {
+      if (this.hasPasskeyUnlock()) {
+        await refreshPasskeyUnlockWrap(this.kek, this.passkeyUnlock);
+      } else {
+        await registerPasskeyUnlock(this.kek, this.passkeyUnlock);
+      }
+      return { ok: true };
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'Passkey setup failed.';
+      return { ok: false, message: formatPasskeyUnlockError(code) };
+    }
+  }
+
+  clearPasskeyUnlock(): void {
+    if (this.passkeyUnlock) {
+      clearPasskeyUnlock(this.passkeyUnlock.storage);
+    }
+  }
+
   private onIdleLock(): void {
+    if (!this.ownsIdle) {
+      return;
+    }
     this.kek = null;
   }
 }

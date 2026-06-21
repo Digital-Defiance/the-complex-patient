@@ -146,6 +146,14 @@ export function AppHostProvider({ factory, children }: AppHostProviderProps): Re
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Home status — subscribe to lock/unlock/sign-out so RouteWatcher stays in sync.
+  useEffect(() => {
+    if (!home) return;
+    return home.subscribeStatus((status) => {
+      setNavState((prev) => (prev.home === status ? prev : { ...prev, home: status }));
+    });
+  }, [home]);
+
   // Set the initial home status when home controller is created.
   // Status updates are driven by explicit calls to refreshHomeStatus().
   useEffect(() => {

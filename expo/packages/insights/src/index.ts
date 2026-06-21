@@ -44,6 +44,20 @@ export {
 } from './correlation';
 
 export type {
+  WeatherCorrelationOutcome,
+  WeatherCorrelationResult,
+  WeatherVariable,
+  DetectWeatherCorrelationsOptions,
+} from './weather-correlation';
+
+export {
+  detectWeatherCorrelations,
+  DEFAULT_WEATHER_SIGNIFICANCE_THRESHOLD,
+  WEATHER_INSUFFICIENT_HISTORY_MESSAGE,
+  WEATHER_NO_SIGNIFICANT_CORRELATIONS_MESSAGE,
+} from './weather-correlation';
+
+export type {
   ReportDataSource,
   PhysicianReport,
   PhysicianReportSection,

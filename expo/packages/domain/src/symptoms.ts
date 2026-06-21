@@ -5,6 +5,7 @@
  */
 
 import type { VaultRecord } from './types';
+import type { LogLocation } from './medications';
 
 /**
  * Time units for symptom duration measurement.
@@ -34,6 +35,8 @@ export interface SymptomEntry extends VaultRecord {
   duration: { value: number; unit: TimeUnit };
   notes: string;
   active: boolean;
+  /** Optional approximate GPS when logged (opt-in); distinct from systemicLocation. */
+  location?: LogLocation;
 }
 
 /**
@@ -70,4 +73,6 @@ export interface Association extends VaultRecord {
 export interface FlareUp extends VaultRecord {
   symptomIds: string[];
   trigger: string;
+  /** Optional approximate GPS when the flare was logged (opt-in). */
+  location?: LogLocation;
 }

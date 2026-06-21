@@ -205,7 +205,18 @@ function compareMedications(a: MedicationProfile, b: MedicationProfile): number 
 
 /** Render a single medication into a human-readable line. */
 function medicationLine(med: MedicationProfile): string {
-  return `${med.drugName} — ${med.dosage}, ${med.form} (${med.conditionTreated}; ${med.prescribingPhysician})`;
+  const base = `${med.drugName} — ${med.dosage}, ${med.form}`;
+  const extras: string[] = [];
+  if (med.conditionTreated.trim()) {
+    extras.push(med.conditionTreated.trim());
+  }
+  if (med.prescribingPhysician.trim()) {
+    extras.push(med.prescribingPhysician.trim());
+  }
+  if (extras.length === 0) {
+    return base;
+  }
+  return `${base} (${extras.join('; ')})`;
 }
 
 /** Render a single correlation card into a human-readable line (20.2). */

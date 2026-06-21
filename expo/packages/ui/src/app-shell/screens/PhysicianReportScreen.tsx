@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAppHost } from '../app-host';
+import { splitMedicationsPartition } from '@complex-patient/clinical-export';
 import {
   generatePhysicianReport,
   createInMemoryReportDataSource,
@@ -77,13 +78,13 @@ export function PhysicianReportScreen({ onBack }: PhysicianReportScreenProps): R
       // Read data exclusively through home.read (Requirement 11.6, 14.1).
       const symptoms = home.read('symptoms');
       const medications = home.read('medications');
+      const split = splitMedicationsPartition(medications.records);
 
-      // Create in-memory report data source — no network I/O (Requirement 11.4).
       const dataSource = createInMemoryReportDataSource({
-        medications: medications.records as never[],
+        medications: split.medications,
         symptoms: symptoms.records,
-        prnLogs: medications.records.filter((r: { id: string }) => 'loggedAt' in r) as never[],
-        medEvents: medications.records.filter((r: { id: string }) => 'scheduledAt' in r) as never[],
+        prnLogs: split.prnLogs,
+        medEvents: split.medEvents,
       });
 
       // Generate on-device, no PHI transmitted (Requirement 11.4).

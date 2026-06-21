@@ -16,7 +16,7 @@ import type { VaultRecord, VaultType } from '@complex-patient/domain';
 import type { SyncOutcome } from '@complex-patient/sync-engine';
 import { createVaultStore, type VaultStore } from '../store/vault-store';
 import type { SyncWorkerLike } from '../store/offline-sync';
-import { createHomeEntry, type HomeEntryController } from './home-entry';
+import { createHomeEntry, type HomeEntryController, type HomeStatus } from './home-entry';
 import { createAuthProvider, type MutableAuthProvider } from './auth';
 
 /**
@@ -140,8 +140,8 @@ describe('createHomeEntry — offline-first feature surface (5.2, 5.3, 5.4)', ()
 
     // Local read reflects the committed write without any network.
     expect(controller.read<MedRec>('medications').records).toHaveLength(1);
-    // Sync was enqueued after the local persist.
-    expect(worker.events[0]).toBe('enqueue:medications');
+    // Sync was enqueued after the local persist (unlock may also queue connectivity sync).
+    expect(worker.events).toContain('enqueue:medications');
   });
 
   it('forwards connectivity restoration to the worker (5.7)', () => {
@@ -208,6 +208,85 @@ describe('createHomeEntry — native parity via Secure Enclave key store (22.2, 
     }
     expect(last).toEqual({ ok: false, reason: 'BIOMETRIC_LOCKED_OUT' });
     expect(controller.getStatus()).toBe('locked');
+  });
+});
+
+describe('createHomeEntry — status subscription (13.5)', () => {
+  it('notifies listeners when the vault locks', async () => {
+    const vault = await createLocalVault(new MemoryStorageBackend());
+    const store = createVaultStore({ vault, crypto: { encrypt, decrypt } });
+    const auth = createAuthProvider({ kind: 'jwt', token: 'jwt' });
+    const controller = createHomeEntry({
+      keyStore: new WebSessionKeyStore(),
+      store,
+      syncWorker: fakeWorker(),
+      auth,
+    });
+
+    await controller.unlockWithKek(KEY);
+    const seen: HomeStatus[] = [];
+    controller.subscribeStatus((status) => {
+      seen.push(status);
+    });
+
+    await controller.lock.lock();
+
+    expect(seen).toContain('ready');
+    expect(seen[seen.length - 1]).toBe('locked');
+    expect(controller.getStatus()).toBe('locked');
+  });
+});
+
+describe('createHomeEntry — corrupt partition handling', () => {
+  it('returns CORRUPT_PARTITION for undecryptable core PHI instead of auto-deleting', async () => {
+    const vault = await createLocalVault(new MemoryStorageBackend());
+    await vault.writePartition('symptoms', {
+      sync_version: 1,
+      iv: 'AA==',
+      auth_tag: 'AA==',
+      ciphertext: 'AA==',
+    });
+    const store = createVaultStore({ vault, crypto: { encrypt, decrypt } });
+    const auth = createAuthProvider();
+    const controller = createHomeEntry({
+      keyStore: new WebSessionKeyStore(),
+      store,
+      syncWorker: fakeWorker(),
+      auth,
+      vault,
+    });
+
+    await controller.signIn({ kind: 'jwt', token: 'jwt' });
+    const result = await controller.unlockWithKek(KEY);
+
+    expect(result).toEqual({ ok: false, reason: 'CORRUPT_PARTITION', partition: 'symptoms' });
+    expect(await vault.readPartition('symptoms')).not.toBeNull();
+  });
+
+  it('unlocks after explicit quarantine consent for a corrupt core partition', async () => {
+    const vault = await createLocalVault(new MemoryStorageBackend());
+    await vault.writePartition('symptoms', {
+      sync_version: 1,
+      iv: 'AA==',
+      auth_tag: 'AA==',
+      ciphertext: 'AA==',
+    });
+    const store = createVaultStore({ vault, crypto: { encrypt, decrypt } });
+    const auth = createAuthProvider();
+    const controller = createHomeEntry({
+      keyStore: new WebSessionKeyStore(),
+      store,
+      syncWorker: fakeWorker(),
+      auth,
+      vault,
+    });
+
+    await controller.signIn({ kind: 'jwt', token: 'jwt' });
+    const result = await controller.unlockWithKek(KEY, { quarantinePartitions: ['symptoms'] });
+
+    expect(result).toEqual({ ok: true, status: 'ready', quarantinedPartitions: ['symptoms'] });
+    expect(await vault.readPartition('symptoms')).toBeNull();
+    expect(controller.read('symptoms').records).toEqual([]);
   });
 });
 

@@ -40,7 +40,10 @@ export {
 } from './prn';
 
 export type { PolyView, PolyViewBlock } from './view';
-export { buildPolypharmacyView } from './view';
+export {
+  buildPolypharmacyView,
+  buildPolypharmacyView as buildMedicationsView,
+} from './view';
 
 export type {
   ReminderPlatform,
@@ -57,3 +60,23 @@ export {
   dispatchMedicationReminder,
   dispatchMedicationReminders,
 } from './reminders';
+
+export type { ScheduledDoseSlot } from './schedule';
+export { expandDosesForDay, scheduledDoseKey, doseInstanceKey } from './schedule';
+
+export type { TodayDoseStatus, TodayScheduledDose, TodayPrnMedication, TodayQueue } from './today';
+export { buildTodayQueue } from './today';
+
+export type { MedEventMutationResult, AdherenceDaySummary } from './adherence';
+export {
+  recordDoseTaken,
+  recordDoseSkipped,
+  recordDoseSnoozed,
+  summarizeAdherenceHistory,
+} from './adherence';
+
+export type { MedicationNotificationTrigger } from './notification-schedule';
+export {
+  buildMedicationNotificationTriggers,
+  notificationTriggerId,
+} from './notification-schedule';

@@ -8,28 +8,9 @@
  * header, or query parameter (Requirements 19.1, 19.2).
  */
 
-import type { SymptomEntry, PrnLog, VaultRecord } from '@complex-patient/domain';
-
-/**
- * A medication adherence / administration event.
- *
- * Represents a single scheduled dose and whether (and when) it was actually
- * taken. This is the medication-side signal the analytics pipeline correlates
- * against symptom severity (19.4).
- *
- * Note: the design's "Insights Domain" references `MedEvent` as part of
- * {@link AnalysisInput}. It is defined here (rather than in `@complex-patient/domain`)
- * because it is an analytics-layer projection of medication scheduling, not a
- * stored vault partition of its own.
- *
- * - `scheduledAt`: ISO 8601 timestamp the dose was scheduled for.
- * - `takenAt`: ISO 8601 timestamp the dose was taken, or `null` when missed.
- */
-export interface MedEvent extends VaultRecord {
-  medicationId: string;
-  scheduledAt: string;
-  takenAt: string | null;
-}
+import type { SymptomEntry, PrnLog } from '@complex-patient/domain';
+export type { MedEvent } from '@complex-patient/domain';
+import type { MedEvent } from '@complex-patient/domain';
 
 /**
  * The decrypted, in-memory inputs to a single analysis run.

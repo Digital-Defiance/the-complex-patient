@@ -135,6 +135,7 @@ class FlareJournalImpl implements FlareJournal {
       op_timestamp: this.deps.now(),
       symptomIds: selectedActiveIds,
       trigger,
+      ...(input.location ? { location: input.location } : {}),
     };
 
     // Persist encrypted to the `flares` partition (17.3). On failure, retain the

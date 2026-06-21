@@ -55,6 +55,7 @@ const partitionMapArb: fc.Arbitrary<Record<VaultType, VaultRecord[]>> = fc.recor
   conditions: nonEmptyRecordsArb,
   flares: nonEmptyRecordsArb,
   associations: nonEmptyRecordsArb,
+  locationTrail: nonEmptyRecordsArb,
 });
 
 /** Generate an arbitrary VaultType to probe individually. */
@@ -64,6 +65,7 @@ const vaultTypeArb: fc.Arbitrary<VaultType> = fc.constantFrom(
   'conditions',
   'flares',
   'associations',
+  'locationTrail',
 );
 
 // ---------------------------------------------------------------------------
@@ -121,6 +123,7 @@ function createFakeSyncStatusStore(): StoreApi<SyncStatusState> {
       conditions: 'idle',
       flares: 'idle',
       associations: 'idle',
+      locationTrail: 'idle',
     },
   };
 

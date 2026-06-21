@@ -41,6 +41,7 @@ export class IdleAutoLock {
   private readonly onIdleLock: () => void;
   private handle: TimerHandle | null = null;
   private running = false;
+  private suspended = false;
 
   constructor(onIdleLock: () => void, options: IdleAutoLockOptions = {}) {
     this.onIdleLock = onIdleLock;
@@ -69,7 +70,25 @@ export class IdleAutoLock {
   /** Cancel the countdown without firing. Called on explicit lock. */
   stop(): void {
     this.running = false;
+    this.suspended = false;
     this.disarm();
+  }
+
+  /**
+   * Pause the idle countdown without clearing the running state.
+   * Used during long-running on-device operations (e.g. clinical export).
+   */
+  suspend(): void {
+    this.suspended = true;
+    this.disarm();
+  }
+
+  /** Resume a previously suspended idle countdown. */
+  resume(): void {
+    this.suspended = false;
+    if (this.running) {
+      this.arm();
+    }
   }
 
   /** Whether the idle countdown is currently active. */
@@ -77,7 +96,15 @@ export class IdleAutoLock {
     return this.running;
   }
 
+  /** Whether auto-lock is temporarily suspended. */
+  isSuspended(): boolean {
+    return this.suspended;
+  }
+
   private arm(): void {
+    if (this.suspended) {
+      return;
+    }
     this.disarm();
     this.handle = this.scheduler.setTimeout(() => {
       this.handle = null;

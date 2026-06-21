@@ -42,6 +42,7 @@ function createSyncStatusStore(
     conditions: 'idle',
     flares: 'idle',
     associations: 'idle',
+    locationTrail: 'idle',
   };
   return createStore<SyncStatusState>(() => ({
     partitions: { ...defaultPartitions, ...initial },
@@ -445,6 +446,7 @@ describe('Full coordinator setState → hook propagation (Req 8.6, 12.1)', () =>
           conditions: 'idle',
           flares: 'idle',
           associations: 'idle',
+          locationTrail: 'idle',
         },
       },
       true, // replace

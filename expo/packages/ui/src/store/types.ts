@@ -53,6 +53,7 @@ export const PHI_VAULT_TYPES: readonly VaultType[] = [
   'conditions',
   'flares',
   'associations',
+  'locationTrail',
 ] as const;
 
 /**

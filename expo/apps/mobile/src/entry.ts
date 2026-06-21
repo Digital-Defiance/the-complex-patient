@@ -31,12 +31,12 @@ import {
   type SecureStoreAdapter,
 } from '@complex-patient/key-store';
 import { createPlatformSessionKeyStore } from '../../session-key-store';
-import { SyncWorker } from '@complex-patient/sync-engine';
 import {
   createAgeGateOnboarding,
   createAuthProvider,
   createDeviceIneligibilityFlagStore,
   createHomeEntry,
+  createSyncWorker,
   createVaultHttpClient,
   createVaultStore,
   type AgeGateOnboardingController,
@@ -104,13 +104,16 @@ export async function createMobileHome(
     (await createLocalVault(await import('../../platform-vault-storage').then((m) => m.createPlatformVaultStorageBackend())));
 
   // Shared idle auto-lock (300s) drives the lock binding (Requirement 3.7).
-  let onIdle: () => void = () => {};
-  const idle = new IdleAutoLock(() => onIdle());
+  let controller!: HomeEntryController;
+  const idle = new IdleAutoLock(() => {
+    void controller.lock.lock();
+  });
 
   const keyStore = createPlatformSessionKeyStore({
     secureStore: options.secureStore,
     biometrics: options.biometrics,
     codec: options.codec,
+    sharedIdle: idle,
   });
 
   // The vault store mirrors the decrypted Local_Vault partitions (task 15.1),
@@ -119,15 +122,9 @@ export async function createMobileHome(
 
   const auth = createAuthProvider();
   const http = createVaultHttpClient({ baseUrl: options.baseUrl, auth, fetch: options.fetch });
-  const syncWorker = new SyncWorker({ http, vault });
+  const syncWorker = createSyncWorker({ http, vault, keyStore });
 
-  const controller = createHomeEntry({ keyStore, store, syncWorker, auth, idle, vault, vaultHttp: http });
-
-  // Route the idle expiry through the controller's lock so PHI + KEK clear
-  // together on the 300s timeout (Requirements 3.6, 3.7).
-  onIdle = () => {
-    void controller.lock.lock();
-  };
+  controller = createHomeEntry({ keyStore, store, syncWorker, auth, idle, vault, vaultHttp: http });
 
   return controller;
 }

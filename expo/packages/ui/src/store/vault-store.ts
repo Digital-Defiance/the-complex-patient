@@ -34,6 +34,8 @@ import {
   type VaultStoreState,
 } from './types';
 
+/** Partitions that may be reset to empty when decrypt fails during hydrate. */
+const OPTIONAL_HYDRATE_PARTITIONS: ReadonlySet<VaultType> = new Set(['locationTrail']);
 const utf8Encoder = new TextEncoder();
 const utf8Decoder = new TextDecoder();
 
@@ -142,6 +144,12 @@ export function createVaultStore(deps: VaultStoreDeps): VaultStore {
     }
     const result = await crypto.decrypt(toEncryptedPayload(blob), kek as CryptoKeyRef);
     if (!result.ok) {
+      if (OPTIONAL_HYDRATE_PARTITIONS.has(vaultType)) {
+        console.warn(
+          `[VaultStore] optional partition ${vaultType} could not be decrypted; treating as empty`,
+        );
+        return { records: [], syncVersion: 0 };
+      }
       // A corrupt/tampered blob must not silently project an empty set that a
       // later write could clobber; fail the hydrate loudly (Requirement 5.1).
       throw new Error(`failed to decrypt ${vaultType} partition: ${result.error}`);

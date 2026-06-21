@@ -11,29 +11,61 @@
  * backend-only controls while unreachable, keeping Local_Vault reads/writes/
  * navigation enabled.
  *
- * Requirements: 8.1, 8.2, 8.3, 12.1, 12.2, 12.3, 12.4, 14.5
+ * Requirements: 8.1, 8.2, 8.3, 12.1, 12.2, 12.3, 12.4, 13.1, 13.5, 14.5
  */
 
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Slot } from 'expo-router';
-import { SyncStatusIndicator, useConnectivityWatcher, ConnectivityProvider } from '@complex-patient/ui';
+import { Slot, useRouter } from 'expo-router';
+import {
+  ActivityResponder,
+  SyncStatusIndicator,
+  useConnectivityWatcher,
+  ConnectivityProvider,
+  WeatherHostProvider,
+  useAppHost,
+} from '@complex-patient/ui';
+import { webWeatherHost } from '../../src/adapters/weather-host';
 
-export default function HomeLayout(): React.ReactElement {
+function AuthenticatedHomeStack(): React.ReactElement {
+  const { home, refreshHomeStatus } = useAppHost();
+  const router = useRouter();
   const { isOffline } = useConnectivityWatcher();
 
-  return (
+  const content = (
     <View style={styles.container}>
       <View style={styles.header}>
         <SyncStatusIndicator isOffline={isOffline} />
       </View>
       <View style={styles.content}>
         <ConnectivityProvider isOffline={isOffline}>
-          <Slot screenOptions={{ headerShown: false }} />
+          <WeatherHostProvider deps={webWeatherHost}>
+            <Slot screenOptions={{ headerShown: false }} />
+          </WeatherHostProvider>
         </ConnectivityProvider>
       </View>
     </View>
   );
+
+  if (!home) {
+    return content;
+  }
+
+  return (
+    <ActivityResponder
+      home={home}
+      onLocked={() => {
+        refreshHomeStatus();
+        router.replace('/auth/unlock' as never);
+      }}
+    >
+      {content}
+    </ActivityResponder>
+  );
+}
+
+export default function HomeLayout(): React.ReactElement {
+  return <AuthenticatedHomeStack />;
 }
 
 const styles = StyleSheet.create({

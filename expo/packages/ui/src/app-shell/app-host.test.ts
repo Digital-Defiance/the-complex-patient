@@ -76,6 +76,7 @@ function createMockHomeController(): HomeEntryController {
     commit: vi.fn(async () => ({ ok: true, records: [] })),
     onConnectivityRestored: vi.fn(),
     notifyActivity: vi.fn(),
+    subscribeStatus: vi.fn(() => () => {}),
     fetchRemoteKdfMaterial: vi.fn(async () => null),
     publishKdfMaterial: vi.fn(async () => {}),
     dispose: vi.fn(),

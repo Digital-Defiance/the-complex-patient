@@ -17,7 +17,7 @@ export default function Home(): React.ReactElement {
   const router = useRouter();
 
   const handleNavigate = useCallback(
-    (subsystem: 'medications' | 'journal' | 'insights' | 'export' | 'import') => {
+    (subsystem: 'medications' | 'journal' | 'insights' | 'export' | 'import' | 'settings') => {
       switch (subsystem) {
         case 'medications':
           router.push('/(home)/medications' as never);
@@ -33,6 +33,9 @@ export default function Home(): React.ReactElement {
           break;
         case 'import':
           router.push('/(home)/import' as never);
+          break;
+        case 'settings':
+          router.push('/(home)/settings' as never);
           break;
       }
     },

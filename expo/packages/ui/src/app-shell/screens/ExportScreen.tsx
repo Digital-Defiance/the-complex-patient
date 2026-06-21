@@ -16,16 +16,17 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Platform,
 } from 'react-native';
-import type { VaultRecord } from '@complex-patient/domain';
 import {
   createClinicalExport,
-  filterActive,
-  splitMedicationsPartition,
   validateExportPasswords,
+  type ClinicalExportProgress,
   type ClinicalExportSource,
 } from '@complex-patient/clinical-export';
+import { countExportRecords, readClinicalExportSource } from '../../app/export-source';
 import { useAppHost } from '../app-host';
+import { beginExportSession } from '../export-session';
 
 export interface ExportScreenProps {
   /** Navigate back to home. */
@@ -39,6 +40,17 @@ type ExportPhase = 'idle' | 'exporting' | 'ready' | 'error';
 const CONSENT_LABEL =
   'I understand this export contains decrypted health data that can be read without Complex Patient. The zip password protects the file in transit only.';
 
+function formatExportSummary(source: ClinicalExportSource): string {
+  const parts: string[] = [];
+  if (source.medications.length > 0) parts.push(`${source.medications.length} medications`);
+  if (source.prnLogs.length > 0) parts.push(`${source.prnLogs.length} PRN logs`);
+  if (source.symptoms.length > 0) parts.push(`${source.symptoms.length} symptoms`);
+  if (source.conditions.length > 0) parts.push(`${source.conditions.length} conditions`);
+  if (source.flares.length > 0) parts.push(`${source.flares.length} flares`);
+  if (source.associations.length > 0) parts.push(`${source.associations.length} associations`);
+  return parts.join(', ');
+}
+
 export function ExportScreen({ onBack, onSaveExport }: ExportScreenProps): React.ReactElement {
   const { home } = useAppHost();
 
@@ -50,36 +62,52 @@ export function ExportScreen({ onBack, onSaveExport }: ExportScreenProps): React
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [phase, setPhase] = useState<ExportPhase>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [exportProgress, setExportProgress] = useState<ClinicalExportProgress | null>(null);
 
-  useEffect(() => {
+  const reloadSource = useCallback(() => {
     if (!home) {
       setReadError(true);
       setSource(null);
       return;
     }
 
-    try {
-      const medications = home.read<VaultRecord>('medications');
-      const symptoms = home.read('symptoms');
-      const conditions = home.read('conditions');
-      const flares = home.read('flares');
-      const associations = home.read('associations');
-      const split = splitMedicationsPartition(medications.records);
+    if (home.getStatus() !== 'ready') {
+      setReadError(true);
+      setSource(null);
+      return;
+    }
 
-      setSource({
-        medications: split.medications,
-        prnLogs: split.prnLogs,
-        symptoms: filterActive(symptoms.records),
-        conditions: filterActive(conditions.records),
-        flares: filterActive(flares.records),
-        associations: filterActive(associations.records),
-      });
+    try {
+      setSource(readClinicalExportSource(home));
       setReadError(false);
     } catch {
       setSource(null);
       setReadError(true);
     }
   }, [home]);
+
+  useEffect(() => {
+    reloadSource();
+    if (!home) {
+      return undefined;
+    }
+
+    const unsubscribeStatus = home.subscribeStatus((status) => {
+      if (status === 'ready') {
+        reloadSource();
+      }
+    });
+    const unsubscribeSync = home.coordinator.syncStatus.subscribe(() => {
+      if (home.getStatus() === 'ready') {
+        reloadSource();
+      }
+    });
+
+    return () => {
+      unsubscribeStatus();
+      unsubscribeSync();
+    };
+  }, [home, reloadSource]);
 
   const passwordsValid = useMemo(() => {
     if (!zipPassword.trim()) return false;
@@ -91,13 +119,70 @@ export function ExportScreen({ onBack, onSaveExport }: ExportScreenProps): React
     if (!consented) blockers.push('Check the consent box.');
     if (!zipPassword.trim()) blockers.push('Enter a zip password.');
     else if (zipPassword !== zipPasswordConfirm) blockers.push('Zip passwords must match.');
+    if (source !== null && countExportRecords(source) === 0) {
+      blockers.push('Add clinical records to your vault before exporting.');
+    }
     return blockers;
-  }, [consented, zipPassword, zipPasswordConfirm]);
+  }, [consented, source, zipPassword, zipPasswordConfirm]);
 
-  const canExport = consented && passwordsValid && !readError && source !== null && phase !== 'exporting';
+  const canExport =
+    consented &&
+    passwordsValid &&
+    !readError &&
+    source !== null &&
+    countExportRecords(source) > 0 &&
+    phase !== 'exporting';
+
+  const recordCount = source ? countExportRecords(source) : 0;
+  const largeExport = recordCount >= 250;
+
+  useEffect(() => {
+    if (phase !== 'exporting') {
+      return undefined;
+    }
+
+    const endExportSession = beginExportSession();
+    home?.lock.suspendIdle();
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    }
+
+    return () => {
+      endExportSession();
+      home?.lock.resumeIdle();
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      }
+    };
+  }, [home, phase]);
 
   const handleExport = useCallback(async () => {
-    if (!source) return;
+    if (!home || home.getStatus() !== 'ready') {
+      setValidationMessage('Unlock your vault before exporting.');
+      return;
+    }
+
+    let freshSource: ClinicalExportSource;
+    try {
+      freshSource = readClinicalExportSource(home);
+      setSource(freshSource);
+    } catch {
+      setValidationMessage('Could not read vault data. Try again after unlocking.');
+      return;
+    }
+
+    if (countExportRecords(freshSource) === 0) {
+      setValidationMessage(
+        'Nothing to export. This vault has no clinical records on this device — they may have been cleared during a recovery unlock, or you may need to re-enter data.',
+      );
+      return;
+    }
 
     const validationError = validateExportPasswords(consented, zipPassword, zipPasswordConfirm);
     if (validationError) {
@@ -108,24 +193,48 @@ export function ExportScreen({ onBack, onSaveExport }: ExportScreenProps): React
     setValidationMessage(null);
     setPhase('exporting');
     setStatusMessage(null);
+    setExportProgress({
+      stage: 'building-fhir',
+      percent: 0,
+      message: 'Starting export…',
+    });
 
-    const result = await createClinicalExport({ source, zipPassword });
+    const result = await createClinicalExport({
+      source: freshSource,
+      zipPassword,
+      onProgress: (progress) => {
+        home?.notifyActivity();
+        setExportProgress(progress);
+      },
+    });
 
     if (result.status === 'error') {
       setPhase('error');
+      setExportProgress(null);
       setStatusMessage(result.message);
       return;
     }
 
     try {
+      setExportProgress({
+        stage: 'saving',
+        percent: 92,
+        message: 'Saving export file…',
+      });
       await onSaveExport(result.zipBytes, result.filename);
+      setExportProgress({
+        stage: 'complete',
+        percent: 100,
+        message: 'Export ready.',
+      });
       setPhase('ready');
       setStatusMessage('Export saved. Share the zip file only with people you trust.');
     } catch {
       setPhase('error');
+      setExportProgress(null);
       setStatusMessage('Could not save the export file.');
     }
-  }, [consented, onSaveExport, source, zipPassword, zipPasswordConfirm]);
+  }, [consented, home, onSaveExport, zipPassword, zipPasswordConfirm]);
 
   if (!home || readError) {
     return (
@@ -144,9 +253,28 @@ export function ExportScreen({ onBack, onSaveExport }: ExportScreenProps): React
     <ScrollView contentContainerStyle={styles.container} accessibilityLabel="Clinical export">
       <Text style={styles.title}>Clinical Export</Text>
       <Text style={styles.lead}>
-        Export decrypted health data as a FHIR JSON bundle inside a password-protected zip file.
-        This happens entirely on your device.
+        Export decrypted health data as a FHIR JSON bundle plus a clinician-readable Markdown
+        summary, inside a password-protected zip file. This happens entirely on your device.
       </Text>
+
+      {source !== null && recordCount > 0 && phase !== 'exporting' && (
+        <View style={styles.summaryBox} testID="export-record-summary">
+          <Text style={styles.summaryTitle}>Ready to export</Text>
+          <Text style={styles.summaryText}>
+            {recordCount} clinical record{recordCount === 1 ? '' : 's'} ({formatExportSummary(source)})
+          </Text>
+        </View>
+      )}
+
+      {source !== null && recordCount === 0 && phase !== 'exporting' && (
+        <View style={styles.emptyVaultBox} testID="export-empty-vault">
+          <Text style={styles.emptyVaultTitle}>No clinical data on this device</Text>
+          <Text style={styles.emptyVaultText}>
+            Export would contain only metadata. If you expected records here, they may have been cleared
+            during vault recovery, or this device never received synced data from the server.
+          </Text>
+        </View>
+      )}
 
       <View style={styles.warningBox} testID="export-consent-warning">
         <Text style={styles.warningTitle}>Important</Text>
@@ -155,6 +283,23 @@ export function ExportScreen({ onBack, onSaveExport }: ExportScreenProps): React
           zero-knowledge protection does not apply to exported files.
         </Text>
       </View>
+
+      {largeExport && phase !== 'exporting' && (
+        <View style={styles.durationWarningBox} testID="export-duration-warning">
+          <Text style={styles.durationWarningTitle}>Large export</Text>
+          <Text style={styles.durationWarningText}>
+            This vault has a lot of data. Encrypting the zip can take 5 minutes or longer in the
+            browser. Keep this tab open and in the foreground until the download starts.
+          </Text>
+        </View>
+      )}
+
+      {Platform.OS === 'web' && phase !== 'exporting' && (
+        <Text style={styles.webHint} testID="export-web-hint">
+          Web exports encrypt in your browser (AES-256, no compression). Very large vaults
+          can still take a few minutes; keep this tab open until the download starts.
+        </Text>
+      )}
 
       <Pressable
         style={styles.checkboxRow}
@@ -208,6 +353,34 @@ export function ExportScreen({ onBack, onSaveExport }: ExportScreenProps): React
         </Text>
       )}
 
+      {phase === 'exporting' && exportProgress && (
+        <View style={styles.progressBox} testID="export-progress">
+          <Text style={styles.progressMessage}>{exportProgress.message}</Text>
+          <View
+            style={styles.progressTrack}
+            accessibilityRole="progressbar"
+            accessibilityValue={{ min: 0, max: 100, now: exportProgress.percent }}
+          >
+            <View
+              style={[
+                styles.progressFill,
+                exportProgress.stage === 'encrypting' &&
+                  exportProgress.percent >= 50 &&
+                  exportProgress.percent < 92 &&
+                  styles.progressFillActive,
+                { width: `${exportProgress.percent}%` },
+              ]}
+            />
+          </View>
+          <Text style={styles.progressPercent}>{exportProgress.percent}%</Text>
+          {exportProgress.stage === 'encrypting' && exportProgress.percent >= 50 && exportProgress.percent < 92 && (
+            <Text style={styles.progressHint} testID="export-progress-hint">
+              Encryption is the long step. Elapsed time in the message is real; the bar moves with time, not zip milestones. Keep this tab open.
+            </Text>
+          )}
+        </View>
+      )}
+
       {statusMessage && (
         <Text
           style={phase === 'error' ? styles.errorText : styles.successText}
@@ -228,7 +401,10 @@ export function ExportScreen({ onBack, onSaveExport }: ExportScreenProps): React
           testID="export-submit"
         >
           {phase === 'exporting' ? (
-            <ActivityIndicator color="#fff" />
+            <View style={styles.exportingButtonContent}>
+              <ActivityIndicator color="#fff" />
+              <Text style={styles.primaryButtonText}>Exporting…</Text>
+            </View>
           ) : (
             <Text style={styles.primaryButtonText}>Export</Text>
           )}
@@ -260,6 +436,40 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 22,
   },
+  summaryBox: {
+    backgroundColor: '#eef8f0',
+    borderColor: '#9fd4a8',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  summaryTitle: {
+    fontWeight: '700',
+    marginBottom: 6,
+    color: '#1f5f2d',
+  },
+  summaryText: {
+    color: '#2f4f35',
+    lineHeight: 20,
+  },
+  emptyVaultBox: {
+    backgroundColor: '#fff1f0',
+    borderColor: '#f5a5a0',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  emptyVaultTitle: {
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#8a1f1f',
+  },
+  emptyVaultText: {
+    color: '#5c2f2f',
+    lineHeight: 20,
+  },
   warningBox: {
     backgroundColor: '#fff8e6',
     borderColor: '#f0c36d',
@@ -276,6 +486,29 @@ const styles = StyleSheet.create({
   warningText: {
     color: '#5c4a1f',
     lineHeight: 20,
+  },
+  durationWarningBox: {
+    backgroundColor: '#fff1f0',
+    borderColor: '#f5a5a0',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  durationWarningTitle: {
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#8a1f1a',
+  },
+  durationWarningText: {
+    color: '#5c1f1a',
+    lineHeight: 20,
+  },
+  webHint: {
+    fontSize: 13,
+    color: '#555',
+    lineHeight: 18,
+    marginBottom: 16,
   },
   checkboxRow: {
     flexDirection: 'row',
@@ -332,6 +565,38 @@ const styles = StyleSheet.create({
     color: '#555',
     marginBottom: 2,
   },
+  progressBox: {
+    marginBottom: 16,
+    gap: 8,
+  },
+  progressMessage: {
+    fontSize: 14,
+    color: '#333',
+  },
+  progressTrack: {
+    height: 10,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#0066cc',
+    borderRadius: 999,
+  },
+  progressFillActive: {
+    backgroundColor: '#004999',
+  },
+  progressPercent: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'right',
+  },
+  progressHint: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 18,
+  },
   actions: {
     gap: 12,
     marginTop: 8,
@@ -346,6 +611,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  exportingButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   secondaryButton: {
     borderWidth: 1,

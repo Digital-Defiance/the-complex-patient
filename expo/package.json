@@ -16,7 +16,9 @@
     "packages/insights",
     "packages/medications",
     "packages/symptom-journal",
-    "packages/clinical-export"
+    "packages/clinical-export",
+    "packages/weather",
+    "packages/med-visuals"
   ],
   "scripts": {
     "test": "vitest run",
@@ -50,6 +52,7 @@
     "expo-file-system": "~19.0.23",
     "expo-linking": "8.0.12",
     "expo-local-authentication": "17.0.8",
+    "expo-location": "~19.0.8",
     "expo-notifications": "0.32.17",
     "expo-router": "6.0.24",
     "expo-secure-store": "15.0.8",

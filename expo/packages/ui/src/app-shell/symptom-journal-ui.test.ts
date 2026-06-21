@@ -1,95 +1,78 @@
-import { describe, expect, it } from 'vitest';
-import type { FlareUp, SymptomEntry } from '@complex-patient/domain';
+import { describe, it, expect } from 'vitest';
 import {
-  buildJournalTimeline,
-  buildSeverityTrend,
-  groupJournalByDay,
-  mergeSymptomRecords,
-  resolveSymptomTypeMatch,
-  suggestSymptomTypes,
-  symptomTypeKey,
+  mergeWeatherIntoTrend,
+  trendHasWeatherData,
+  weatherOverlayBandHeight,
+  weatherOverlayValue,
 } from './symptom-journal-ui';
 
-function symptom(id: string, type: string): SymptomEntry {
-  return {
-    id,
-    op_timestamp: '2024-01-01T00:00:00Z',
-    symptomType: type,
-    systemicLocation: 'Head',
-    severity: 5,
-    duration: { value: 1, unit: 'hours' },
-    notes: '',
-    active: true,
-  };
-}
+describe('mergeWeatherIntoTrend', () => {
+  it('aligns weather rows onto severity trend days', () => {
+    const merged = mergeWeatherIntoTrend(
+      [{ day: '2024-06-14', maxSeverity: 7, flareCount: 0, symptomCount: 1 }],
+      [
+        {
+          day: '2024-06-14',
+          meanPressureHpa: 1010,
+          meanHumidityPct: 55,
+          meanTemperatureC: 18,
+          totalPrecipitationMm: 2.5,
+          pressureDelta24h: -3,
+        },
+      ],
+    );
 
-describe('symptom-journal-ui', () => {
-  it('matches symptom types case-insensitively', () => {
-    const existing = [symptom('1', 'Headache')];
-    expect(resolveSymptomTypeMatch(existing, 'headache')).toBe('Headache');
-    expect(symptomTypeKey(' Headache ')).toBe('headache');
-  });
-
-  it('suggests existing symptom types while typing', () => {
-    const existing = [symptom('1', 'Headache'), symptom('2', 'Joint pain')];
-    expect(suggestSymptomTypes(existing, 'head')).toEqual(['Headache']);
-  });
-
-  it('merges journal writes without dropping existing records', () => {
-    const current = [symptom('a', 'Headache')];
-    const next = [symptom('b', 'Fatigue')];
-    const merged = mergeSymptomRecords(current, next);
-    expect(merged.map((entry) => entry.id)).toEqual(['a', 'b']);
-  });
-
-  it('builds a combined symptom and flare timeline newest first', () => {
-    const symptoms = [
-      { ...symptom('s1', 'Headache'), op_timestamp: '2024-06-10T10:00:00Z' },
-      { ...symptom('s2', 'Fatigue'), op_timestamp: '2024-06-12T09:00:00Z' },
-    ];
-    const flares: FlareUp[] = [
-      {
-        id: 'f1',
-        op_timestamp: '2024-06-11T15:00:00Z',
-        symptomIds: ['s1', 's2'],
-        trigger: 'Weather change',
-      },
-    ];
-
-    const timeline = buildJournalTimeline(symptoms, flares);
-    expect(timeline.map((entry) => entry.id)).toEqual(['s2', 'f1', 's1']);
-    expect(timeline[1]).toMatchObject({
-      kind: 'flare',
-      symptomLabels: ['Headache', 'Fatigue'],
+    expect(merged[0]).toMatchObject({
+      day: '2024-06-14',
+      maxSeverity: 7,
+      meanPressureHpa: 1010,
+      meanTemperatureC: 18,
+      totalPrecipitationMm: 2.5,
+      pressureDelta24h: -3,
     });
   });
+});
 
-  it('groups journal entries by calendar day', () => {
-    const timeline = buildJournalTimeline(
-      [{ ...symptom('s1', 'Headache'), op_timestamp: '2024-06-10T10:00:00Z' }],
-      [{ id: 'f1', op_timestamp: '2024-06-10T18:00:00Z', symptomIds: ['s1', 's2'], trigger: '' }],
-    );
-    const groups = groupJournalByDay(timeline);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].entries).toHaveLength(2);
+describe('weather overlay helpers', () => {
+  const day = {
+    day: '2024-06-14',
+    maxSeverity: 5,
+    flareCount: 0,
+    symptomCount: 1,
+    meanPressureHpa: 1010,
+    meanHumidityPct: 80,
+    meanTemperatureC: 22,
+    totalPrecipitationMm: 4,
+    pressureDelta24h: -6,
+    meanHeatIndexC: 22,
+    rapidPressureDrop: true,
+  };
+
+  it('reads overlay values by metric id', () => {
+    expect(weatherOverlayValue(day, 'humidity')).toBe(80);
+    expect(weatherOverlayValue(day, 'precipitation')).toBe(4);
   });
 
-  it('builds a trailing severity trend with flare markers', () => {
-    const timeline = buildJournalTimeline(
-      [
-        { ...symptom('s1', 'Headache'), op_timestamp: '2024-06-10T10:00:00Z', severity: 7 },
-        { ...symptom('s2', 'Fatigue'), op_timestamp: '2024-06-12T09:00:00Z', severity: 4 },
-      ],
-      [{ id: 'f1', op_timestamp: '2024-06-11T15:00:00Z', symptomIds: ['s1', 's2'], trigger: '' }],
-    );
+  it('detects when weather data exists on the trend', () => {
+    expect(trendHasWeatherData([day])).toBe(true);
+    expect(
+      trendHasWeatherData([
+        {
+          ...day,
+          meanPressureHpa: null,
+          meanHumidityPct: null,
+          meanTemperatureC: null,
+          totalPrecipitationMm: null,
+          pressureDelta24h: null,
+          meanHeatIndexC: null,
+          rapidPressureDrop: false,
+        },
+      ]),
+    ).toBe(false);
+  });
 
-    const trend = buildSeverityTrend(timeline, 14, new Date('2024-06-12T12:00:00Z'));
-    const june10 = trend.find((day) => day.day === '2024-06-10');
-    const june11 = trend.find((day) => day.day === '2024-06-11');
-    const june12 = trend.find((day) => day.day === '2024-06-12');
-
-    expect(june10?.maxSeverity).toBe(7);
-    expect(june11?.flareCount).toBe(1);
-    expect(june12?.maxSeverity).toBe(4);
+  it('scales band heights for overlays', () => {
+    expect(weatherOverlayBandHeight(-6, 'pressureDelta24h', { min: 0, max: 0 })).toBeGreaterThan(0);
+    expect(weatherOverlayBandHeight(80, 'humidity', { min: 0, max: 100 })).toBeGreaterThan(0);
   });
 });

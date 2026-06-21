@@ -44,6 +44,25 @@ describe('resolveKdfMaterial', () => {
     expect(saveLocal).toHaveBeenCalledWith(remote);
   });
 
+  it('keeps local salt when vault data exists on device and remote differs', async () => {
+    const local = material(0x01);
+    const remote = material(0x03);
+    const saveLocal = vi.fn(async () => {});
+    const publishRemote = vi.fn(async () => {});
+
+    const resolved = await resolveKdfMaterial({
+      loadLocal: async () => local,
+      saveLocal,
+      fetchRemote: async () => remote,
+      publishRemote,
+      hasExistingVaultData: async () => true,
+    });
+
+    expect(resolved).toEqual(local);
+    expect(saveLocal).not.toHaveBeenCalled();
+    expect(publishRemote).toHaveBeenCalledWith(local);
+  });
+
   it('publishes local material when remote is absent', async () => {
     const local = material(0x04);
     const publishRemote = vi.fn(async () => {});

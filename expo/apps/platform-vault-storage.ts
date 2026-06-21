@@ -16,6 +16,11 @@ export function createLocalStorageVaultBackend(): KeyValueStorageBackend {
     setItem: (key, value) => {
       storage.setItem(key, value);
     },
+    removeItem: (key) => {
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.removeItem(key);
+      }
+    },
   });
 }
 
@@ -57,6 +62,17 @@ async function createFileSystemVaultBackend(): Promise<KeyValueStorageBackend> {
     async setItem(key, value) {
       await ensureVaultDir();
       await FileSystem.writeAsStringAsync(vaultFilePath(key), value);
+    },
+    async removeItem(key) {
+      try {
+        const path = vaultFilePath(key);
+        const info = await FileSystem.getInfoAsync(path);
+        if (info.exists) {
+          await FileSystem.deleteAsync(path, { idempotent: true });
+        }
+      } catch {
+        // Missing partition files are treated as already cleared.
+      }
     },
   });
 }

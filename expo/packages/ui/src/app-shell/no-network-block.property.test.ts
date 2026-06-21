@@ -58,6 +58,7 @@ const vaultTypeArb: fc.Arbitrary<VaultType> = fc.constantFrom(
   'conditions' as const,
   'flares' as const,
   'associations' as const,
+  'locationTrail' as const,
 );
 
 /** Generate an arbitrary TestRecord with a unique id and value. */

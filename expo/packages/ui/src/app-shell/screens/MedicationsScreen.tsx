@@ -12,8 +12,11 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, StyleSheet } from 'react-native';
-import { buildPolypharmacyView, type PolyView, type PolyViewBlock } from '@complex-patient/medications';
-import type { MedicationProfile } from '@complex-patient/domain';
+import { buildMedicationsView, type PolyView, type PolyViewBlock } from '@complex-patient/medications';
+import type { MedicationProfile, VaultRecord } from '@complex-patient/domain';
+import { splitMedicationsPartition } from '@complex-patient/clinical-export';
+import { MedProductIcon } from '@complex-patient/med-visuals';
+import { parseDosageString } from '../dosage-units';
 import { useAppHost } from '../app-host';
 import { usePartition } from '../hooks';
 
@@ -24,6 +27,8 @@ import { usePartition } from '../hooks';
 export interface MedicationsScreenProps {
   /** Called when navigating back or to PRN screen. */
   onNavigatePrn?: () => void;
+  onAdd?: () => void;
+  onEditMedication?: (medicationId: string) => void;
   /** Called when navigating back to home. */
   onBack?: () => void;
 }
@@ -45,7 +50,7 @@ interface EditState {
 // Component
 // ---------------------------------------------------------------------------
 
-export function MedicationsScreen({ onNavigatePrn, onBack }: MedicationsScreenProps): React.ReactElement {
+export function MedicationsScreen({ onNavigatePrn, onAdd, onEditMedication, onBack }: MedicationsScreenProps): React.ReactElement {
   const { home } = useAppHost();
 
   // If home is not available, render the data-unavailable fallback.
@@ -60,7 +65,13 @@ export function MedicationsScreen({ onNavigatePrn, onBack }: MedicationsScreenPr
   }
 
   return (
-    <MedicationsScreenInner home={home} onNavigatePrn={onNavigatePrn} onBack={onBack} />
+    <MedicationsScreenInner
+      home={home}
+      onNavigatePrn={onNavigatePrn}
+      onAdd={onAdd}
+      onEditMedication={onEditMedication}
+      onBack={onBack}
+    />
   );
 }
 
@@ -71,15 +82,19 @@ export function MedicationsScreen({ onNavigatePrn, onBack }: MedicationsScreenPr
 interface InnerProps {
   home: NonNullable<ReturnType<typeof useAppHost>['home']>;
   onNavigatePrn?: () => void;
+  onAdd?: () => void;
+  onEditMedication?: (medicationId: string) => void;
   onBack?: () => void;
 }
 
-function MedicationsScreenInner({ home, onNavigatePrn, onBack }: InnerProps): React.ReactElement {
-  // Read medications exclusively through home.read via usePartition (Requirement 9.6, 14.1).
-  const records = usePartition<MedicationProfile>(home, 'medications');
+function MedicationsScreenInner({ home, onNavigatePrn, onAdd, onEditMedication, onBack }: InnerProps): React.ReactElement {
+  const allRecords = usePartition<VaultRecord>(home, 'medications');
+  const medications = useMemo(
+    () => splitMedicationsPartition(allRecords).medications,
+    [allRecords],
+  );
 
-  // Build the adaptive view from the current medication records.
-  const polyView: PolyView = useMemo(() => buildPolypharmacyView(records), [records]);
+  const polyView: PolyView = useMemo(() => buildMedicationsView(medications), [medications]);
 
   // Edit state — retains values on commit failure (Requirement 9.7).
   const [editing, setEditing] = useState<EditState | null>(null);
@@ -152,11 +167,16 @@ function MedicationsScreenInner({ home, onNavigatePrn, onBack }: InnerProps): Re
               <Text style={styles.backText}>← Back</Text>
             </Pressable>
           )}
-          <Text style={styles.title}>Medications</Text>
+          <Text style={styles.title}>Cabinet</Text>
         </View>
         <Text style={styles.emptyMessage} testID="medications-empty-message">
           No medications found. Add a medication to get started.
         </Text>
+        {onAdd && (
+          <Pressable onPress={onAdd} accessibilityRole="button" testID="medications-add-empty">
+            <Text style={styles.linkText}>Add medication</Text>
+          </Pressable>
+        )}
         {onNavigatePrn && (
           <Pressable onPress={onNavigatePrn} accessibilityRole="button" testID="medications-nav-prn">
             <Text style={styles.linkText}>PRN Quick Log</Text>
@@ -174,7 +194,12 @@ function MedicationsScreenInner({ home, onNavigatePrn, onBack }: InnerProps): Re
             <Text style={styles.backText}>← Back</Text>
           </Pressable>
         )}
-        <Text style={styles.title}>Medications</Text>
+        <Text style={styles.title}>Cabinet</Text>
+        {onAdd && (
+          <Pressable onPress={onAdd} accessibilityRole="button" testID="medications-add">
+            <Text style={styles.linkText}>Add</Text>
+          </Pressable>
+        )}
         {onNavigatePrn && (
           <Pressable onPress={onNavigatePrn} accessibilityRole="button" testID="medications-nav-prn">
             <Text style={styles.linkText}>PRN Quick Log</Text>
@@ -195,6 +220,7 @@ function MedicationsScreenInner({ home, onNavigatePrn, onBack }: InnerProps): Re
           medications={polyView.medications}
           editing={editing}
           onEdit={handleEdit}
+          onEditMedication={onEditMedication}
           onSave={handleSave}
           onCancel={handleCancelEdit}
           onUpdateField={updateField}
@@ -205,6 +231,7 @@ function MedicationsScreenInner({ home, onNavigatePrn, onBack }: InnerProps): Re
           asNeeded={polyView.asNeeded}
           editing={editing}
           onEdit={handleEdit}
+          onEditMedication={onEditMedication}
           onSave={handleSave}
           onCancel={handleCancelEdit}
           onUpdateField={updateField}
@@ -222,12 +249,13 @@ interface ListProps {
   medications: MedicationProfile[];
   editing: EditState | null;
   onEdit: (med: MedicationProfile) => void;
+  onEditMedication?: (medicationId: string) => void;
   onSave: () => void;
   onCancel: () => void;
   onUpdateField: (field: keyof Omit<EditState, 'medicationId'>, value: string) => void;
 }
 
-function FlatMedicationList({ medications, editing, onEdit, onSave, onCancel, onUpdateField }: ListProps): React.ReactElement {
+function FlatMedicationList({ medications, editing, onEdit, onEditMedication, onSave, onCancel, onUpdateField }: ListProps): React.ReactElement {
   return (
     <View testID="medications-flat-list">
       {medications.map((med) => (
@@ -236,6 +264,7 @@ function FlatMedicationList({ medications, editing, onEdit, onSave, onCancel, on
           medication={med}
           editing={editing}
           onEdit={onEdit}
+          onEditMedication={onEditMedication}
           onSave={onSave}
           onCancel={onCancel}
           onUpdateField={onUpdateField}
@@ -254,12 +283,13 @@ interface GroupedProps {
   asNeeded: MedicationProfile[];
   editing: EditState | null;
   onEdit: (med: MedicationProfile) => void;
+  onEditMedication?: (medicationId: string) => void;
   onSave: () => void;
   onCancel: () => void;
   onUpdateField: (field: keyof Omit<EditState, 'medicationId'>, value: string) => void;
 }
 
-function GroupedMedicationView({ blocks, asNeeded, editing, onEdit, onSave, onCancel, onUpdateField }: GroupedProps): React.ReactElement {
+function GroupedMedicationView({ blocks, asNeeded, editing, onEdit, onEditMedication, onSave, onCancel, onUpdateField }: GroupedProps): React.ReactElement {
   return (
     <View testID="medications-grouped-view">
       {/* Render blocks in the exact order returned by buildPolypharmacyView (Requirement 9.2) */}
@@ -272,6 +302,7 @@ function GroupedMedicationView({ blocks, asNeeded, editing, onEdit, onSave, onCa
               medication={med}
               editing={editing}
               onEdit={onEdit}
+              onEditMedication={onEditMedication}
               onSave={onSave}
               onCancel={onCancel}
               onUpdateField={onUpdateField}
@@ -289,6 +320,7 @@ function GroupedMedicationView({ blocks, asNeeded, editing, onEdit, onSave, onCa
               medication={med}
               editing={editing}
               onEdit={onEdit}
+              onEditMedication={onEditMedication}
               onSave={onSave}
               onCancel={onCancel}
               onUpdateField={onUpdateField}
@@ -308,12 +340,13 @@ interface MedicationRowProps {
   medication: MedicationProfile;
   editing: EditState | null;
   onEdit: (med: MedicationProfile) => void;
+  onEditMedication?: (medicationId: string) => void;
   onSave: () => void;
   onCancel: () => void;
   onUpdateField: (field: keyof Omit<EditState, 'medicationId'>, value: string) => void;
 }
 
-function MedicationRow({ medication, editing, onEdit, onSave, onCancel, onUpdateField }: MedicationRowProps): React.ReactElement {
+function MedicationRow({ medication, editing, onEdit, onEditMedication, onSave, onCancel, onUpdateField }: MedicationRowProps): React.ReactElement {
   const isEditing = editing?.medicationId === medication.id;
 
   if (isEditing && editing) {
@@ -373,6 +406,12 @@ function MedicationRow({ medication, editing, onEdit, onSave, onCancel, onUpdate
 
   return (
     <View style={styles.medicationRow} testID={`medication-row-${medication.id}`}>
+      <MedProductIcon
+        appearance={medication.appearance}
+        form={medication.form}
+        dosageUnit={parseDosageString(medication.dosage).unit}
+        size={28}
+      />
       <View style={styles.medInfo}>
         <Text style={styles.drugName} testID={`med-name-${medication.id}`}>
           {medication.drugName}
@@ -383,15 +422,31 @@ function MedicationRow({ medication, editing, onEdit, onSave, onCancel, onUpdate
         <Text style={styles.detailText}>
           {medication.prescribingPhysician} • {medication.conditionTreated}
         </Text>
+        {medication.refill?.quantityOnHand !== undefined && (
+          <Text style={styles.refillText} testID={`med-refill-${medication.id}`}>
+            Qty on hand: {medication.refill.quantityOnHand}
+          </Text>
+        )}
       </View>
-      <Pressable
-        onPress={() => onEdit(medication)}
-        accessibilityRole="button"
-        accessibilityLabel={`Edit ${medication.drugName}`}
-        testID={`edit-btn-${medication.id}`}
-      >
-        <Text style={styles.editBtnText}>Edit</Text>
-      </Pressable>
+      <View style={styles.rowActions}>
+        {onEditMedication && (
+          <Pressable
+            onPress={() => onEditMedication(medication.id)}
+            accessibilityRole="button"
+            testID={`full-edit-${medication.id}`}
+          >
+            <Text style={styles.editBtnText}>Schedule</Text>
+          </Pressable>
+        )}
+        <Pressable
+          onPress={() => onEdit(medication)}
+          accessibilityRole="button"
+          accessibilityLabel={`Edit ${medication.drugName}`}
+          testID={`edit-btn-${medication.id}`}
+        >
+          <Text style={styles.editBtnText}>Quick edit</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -456,9 +511,14 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
   medInfo: {
     flex: 1,
+  },
+  rowActions: {
+    gap: 8,
+    alignItems: 'flex-end',
   },
   drugName: {
     fontSize: 16,
@@ -474,6 +534,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
     marginTop: 2,
+  },
+  refillText: {
+    fontSize: 12,
+    color: '#8a5a00',
+    marginTop: 4,
   },
   editBtnText: {
     fontSize: 14,

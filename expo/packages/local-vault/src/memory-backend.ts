@@ -49,6 +49,10 @@ export class MemoryStorageBackend implements StorageBackend {
     this.store.set(key, value);
   }
 
+  async removeItem(key: string): Promise<void> {
+    this.store.delete(key);
+  }
+
   /**
    * Inspect the raw persisted entries. Test/diagnostic helper only — lets a
    * caller assert that only ciphertext envelopes were written at rest.

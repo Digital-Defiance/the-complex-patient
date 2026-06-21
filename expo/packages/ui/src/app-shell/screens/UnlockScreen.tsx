@@ -25,11 +25,12 @@
  * Requirements: 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9
  */
 
-import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { PASSKEY_SETUP_SESSION_KEY } from '@complex-patient/key-store';
 import { useAppHost } from '../app-host';
 import { deriveKEK, type KdfParams, type CryptoKeyRef } from '@complex-patient/crypto-engine';
-import { resolveKdfMaterial, bytesFromBase64, base64FromBytes } from '../../app/kdf-material-sync';
+import { resolveKdfMaterial, bytesFromBase64, base64FromBytes, KdfMaterialMissingError, normalizeKdfParams } from '../../app/kdf-material-sync';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -69,8 +70,23 @@ export interface StoredKdfMaterial {
 // ---------------------------------------------------------------------------
 
 export type PassphraseSubmitResult =
-  | { ok: true }
-  | { ok: false; reason: 'LENGTH' | 'DERIVATION_FAILED' | 'STILL_LOCKED' };
+  | { ok: true; quarantinedPartitions?: string[] }
+  | {
+      ok: false;
+      reason:
+        | 'LENGTH'
+        | 'DERIVATION_FAILED'
+        | 'STILL_LOCKED'
+        | 'KDF_MISSING'
+        | 'NOT_AUTHENTICATED'
+        | 'CORRUPT_PARTITION';
+      partition?: string;
+    };
+
+export interface PassphraseSubmitOptions {
+  /** Quarantine these partitions before unlock (explicit user consent). */
+  quarantinePartitions?: string[];
+}
 
 // ---------------------------------------------------------------------------
 // submitPassphrase — pure logic (testable without React)
@@ -78,12 +94,16 @@ export type PassphraseSubmitResult =
 
 export interface PassphraseScreenDeps {
   home: {
-    unlockWithKek: (kek: CryptoKeyRef) => Promise<{ ok: boolean }>;
+    unlockWithKek: (
+      kek: CryptoKeyRef,
+      options?: { quarantinePartitions?: string[] },
+    ) => Promise<{ ok: boolean; reason?: string; partition?: string; quarantinedPartitions?: string[] }>;
     fetchRemoteKdfMaterial?: () => Promise<{ salt: Uint8Array; params: KdfParams } | null>;
     publishKdfMaterial?: (material: { salt: Uint8Array; params: KdfParams }) => Promise<void>;
   };
   loadKdfMaterial(): Promise<{ salt: Uint8Array; params: KdfParams } | null>;
   saveKdfMaterial(m: { salt: Uint8Array; params: KdfParams }): Promise<void>;
+  hasExistingVaultData?: () => Promise<boolean>;
 }
 
 /**
@@ -95,6 +115,7 @@ export interface PassphraseScreenDeps {
 export async function submitPassphrase(
   deps: PassphraseScreenDeps,
   passphrase: string,
+  options?: PassphraseSubmitOptions,
 ): Promise<PassphraseSubmitResult> {
   // Requirement 7.8: enforce 12–128 length bound BEFORE any derivation
   if (passphrase.length < PASSPHRASE_MIN || passphrase.length > PASSPHRASE_MAX) {
@@ -102,12 +123,21 @@ export async function submitPassphrase(
   }
 
   // Resolve shared KDF material (local + Sync_Backend) before deriving the KEK.
-  const material = await resolveKdfMaterial({
-    loadLocal: deps.loadKdfMaterial,
-    saveLocal: deps.saveKdfMaterial,
-    fetchRemote: deps.home.fetchRemoteKdfMaterial,
-    publishRemote: deps.home.publishKdfMaterial,
-  });
+  let material;
+  try {
+    material = await resolveKdfMaterial({
+      loadLocal: deps.loadKdfMaterial,
+      saveLocal: deps.saveKdfMaterial,
+      fetchRemote: deps.home.fetchRemoteKdfMaterial,
+      publishRemote: deps.home.publishKdfMaterial,
+      hasExistingVaultData: deps.hasExistingVaultData,
+    });
+  } catch (error) {
+    if (error instanceof KdfMaterialMissingError) {
+      return { ok: false, reason: 'KDF_MISSING' };
+    }
+    throw error;
+  }
 
   // Derive KEK through the Crypto_Engine (on-device only)
   const derived = await deriveKEK(passphrase, material.salt, material.params);
@@ -118,9 +148,23 @@ export async function submitPassphrase(
 
   // Attempt to unlock the vault with the derived KEK
   console.log('[Unlock] calling unlockWithKek...');
-  const res = await deps.home.unlockWithKek(derived.kek);
+  const res = await deps.home.unlockWithKek(derived.kek, {
+    quarantinePartitions: options?.quarantinePartitions,
+  });
   console.log('[Unlock] unlockWithKek result:', JSON.stringify(res));
-  return res.ok ? { ok: true } : { ok: false, reason: 'STILL_LOCKED' };
+  if (res.ok) {
+    return {
+      ok: true,
+      quarantinedPartitions: res.quarantinedPartitions,
+    };
+  }
+  if (res.reason === 'NOT_AUTHENTICATED') {
+    return { ok: false, reason: 'NOT_AUTHENTICATED' };
+  }
+  if (res.reason === 'CORRUPT_PARTITION' && res.partition) {
+    return { ok: false, reason: 'CORRUPT_PARTITION', partition: res.partition };
+  }
+  return { ok: false, reason: 'STILL_LOCKED' };
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +229,7 @@ export function createKdfMaterialStorage(storage: KdfMaterialStorage) {
       try {
         const parsed: StoredKdfMaterial = JSON.parse(raw);
         const salt = bytesFromBase64(parsed.saltBase64);
-        return { salt, params: parsed.params };
+        return { salt, params: normalizeKdfParams(parsed.params) };
       } catch {
         return null;
       }
@@ -200,8 +244,22 @@ export function createKdfMaterialStorage(storage: KdfMaterialStorage) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// UnlockScreen component
+/** Shown when the device supports biometrics — sets expectation after a slow passphrase unlock. */
+export const BIOMETRIC_FUTURE_UNLOCK_HINT =
+  'After you unlock with your passphrase once, future unlocks can use biometrics and are much faster.';
+
+/** Shown on the biometric-first path before a stored unlock key exists. */
+export const BIOMETRIC_FAST_PATH_HINT =
+  'Use biometrics for quick access. First-time setup still requires your master passphrase.';
+
+/** Shown when passkey unlock is available on web. */
+export const PASSKEY_FAST_PATH_HINT =
+  'Use your device passkey for quick access. Your master passphrase is still required the first time on this browser.';
+
+/** Shown on the passphrase path when passkey setup is offered. */
+export const PASSKEY_SETUP_HINT =
+  'After unlock, save a passkey on the home screen to skip slow key derivation when you return to this browser.';
+
 // ---------------------------------------------------------------------------
 
 export interface UnlockScreenProps {
@@ -213,28 +271,91 @@ export interface UnlockScreenProps {
    * when no biometrics are enrolled, this should be false.
    */
   biometricAvailable?: boolean;
+  /**
+   * Whether passkey unlock is configured on this browser. When true, the screen
+   * shows a passkey unlock button before the passphrase form.
+   */
+  passkeyAvailable?: boolean;
+  /** Show a checkbox to register passkey unlock after a passphrase unlock. */
+  offerPasskeySetup?: boolean;
+  /** Optional signal that encrypted vault data already exists on this device. */
+  hasExistingVaultData?: () => Promise<boolean>;
 }
 
-export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockScreenProps): React.ReactElement {
+export function UnlockScreen({
+  kdfStorage,
+  biometricAvailable = false,
+  passkeyAvailable: passkeyAvailableProp = false,
+  offerPasskeySetup: offerPasskeySetupProp = false,
+  hasExistingVaultData,
+}: UnlockScreenProps): React.ReactElement {
   const { home, refreshHomeStatus } = useAppHost();
+
+  const passkeySupported = home?.isPasskeyUnlockAvailable?.() ?? false;
+  const [hasPasskey, setHasPasskey] = useState(
+    () => home?.hasPasskeyUnlock?.() ?? passkeyAvailableProp,
+  );
+
+  useEffect(() => {
+    const refreshPasskeyState = () => {
+      if (home?.hasPasskeyUnlock) {
+        setHasPasskey(home.hasPasskeyUnlock());
+        return;
+      }
+      setHasPasskey(passkeyAvailableProp);
+    };
+
+    refreshPasskeyState();
+
+    if (typeof globalThis.window === 'undefined') {
+      return undefined;
+    }
+
+    const win = globalThis.window;
+    win.addEventListener('focus', refreshPasskeyState);
+    win.document.addEventListener('visibilitychange', refreshPasskeyState);
+    return () => {
+      win.removeEventListener('focus', refreshPasskeyState);
+      win.document.removeEventListener('visibilitychange', refreshPasskeyState);
+    };
+  }, [home, passkeyAvailableProp]);
+
+  const passkeyAvailable = passkeySupported && hasPasskey;
+  const offerPasskeySetup = passkeySupported && !hasPasskey;
+  const quickUnlockAvailable = biometricAvailable || passkeyAvailable;
 
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
-  /**
-   * Whether to show the passphrase input form. Initially hidden when biometric
-   * is available (the user can attempt biometric first). Set to true on
-   * BIOMETRIC_FAILED / BIOMETRIC_LOCKED_OUT fallback (Requirement 7.5).
-   */
-  const [showPassphraseInput, setShowPassphraseInput] = useState(!biometricAvailable);
+  const [showPassphraseInput, setShowPassphraseInput] = useState(!quickUnlockAvailable);
+  const [preferPassphrase, setPreferPassphrase] = useState(false);
+  const [enablePasskeyAfterUnlock, setEnablePasskeyAfterUnlock] = useState(true);
+  const [corruptPartitionOffer, setCorruptPartitionOffer] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (passkeyAvailable && !preferPassphrase) {
+      setShowPassphraseInput(false);
+    }
+  }, [passkeyAvailable, preferPassphrase]);
+
+  const queuePasskeySetupOffer = useCallback(() => {
+    if (!enablePasskeyAfterUnlock || !offerPasskeySetup) {
+      return;
+    }
+    const storage =
+      typeof globalThis.sessionStorage !== 'undefined' ? globalThis.sessionStorage : null;
+    if (storage) {
+      storage.setItem(PASSKEY_SETUP_SESSION_KEY, '1');
+    }
+  }, [enablePasskeyAfterUnlock, offerPasskeySetup]);
 
   const handleSubmit = useCallback(async () => {
     if (!home) return;
 
     setError(null);
     setLoading(true);
-    setLoadingMessage('Deriving encryption key… This can take up to a minute.');
+    setLoadingMessage('Deriving encryption key… This can take a minute or so.');
 
     const { loadKdfMaterial, saveKdfMaterial } = createKdfMaterialStorage(kdfStorage);
 
@@ -244,11 +365,22 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
           home,
           loadKdfMaterial,
           saveKdfMaterial,
+          hasExistingVaultData,
         },
         passphrase,
       );
 
       if (result.ok) {
+        setCorruptPartitionOffer(null);
+        if (result.quarantinedPartitions && result.quarantinedPartitions.length > 0) {
+          Alert.alert(
+            'Some vault data was quarantined',
+            `Undecryptable data was moved to a local encrypted backup for: ${result.quarantinedPartitions.join(', ')}. Those records will appear empty until recovered. This is not normal — contact support if you did not expect this.`,
+            [{ text: 'Continue', onPress: () => refreshHomeStatus() }],
+          );
+          return;
+        }
+        queuePasskeySetupOffer();
         refreshHomeStatus();
         return;
       }
@@ -260,8 +392,25 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
         case 'DERIVATION_FAILED':
           setError('Unable to derive key. Please try again.');
           break;
+        case 'CORRUPT_PARTITION':
+          setCorruptPartitionOffer(result.partition ?? null);
+          setError(
+            `Your ${result.partition ?? 'vault'} data on this device could not be decrypted. This is not normal. You can try again after the app restores from the server, or continue with empty ${result.partition ?? 'data'} (encrypted backup quarantined on this device only).`,
+          );
+          break;
         case 'STILL_LOCKED':
-          setError('Unlock failed. Please check your passphrase and try again.');
+          setCorruptPartitionOffer(null);
+          setError(
+            'Unlock failed. Your passphrase may be wrong, or a synced vault copy on the server does not match this device. Try again in a moment — the app will attempt to restore compatible server data automatically.',
+          );
+          break;
+        case 'KDF_MISSING':
+          setError(
+            'Vault data is on this device but key-derivation settings are missing. Restore from backup or contact support — entering your passphrase cannot recover the vault in this state.',
+          );
+          break;
+        case 'NOT_AUTHENTICATED':
+          setError('Session expired. Sign in again, then unlock.');
           break;
       }
     } catch (cause) {
@@ -271,7 +420,53 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
       setLoading(false);
       setLoadingMessage(null);
     }
-  }, [home, passphrase, kdfStorage, refreshHomeStatus]);
+  }, [hasExistingVaultData, home, kdfStorage, queuePasskeySetupOffer, passphrase, refreshHomeStatus]);
+
+  const handleQuarantineAndUnlock = useCallback(async () => {
+    if (!home || !corruptPartitionOffer) return;
+
+    setError(null);
+    setLoading(true);
+    setLoadingMessage('Quarantining undecryptable backup and unlocking…');
+
+    const { loadKdfMaterial, saveKdfMaterial } = createKdfMaterialStorage(kdfStorage);
+
+    try {
+      const result = await submitPassphrase(
+        {
+          home,
+          loadKdfMaterial,
+          saveKdfMaterial,
+          hasExistingVaultData,
+        },
+        passphrase,
+        { quarantinePartitions: [corruptPartitionOffer] },
+      );
+
+      if (result.ok) {
+        setCorruptPartitionOffer(null);
+        queuePasskeySetupOffer();
+        if (result.quarantinedPartitions && result.quarantinedPartitions.length > 0) {
+          Alert.alert(
+            'Vault unlocked with quarantined data',
+            `${result.quarantinedPartitions.join(', ')} was moved to a local encrypted backup and will appear empty. This is not normal.`,
+            [{ text: 'Continue', onPress: () => refreshHomeStatus() }],
+          );
+          return;
+        }
+        refreshHomeStatus();
+        return;
+      }
+
+      setError('Could not unlock after quarantine. Try again or contact support.');
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Unlock failed unexpectedly.';
+      setError(message);
+    } finally {
+      setLoading(false);
+      setLoadingMessage(null);
+    }
+  }, [corruptPartitionOffer, hasExistingVaultData, home, kdfStorage, queuePasskeySetupOffer, passphrase, refreshHomeStatus]);
 
   /**
    * Attempt biometric unlock. On success the AppHost route resolver navigates
@@ -318,13 +513,47 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
       <Text style={styles.subtitle}>
         {showPassphraseInput
           ? 'Enter your Master Passphrase to decrypt your data.'
-          : 'Use biometrics to unlock your vault.'}
+          : passkeyAvailable
+            ? 'Use your passkey to unlock your vault.'
+            : 'Use biometrics to unlock your vault.'}
       </Text>
+
+      {quickUnlockAvailable && !showPassphraseInput && (
+        <Text style={styles.hint} testID="unlock-quick-path-hint">
+          {passkeyAvailable ? PASSKEY_FAST_PATH_HINT : BIOMETRIC_FAST_PATH_HINT}
+        </Text>
+      )}
+
+      {offerPasskeySetup && showPassphraseInput && (
+        <Text style={styles.hint} testID="unlock-passkey-setup-hint">
+          {PASSKEY_SETUP_HINT}
+        </Text>
+      )}
+
+      {biometricAvailable && showPassphraseInput && !offerPasskeySetup && (
+        <Text style={styles.hint} testID="unlock-biometric-future-hint">
+          {BIOMETRIC_FUTURE_UNLOCK_HINT}
+        </Text>
+      )}
 
       {error && (
         <Text style={styles.error} accessibilityRole="alert" testID="unlock-error">
           {error}
         </Text>
+      )}
+
+      {corruptPartitionOffer && showPassphraseInput && (
+        <Pressable
+          style={[styles.secondaryButton, loading && styles.buttonDisabled]}
+          onPress={handleQuarantineAndUnlock}
+          disabled={loading}
+          accessibilityRole="button"
+          testID="unlock-quarantine-partition"
+        >
+          <Text style={styles.secondaryButtonText}>
+            Continue with empty {corruptPartitionOffer} (keep encrypted backup)
+          </Text>
+        </Pressable>
       )}
 
       {loadingMessage && (
@@ -333,27 +562,44 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
         </Text>
       )}
 
-      {/* Biometric unlock button — shown when biometric is available */}
-      {biometricAvailable && !showPassphraseInput && (
+      {/* Quick unlock — biometrics (native) or passkey (web) */}
+      {quickUnlockAvailable && !showPassphraseInput && (
         <Pressable
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleBiometric}
           disabled={loading}
           accessibilityRole="button"
-          accessibilityLabel="Unlock with biometrics"
-          testID="unlock-biometric"
+          accessibilityLabel={passkeyAvailable ? 'Unlock with passkey' : 'Unlock with biometrics'}
+          testID={passkeyAvailable ? 'unlock-passkey' : 'unlock-biometric'}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Unlock with Biometrics</Text>
+            <Text style={styles.buttonText}>
+              {passkeyAvailable ? 'Unlock with Passkey' : 'Unlock with Biometrics'}
+            </Text>
           )}
         </Pressable>
       )}
 
-      {/* Passphrase re-entry path — shown initially (no biometric) or on fallback */}
+      {/* Passphrase re-entry path — shown initially (no quick unlock) or on fallback */}
       {showPassphraseInput && (
         <>
+          {offerPasskeySetup && (
+            <Pressable
+              style={styles.checkboxRow}
+              onPress={() => setEnablePasskeyAfterUnlock((value) => !value)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: enablePasskeyAfterUnlock }}
+              testID="unlock-passkey-setup-checkbox"
+            >
+              <View style={[styles.checkbox, enablePasskeyAfterUnlock && styles.checkboxChecked]} />
+              <Text style={styles.checkboxLabel}>
+                Set up passkey unlock on the home screen after unlock
+              </Text>
+            </Pressable>
+          )}
+
           <TextInput
             style={styles.input}
             placeholder="Master Passphrase"
@@ -384,11 +630,14 @@ export function UnlockScreen({ kdfStorage, biometricAvailable = false }: UnlockS
         </>
       )}
 
-      {/* Link to switch to passphrase entry when biometric is showing */}
-      {biometricAvailable && !showPassphraseInput && (
+      {/* Link to switch to passphrase entry when quick unlock is showing */}
+      {quickUnlockAvailable && !showPassphraseInput && (
         <Pressable
           style={styles.linkButton}
-          onPress={() => setShowPassphraseInput(true)}
+          onPress={() => {
+            setPreferPassphrase(true);
+            setShowPassphraseInput(true);
+          }}
           accessibilityRole="button"
           accessibilityLabel="Use passphrase instead"
           testID="unlock-use-passphrase"
@@ -421,9 +670,17 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#555',
-    marginBottom: 24,
+    marginBottom: 12,
     textAlign: 'center',
     maxWidth: 320,
+  },
+  hint: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    textAlign: 'center',
+    maxWidth: 320,
+    lineHeight: 20,
   },
   error: {
     color: '#c00',
@@ -468,6 +725,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  secondaryButton: {
+    width: '100%',
+    maxWidth: 320,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#c62828',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  secondaryButtonText: {
+    color: '#8a1f1f',
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '600',
+    lineHeight: 20,
+  },
   linkButton: {
     marginTop: 16,
     padding: 8,
@@ -476,5 +750,30 @@ const styles = StyleSheet.create({
     color: '#0066cc',
     fontSize: 14,
     textDecorationLine: 'underline',
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 16,
+    width: '100%',
+    maxWidth: 360,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderWidth: 2,
+    borderColor: '#0066cc',
+    borderRadius: 4,
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: '#0066cc',
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#333',
   },
 });

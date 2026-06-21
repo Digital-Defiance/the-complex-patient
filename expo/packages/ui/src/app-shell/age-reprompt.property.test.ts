@@ -91,6 +91,8 @@ function createTestController(): AgeGateOnboardingController {
   const flagStore = {
     isIneligible: async () => false,
     markIneligible: async () => {},
+    isAgeEligible: async () => false,
+    markAgeEligible: async () => {},
   };
   // Fix the reference date to 2025-06-01 UTC so age computations are deterministic.
   const now = () => new Date(Date.UTC(2025, 5, 1));

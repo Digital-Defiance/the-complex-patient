@@ -4,19 +4,29 @@
  * Combined symptom + flare journal history with a trailing severity trend chart.
  */
 
-import React, { useMemo } from 'react';
-import { View, Text, SectionList, Pressable, StyleSheet, ScrollView } from 'react-native';
-import type { FlareUp, SymptomEntry } from '@complex-patient/domain';
-import { filterActive } from '@complex-patient/clinical-export';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
+import { View, Text, SectionList, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import type { FlareUp, LocationTrailSample, SymptomEntry, VaultRecord } from '@complex-patient/domain';
+import { filterActive, splitMedicationsPartition } from '@complex-patient/clinical-export';
+import { locationPointsForWeather } from '@complex-patient/weather';
 import { useAppHost } from '../app-host';
 import { usePartition } from '../hooks';
+import { useWeatherHost } from '../weather-host-context';
 import {
   buildJournalTimeline,
   buildSeverityTrend,
   formatJournalDayLabel,
   groupJournalByDay,
+  mergeWeatherIntoTrend,
+  trendHasWeatherData,
+  weatherOverlayBandHeight,
+  weatherOverlayRange,
+  weatherOverlayValue,
+  WEATHER_OVERLAY_COLORS,
+  WEATHER_TREND_OVERLAYS,
   type JournalHistoryEntry,
-  type SeverityTrendDay,
+  type SeverityTrendDayWithWeather,
+  type WeatherTrendOverlayId,
 } from '../symptom-journal-ui';
 
 export interface SymptomJournalHistoryScreenProps {
@@ -42,8 +52,32 @@ function formatFlareSummary(entry: JournalHistoryEntry & { kind: 'flare' }): str
   return trigger ? `${symptoms} · Trigger: ${trigger}` : symptoms;
 }
 
-function SeverityTrendChart({ trend }: { trend: SeverityTrendDay[] }): React.ReactElement {
+function SeverityTrendChart({
+  trend,
+  selectedOverlays,
+  onToggleOverlay,
+  hasLocationPoints,
+  weatherAvailable,
+}: {
+  trend: SeverityTrendDayWithWeather[];
+  selectedOverlays: readonly WeatherTrendOverlayId[];
+  onToggleOverlay: (overlayId: WeatherTrendOverlayId) => void;
+  hasLocationPoints: boolean;
+  weatherAvailable: boolean;
+}): React.ReactElement {
   const hasData = trend.some((day) => day.maxSeverity !== null || day.flareCount > 0);
+
+  const overlayRanges = useMemo(() => {
+    const ranges = {} as Record<WeatherTrendOverlayId, { min: number; max: number }>;
+    for (const overlay of WEATHER_TREND_OVERLAYS) {
+      ranges[overlay.id] = weatherOverlayRange(trend, overlay.id);
+    }
+    return ranges;
+  }, [trend]);
+
+  const activeLegend = WEATHER_TREND_OVERLAYS.filter((overlay) =>
+    selectedOverlays.includes(overlay.id),
+  );
 
   if (!hasData) {
     return (
@@ -57,15 +91,80 @@ function SeverityTrendChart({ trend }: { trend: SeverityTrendDay[] }): React.Rea
     <View style={styles.chartWrap} testID="journal-history-chart">
       <Text style={styles.chartTitle}>14-day severity trend</Text>
       <Text style={styles.chartLegend}>
-        Bars = peak symptom severity · Orange dot = flare-up
+        Bars = peak symptom severity · Orange dot = flare-up · Teal triangle = rapid pressure drop
       </Text>
+
+      {hasLocationPoints ? (
+        <View style={styles.overlaySection} testID="journal-history-weather-overlays">
+          <Text style={styles.overlayLabel}>Weather overlays</Text>
+          <View style={styles.overlayChipRow}>
+            {WEATHER_TREND_OVERLAYS.map((overlay) => {
+              const selected = selectedOverlays.includes(overlay.id);
+              return (
+                <Pressable
+                  key={overlay.id}
+                  style={[styles.overlayChip, selected && styles.overlayChipSelected]}
+                  onPress={() => onToggleOverlay(overlay.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  testID={`journal-history-overlay-${overlay.id}`}
+                >
+                  <View
+                    style={[styles.overlaySwatch, { backgroundColor: WEATHER_OVERLAY_COLORS[overlay.id] }]}
+                  />
+                  <Text style={styles.overlayChipText}>{overlay.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {!weatherAvailable && (
+            <Text style={styles.overlayHint}>Loading weather from your logged locations…</Text>
+          )}
+          {weatherAvailable && activeLegend.length > 0 && (
+            <Text style={styles.overlayLegend}>
+              {activeLegend.map((entry) => entry.legend).join(' · ')}
+            </Text>
+          )}
+        </View>
+      ) : (
+        <Text style={styles.overlayHint} testID="journal-history-weather-unavailable">
+          Enable &quot;Attach location&quot; in Settings when logging symptoms, flares, or medications (or the
+          mobile location trail) to overlay weather on this chart.
+        </Text>
+      )}
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chartRow}>
         {trend.map((day) => {
           const barHeight = day.maxSeverity ? (day.maxSeverity / 10) * 72 : 4;
           return (
             <View key={day.day} style={styles.chartColumn} testID={`journal-history-chart-${day.day}`}>
+              {day.rapidPressureDrop && (
+                <View style={styles.pressureDropMarker} testID={`journal-history-pressure-drop-${day.day}`} />
+              )}
               {day.flareCount > 0 && <View style={styles.flareDot} />}
               <View style={[styles.chartBar, { height: barHeight }]} />
+              {selectedOverlays.map((overlayId) => {
+                const value = weatherOverlayValue(day, overlayId);
+                if (value === null) {
+                  return null;
+                }
+                const bandHeight = weatherOverlayBandHeight(
+                  value,
+                  overlayId,
+                  overlayRanges[overlayId],
+                );
+                const bandColor =
+                  overlayId === 'pressureDelta24h' && value > 0
+                    ? '#64748b'
+                    : WEATHER_OVERLAY_COLORS[overlayId];
+                return (
+                  <View
+                    key={`${day.day}-${overlayId}`}
+                    style={[styles.overlayBand, { height: bandHeight, backgroundColor: bandColor }]}
+                    testID={`journal-history-overlay-${overlayId}-${day.day}`}
+                  />
+                );
+              })}
               <Text style={styles.chartLabel}>{day.day.slice(8)}</Text>
             </View>
           );
@@ -136,8 +235,11 @@ function SymptomJournalHistoryScreenInner({
   onBack: () => void;
   onLogSymptom?: () => void;
 }): React.ReactElement {
+  const { weather } = useWeatherHost();
   const symptoms = usePartition<SymptomEntry>(home, 'symptoms');
   const flares = usePartition<FlareUp>(home, 'flares');
+  const medicationRecords = usePartition<VaultRecord>(home, 'medications');
+  const trailSamples = usePartition<LocationTrailSample>(home, 'locationTrail');
 
   const timeline = useMemo(
     () => buildJournalTimeline(filterActive(symptoms), flares),
@@ -155,6 +257,61 @@ function SymptomJournalHistoryScreenInner({
   );
 
   const trend = useMemo(() => buildSeverityTrend(timeline), [timeline]);
+  const locationPoints = useMemo(() => {
+    const { prnLogs } = splitMedicationsPartition(medicationRecords);
+    return locationPointsForWeather({
+      symptoms,
+      flares,
+      prnLogs,
+      trailSamples,
+    });
+  }, [flares, medicationRecords, symptoms, trailSamples]);
+
+  const [trendWithWeather, setTrendWithWeather] = useState(() => mergeWeatherIntoTrend(trend, []));
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [selectedOverlays, setSelectedOverlays] = useState<WeatherTrendOverlayId[]>(['pressureDelta24h']);
+
+  const toggleOverlay = useCallback((overlayId: WeatherTrendOverlayId) => {
+    setSelectedOverlays((current) =>
+      current.includes(overlayId)
+        ? current.filter((id) => id !== overlayId)
+        : [...current, overlayId],
+    );
+  }, []);
+
+  useEffect(() => {
+    setTrendWithWeather(mergeWeatherIntoTrend(trend, []));
+    if (locationPoints.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    setWeatherLoading(true);
+    void weather
+      .loadTrendForPoints(
+        trend.map((day) => day.day),
+        locationPoints,
+      )
+      .then((weatherDays) => {
+        if (!cancelled) {
+          setTrendWithWeather(mergeWeatherIntoTrend(trend, weatherDays));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTrendWithWeather(mergeWeatherIntoTrend(trend, []));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setWeatherLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locationPoints, trend, weather]);
 
   return (
     <View style={styles.container} accessibilityLabel="Journal history">
@@ -163,7 +320,21 @@ function SymptomJournalHistoryScreenInner({
         Symptoms and flare-ups together, grouped by day. Orange markers show flare days on the chart.
       </Text>
 
-      <SeverityTrendChart trend={trend} />
+      {weatherLoading && (
+        <ActivityIndicator
+          style={styles.weatherLoading}
+          accessibilityLabel="Loading weather overlay"
+          testID="journal-history-weather-loading"
+        />
+      )}
+
+      <SeverityTrendChart
+        trend={trendWithWeather}
+        selectedOverlays={selectedOverlays}
+        onToggleOverlay={toggleOverlay}
+        hasLocationPoints={locationPoints.length > 0}
+        weatherAvailable={trendHasWeatherData(trendWithWeather)}
+      />
 
       {timeline.length === 0 ? (
         <View style={styles.emptyBox} testID="journal-history-empty">
@@ -259,7 +430,7 @@ const styles = StyleSheet.create({
     width: 28,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    minHeight: 96,
+    minHeight: 110,
   },
   chartBar: {
     width: 18,
@@ -274,10 +445,77 @@ const styles = StyleSheet.create({
     backgroundColor: '#d97706',
     marginBottom: 2,
   },
+  pressureDropMarker: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderBottomWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#0d9488',
+    marginBottom: 2,
+  },
   chartLabel: {
     marginTop: 6,
     fontSize: 10,
     color: '#666',
+  },
+  overlaySection: {
+    marginBottom: 12,
+    gap: 8,
+  },
+  overlayLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  overlayChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  overlayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#fff',
+  },
+  overlayChipSelected: {
+    borderColor: '#2563eb',
+    backgroundColor: '#eff6ff',
+  },
+  overlaySwatch: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+  },
+  overlayChipText: {
+    fontSize: 12,
+    color: '#334155',
+  },
+  overlayHint: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 18,
+  },
+  overlayLegend: {
+    fontSize: 11,
+    color: '#64748b',
+    lineHeight: 16,
+  },
+  overlayBand: {
+    width: 18,
+    borderRadius: 2,
+    marginTop: 3,
+  },
+  weatherLoading: {
+    marginBottom: 8,
   },
   sectionHeader: {
     fontSize: 15,

@@ -19,6 +19,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useAppHost } from '../app-host';
 import { useStore } from '../hooks';
+import type { VaultType } from '@complex-patient/domain';
 import type { PartitionSyncStatus, SyncStatusState } from '../../store/offline-sync';
 import { PHI_VAULT_TYPES } from '../../store/types';
 
@@ -39,6 +40,28 @@ export function aggregateSyncStatus(state: SyncStatusState): PartitionSyncStatus
     if (s === 'syncing' && worst === 'idle') worst = 'syncing';
   }
   return worst;
+}
+
+/** List vault partitions currently in a given sync status (for UI detail). */
+export function partitionsWithStatus(
+  state: SyncStatusState,
+  status: PartitionSyncStatus,
+): VaultType[] {
+  return PHI_VAULT_TYPES.filter((vaultType) => state.partitions[vaultType] === status);
+}
+
+function formatStatusLabel(
+  status: PartitionSyncStatus,
+  syncState: SyncStatusState,
+): string {
+  const base = STATUS_VISUALS[status].label;
+  if (status === 'conflict' || status === 'pending') {
+    const affected = partitionsWithStatus(syncState, status);
+    if (affected.length > 0) {
+      return `${base} (${affected.join(', ')})`;
+    }
+  }
+  return base;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,13 +102,14 @@ export function SyncStatusIndicator({ isOffline }: SyncStatusIndicatorProps): Re
   const syncState = useStore(home.coordinator.syncStatus, (s) => s);
   const status = aggregateSyncStatus(syncState);
   const visual = STATUS_VISUALS[status];
+  const label = formatStatusLabel(status, syncState);
 
   return (
     <View
       style={styles.container}
       testID="sync-status-indicator"
       accessibilityRole="none"
-      accessibilityLabel={`Sync status: ${visual.label}${isOffline ? ', offline' : ''}`}
+      accessibilityLabel={`Sync status: ${label}${isOffline ? ', offline' : ''}`}
     >
       <View style={[styles.dot, { backgroundColor: visual.color }]}>
         <Text style={styles.icon}>{visual.icon}</Text>
@@ -94,7 +118,7 @@ export function SyncStatusIndicator({ isOffline }: SyncStatusIndicatorProps): Re
         style={[styles.label, { color: visual.color }]}
         testID="sync-status-label"
       >
-        {visual.label}
+        {label}
       </Text>
       {isOffline && (
         <Text style={styles.offlineBadge} testID="sync-status-offline">

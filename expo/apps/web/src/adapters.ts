@@ -7,6 +7,7 @@
  */
 
 import type { DeviceFlagStorage } from '@complex-patient/ui';
+import { createBrowserPasskeyStorage, type PasskeyUnlockStorage } from '@complex-patient/key-store';
 
 import { createLocalStorageFlagStorage } from '../../device-flag-storage';
 
@@ -21,3 +22,8 @@ import { createLocalStorageFlagStorage } from '../../device-flag-storage';
  * {@link DeviceFlagStorage}.
  */
 export const webFlagStorage: DeviceFlagStorage = createLocalStorageFlagStorage();
+
+/** localStorage backing store for PRF-wrapped KEK passkey unlock metadata. */
+export function createWebPasskeyStorage(): PasskeyUnlockStorage {
+  return createBrowserPasskeyStorage();
+}

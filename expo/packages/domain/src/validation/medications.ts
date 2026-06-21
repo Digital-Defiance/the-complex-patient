@@ -36,32 +36,58 @@ export type PrnLimitValidationResult =
   | { valid: true }
   | { valid: false; message: string };
 
-const PROFILE_FIELDS = [
-  'drugName',
-  'dosage',
-  'form',
-  'prescribingPhysician',
-  'conditionTreated',
-] as const;
+const REQUIRED_PROFILE_FIELDS = ['drugName', 'dosage', 'form'] as const;
+
+const OPTIONAL_PROFILE_FIELDS = ['prescribingPhysician', 'conditionTreated'] as const;
+
+const PROFILE_FIELDS = [...REQUIRED_PROFILE_FIELDS, ...OPTIONAL_PROFILE_FIELDS] as const;
+
+function validateProfileField(
+  field: (typeof PROFILE_FIELDS)[number],
+  value: unknown,
+  required: boolean,
+): ProfileFieldError | null {
+  if (typeof value !== 'string') {
+    return { field, message: `${field} must be a string` };
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    if (required) {
+      return { field, message: `${field} is required and must be non-empty` };
+    }
+    return null;
+  }
+
+  if (trimmed.length > 200) {
+    return { field, message: `${field} must be at most 200 characters` };
+  }
+
+  return null;
+}
 
 /**
- * Validates the five required text fields of a medication profile.
+ * Validates medication profile text fields.
  *
- * Each field must be non-empty (after trimming) and ≤200 characters.
- * Returns per-field errors identifying each invalid field.
- * Rejects the whole profile if any field is invalid (10.1, 10.2).
+ * drugName, dosage, and form are required (non-empty, ≤200 chars).
+ * prescribingPhysician and conditionTreated are optional (≤200 chars when provided).
  */
 export function validateMedicationProfile(
   profile: Pick<MedicationProfile, 'drugName' | 'dosage' | 'form' | 'prescribingPhysician' | 'conditionTreated'>,
 ): ProfileValidationResult {
   const errors: ProfileFieldError[] = [];
 
-  for (const field of PROFILE_FIELDS) {
-    const value = profile[field];
-    if (typeof value !== 'string' || value.length === 0) {
-      errors.push({ field, message: `${field} is required and must be non-empty` });
-    } else if (value.length > 200) {
-      errors.push({ field, message: `${field} must be at most 200 characters` });
+  for (const field of REQUIRED_PROFILE_FIELDS) {
+    const error = validateProfileField(field, profile[field], true);
+    if (error) {
+      errors.push(error);
+    }
+  }
+
+  for (const field of OPTIONAL_PROFILE_FIELDS) {
+    const error = validateProfileField(field, profile[field], false);
+    if (error) {
+      errors.push(error);
     }
   }
 

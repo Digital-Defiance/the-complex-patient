@@ -11,6 +11,7 @@ import type { StorageBackend } from './types';
 export interface KeyValueStore {
   getItem(key: string): Promise<string | null> | string | null;
   setItem(key: string, value: string): Promise<void> | void;
+  removeItem?(key: string): Promise<void> | void;
 }
 
 export class KeyValueStorageBackend implements StorageBackend {
@@ -27,5 +28,13 @@ export class KeyValueStorageBackend implements StorageBackend {
 
   async setItem(key: string, value: string): Promise<void> {
     await this.store.setItem(key, value);
+  }
+
+  async removeItem(key: string): Promise<void> {
+    if (this.store.removeItem) {
+      await this.store.removeItem(key);
+      return;
+    }
+    await this.store.setItem(key, '');
   }
 }

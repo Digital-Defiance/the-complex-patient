@@ -27,12 +27,12 @@ import {
   WebSessionKeyStore,
   type LifecycleAdapter,
 } from '@complex-patient/key-store';
-import { SyncWorker } from '@complex-patient/sync-engine';
 import {
   createAgeGateOnboarding,
   createAuthProvider,
   createDeviceIneligibilityFlagStore,
   createHomeEntry,
+  createSyncWorker,
   createVaultHttpClient,
   createVaultStore,
   type AgeGateOnboardingController,
@@ -40,6 +40,7 @@ import {
   type FetchLike,
   type HomeEntryController,
 } from '@complex-patient/ui';
+import { inferAgeEligibleFromWebVault } from './infer-age-eligible';
 
 /** Raised when the web app is loaded outside a secure (HTTPS) context (1.8). */
 export class SecureContextRequiredError extends Error {
@@ -107,11 +108,17 @@ export async function createWebHome(options: WebEntryOptions): Promise<HomeEntry
   const vault = options.vault ?? (await createLocalVault(await createPlatformVaultStorageBackend()));
 
   // Shared idle auto-lock (300s) drives the lock binding (Requirement 3.7).
-  let onIdle: () => void = () => {};
-  const idle = new IdleAutoLock(() => onIdle());
+  let controller!: HomeEntryController;
+  const idle = new IdleAutoLock(() => {
+    void controller.lock.lock();
+  });
 
   // Web key store: volatile RAM only, discarded on tab close/reload (3.5, 3.6).
-  const keyStore = new WebSessionKeyStore({ lifecycle: options.lifecycle });
+  // Passkey unlock defaults to browser localStorage + current hostname when omitted.
+  const keyStore = new WebSessionKeyStore({
+    lifecycle: options.lifecycle,
+    sharedIdle: idle,
+  });
 
   // The vault store mirrors the decrypted Local_Vault partitions (task 15.1),
   // constructed with the centralized Crypto_Engine (Requirement 22.3).
@@ -119,15 +126,9 @@ export async function createWebHome(options: WebEntryOptions): Promise<HomeEntry
 
   const auth = createAuthProvider();
   const http = createVaultHttpClient({ baseUrl: options.baseUrl, auth, fetch: options.fetch });
-  const syncWorker = new SyncWorker({ http, vault });
+  const syncWorker = createSyncWorker({ http, vault, keyStore });
 
-  const controller = createHomeEntry({ keyStore, store, syncWorker, auth, idle, vault, vaultHttp: http });
-
-  // Route the idle expiry through the controller's lock so PHI + KEK clear
-  // together on the 300s timeout (Requirements 3.6, 3.7).
-  onIdle = () => {
-    void controller.lock.lock();
-  };
+  controller = createHomeEntry({ keyStore, store, syncWorker, auth, idle, vault, vaultHttp: http });
 
   return controller;
 }
@@ -155,7 +156,10 @@ export function createWebApp(options: WebEntryOptions): WebApp {
     throw new Error('createWebApp requires an ineligibilityStorage adapter (Requirement 23.7)');
   }
   const flagStore = createDeviceIneligibilityFlagStore(options.ineligibilityStorage);
-  const onboarding = createAgeGateOnboarding({ flagStore });
+  const onboarding = createAgeGateOnboarding({
+    flagStore,
+    inferAgeEligibleFromDevice: inferAgeEligibleFromWebVault,
+  });
 
   async function createHome(): Promise<HomeEntryController> {
     if (!onboarding.isEligible()) {

@@ -142,7 +142,7 @@ describe('createVaultStore — write-through commit', () => {
     let projectionAtPersistTime: VaultRecord[] | null = null;
     const spyingVault = {
       readPartition: vault.readPartition.bind(vault),
-      writePartition: async (vt: 'medications' | 'symptoms' | 'conditions' | 'flares' | 'associations', blob: { sync_version: number; iv: string; auth_tag: string; ciphertext: string }) => {
+      writePartition: async (vt: 'medications' | 'symptoms' | 'conditions' | 'flares' | 'associations' | 'locationTrail', blob: { sync_version: number; iv: string; auth_tag: string; ciphertext: string }) => {
         // At the instant of persistence the in-memory projection must NOT yet
         // reflect the new record (write-through ordering, Requirement 5.4).
         projectionAtPersistTime = spyStore.getPartition('medications').records.slice();

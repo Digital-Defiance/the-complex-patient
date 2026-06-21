@@ -17,6 +17,9 @@ export function createHomeSymptomStore(home: HomeEntryController): SymptomStore 
         mergeSymptomRecords(current, records),
       );
       if (!result.ok) {
+        if (result.error === 'LOCKED') {
+          throw new Error('Your session is locked. Unlock to save this entry.');
+        }
         throw new Error(result.message);
       }
     },
@@ -43,6 +46,9 @@ export function createHomeFlareStore(home: HomeEntryController): FlareStore {
         return ordered;
       });
       if (!result.ok) {
+        if (result.error === 'LOCKED') {
+          throw new Error('Your session is locked. Unlock to save this entry.');
+        }
         throw new Error(result.message);
       }
     },

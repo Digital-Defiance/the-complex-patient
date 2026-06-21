@@ -32,6 +32,13 @@ export interface LocalVault {
   init(): Promise<void>;
   readPartition(vaultType: VaultType): Promise<VaultBlob | null>;
   writePartition(vaultType: VaultType, blob: VaultBlob): Promise<void>;
+  /** Remove a persisted partition blob so reads return null. */
+  clearPartition(vaultType: VaultType): Promise<void>;
+  /**
+   * Move a partition blob to quarantine storage so unlock can proceed without
+   * deleting the encrypted backup (may be recoverable later).
+   */
+  quarantinePartition(vaultType: VaultType): Promise<boolean>;
   readBase(vaultType: VaultType): Promise<VaultBlob | null>;
   setBase(vaultType: VaultType, blob: VaultBlob): Promise<void>;
 }
@@ -150,6 +157,23 @@ export class EncryptedLocalVault implements LocalVault {
     this.assertInitialized();
     const serialized = JSON.stringify(normalizeBlob(blob));
     await this.backend.setItem(storageKey('partition', vaultType), serialized);
+  }
+
+  async clearPartition(vaultType: VaultType): Promise<void> {
+    this.assertInitialized();
+    await this.backend.removeItem(storageKey('partition', vaultType));
+  }
+
+  async quarantinePartition(vaultType: VaultType): Promise<boolean> {
+    this.assertInitialized();
+    const partitionKey = storageKey('partition', vaultType);
+    const raw = await this.backend.getItem(partitionKey);
+    if (raw === null) {
+      return false;
+    }
+    await this.backend.setItem(storageKey('quarantine', vaultType), raw);
+    await this.backend.removeItem(partitionKey);
+    return true;
   }
 
   async readBase(vaultType: VaultType): Promise<VaultBlob | null> {

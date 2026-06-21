@@ -59,6 +59,14 @@ function buildPatient(): Record<string, unknown> {
 }
 
 function buildMedicationStatement(med: MedicationProfile): Record<string, unknown> {
+  const noteParts = [`Schedule: ${JSON.stringify(med.schedule)}`];
+  if (med.prescribingPhysician.trim()) {
+    noteParts.unshift(`Prescriber: ${med.prescribingPhysician.trim()}`);
+  }
+  if (med.conditionTreated.trim()) {
+    noteParts.unshift(`Condition treated: ${med.conditionTreated.trim()}`);
+  }
+
   return withDomainExtension(
     {
       resourceType: 'MedicationStatement',
@@ -76,7 +84,7 @@ function buildMedicationStatement(med: MedicationProfile): Record<string, unknow
       ],
       note: [
         {
-          text: `Prescriber: ${med.prescribingPhysician}. Condition treated: ${med.conditionTreated}. Schedule: ${JSON.stringify(med.schedule)}`,
+          text: noteParts.join('. '),
         },
       ],
     },

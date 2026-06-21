@@ -1,51 +1,75 @@
 /**
  * @complex-patient/ui — InsightsScreen
  *
- * Renders AI insight cards from the Insights_Engine correlation detection.
- * Handles four states:
- * 1. Data unavailable (home.read fails) → data-unavailable message, no cards.
- * 2. Insufficient history → insufficient-history message, no cards.
- * 3. Zero correlations without insufficiency → no-correlations-found message.
- * 4. OK → render correlation insight cards.
- *
- * Computes cards only from `home.read` data (Requirement 11.6). Blocks
- * insights with a data-unavailable message when the data source is unavailable
- * (Requirement 11.7).
- *
- * Requirements: 11.1, 11.2, 11.3, 11.6, 11.7
+ * Renders medication and weather correlation insight cards from on-device analysis.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
-import { useAppHost } from '../app-host';
+import type { FlareUp, LocationTrailSample, SymptomEntry, VaultRecord } from '@complex-patient/domain';
+import { splitMedicationsPartition } from '@complex-patient/clinical-export';
+import { locationPointsForWeather } from '@complex-patient/weather';
 import {
   detectCorrelations,
+  detectWeatherCorrelations,
   createInMemoryVaultDataSource,
   INSUFFICIENT_HISTORY_MESSAGE,
   NO_SIGNIFICANT_CORRELATIONS_MESSAGE,
+  WEATHER_INSUFFICIENT_HISTORY_MESSAGE,
+  WEATHER_NO_SIGNIFICANT_CORRELATIONS_MESSAGE,
   type CorrelationOutcome,
+  type WeatherCorrelationOutcome,
   type AIInsightCard,
 } from '@complex-patient/insights';
+import { useAppHost } from '../app-host';
+import { useWeatherHost } from '../weather-host-context';
 
-/**
- * Props for the InsightsScreen. The navigation callback is supplied by the
- * route file so the screen stays decoupled from Expo Router directly.
- */
 export interface InsightsScreenProps {
-  /** Navigate to the physician report screen. */
   onNavigateToReport: () => void;
-  /** Navigate back to home. */
   onBack: () => void;
+}
+
+function InsightCardList({
+  cards,
+  testIdPrefix,
+}: {
+  cards: AIInsightCard[];
+  testIdPrefix: string;
+}): React.ReactElement | null {
+  if (cards.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.cardsContainer} testID={`${testIdPrefix}-cards`}>
+      {cards.map((card, index) => (
+        <View
+          key={`${card.variables[0]}-${card.variables[1]}-${index}`}
+          style={styles.card}
+          testID={`${testIdPrefix}-card-${index}`}
+        >
+          <Text style={styles.cardTitle}>
+            {card.variables[0]} ↔ {card.variables[1]}
+          </Text>
+          <Text style={styles.cardDetail}>Direction: {card.direction}</Text>
+          <Text style={styles.cardDetail}>
+            Lag: {card.lagDays} day{card.lagDays !== 1 ? 's' : ''}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 export function InsightsScreen({ onNavigateToReport, onBack }: InsightsScreenProps): React.ReactElement {
   const { home } = useAppHost();
+  const { weather } = useWeatherHost();
 
-  const [outcome, setOutcome] = useState<CorrelationOutcome | null>(null);
+  const [medOutcome, setMedOutcome] = useState<CorrelationOutcome | null>(null);
+  const [weatherOutcome, setWeatherOutcome] = useState<WeatherCorrelationOutcome | null>(null);
   const [dataUnavailable, setDataUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Compute insight cards exclusively from home.read data (Requirement 11.6).
   useEffect(() => {
     if (!home) {
       setDataUnavailable(true);
@@ -53,31 +77,73 @@ export function InsightsScreen({ onNavigateToReport, onBack }: InsightsScreenPro
       return;
     }
 
-    try {
-      // Read data through home.read (Requirement 11.6, 14.1).
-      const symptoms = home.read('symptoms');
-      const medications = home.read('medications');
+    let cancelled = false;
 
-      // Create in-memory data source from home.read data only.
-      const dataSource = createInMemoryVaultDataSource({
-        symptoms: symptoms.records,
-        prnLogs: medications.records.filter((r: { id: string }) => 'loggedAt' in r) as never[],
-        medEvents: medications.records.filter((r: { id: string }) => 'scheduledAt' in r) as never[],
-      });
+    void (async () => {
+      try {
+        const symptoms = home.read<SymptomEntry>('symptoms');
+        const flares = home.read<FlareUp>('flares');
+        const medications = home.read('medications');
+        const trailSamples = home.read<LocationTrailSample>('locationTrail');
+        const split = splitMedicationsPartition(medications.records);
 
-      const result = detectCorrelations(dataSource);
-      setOutcome(result);
-      setDataUnavailable(false);
-    } catch {
-      // Requirement 11.7: on read failure, block insights with data-unavailable.
-      setOutcome(null);
-      setDataUnavailable(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [home]);
+        const medResult = detectCorrelations(
+          createInMemoryVaultDataSource({
+            symptoms: symptoms.records,
+            prnLogs: split.prnLogs,
+            medEvents: split.medEvents,
+          }),
+        );
 
-  // Loading state.
+        const locationPoints = locationPointsForWeather({
+          symptoms: symptoms.records,
+          flares: flares.records,
+          prnLogs: split.prnLogs,
+          trailSamples: trailSamples.records,
+        });
+
+        let weatherResult: WeatherCorrelationOutcome = {
+          status: 'insufficient-data',
+          message: WEATHER_INSUFFICIENT_HISTORY_MESSAGE,
+          trackingDays: 0,
+          pairedObservations: 0,
+        };
+
+        if (locationPoints.length > 0) {
+          const days: string[] = [];
+          const now = new Date();
+          for (let offset = 29; offset >= 0; offset -= 1) {
+            const date = new Date(now);
+            date.setUTCDate(date.getUTCDate() - offset);
+            days.push(date.toISOString().slice(0, 10));
+          }
+          const weatherDays = await weather.loadTrendForPoints(days, locationPoints);
+          weatherResult = detectWeatherCorrelations(symptoms.records, weatherDays);
+        }
+
+        if (!cancelled) {
+          setMedOutcome(medResult);
+          setWeatherOutcome(weatherResult);
+          setDataUnavailable(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setMedOutcome(null);
+          setWeatherOutcome(null);
+          setDataUnavailable(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [home, weather]);
+
   if (loading) {
     return (
       <View style={styles.container} accessibilityRole="none" accessibilityLabel="Insights">
@@ -86,7 +152,6 @@ export function InsightsScreen({ onNavigateToReport, onBack }: InsightsScreenPro
     );
   }
 
-  // Requirement 11.7: data source unavailable → data-unavailable message.
   if (dataUnavailable) {
     return (
       <View style={styles.container} accessibilityRole="none" accessibilityLabel="Insights">
@@ -101,30 +166,43 @@ export function InsightsScreen({ onNavigateToReport, onBack }: InsightsScreenPro
     );
   }
 
-  // Requirement 11.2: insufficient history → insufficient-history message, no cards.
-  if (outcome && outcome.status === 'insufficient-data') {
-    return (
-      <View style={styles.container} accessibilityRole="none" accessibilityLabel="Insights">
-        <Text style={styles.title}>Insights</Text>
-        <Text style={styles.messageText} accessibilityRole="alert" testID="insights-insufficient-history">
-          {INSUFFICIENT_HISTORY_MESSAGE}
-        </Text>
-        <Pressable style={styles.backButton} onPress={onBack} accessibilityRole="button" testID="insights-back">
-          <Text style={styles.backButtonText}>Back to Home</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const medCards = medOutcome?.status === 'ok' ? medOutcome.cards : [];
+  const weatherCards = weatherOutcome?.status === 'ok' ? weatherOutcome.cards : [];
+  const hasAnyCards = medCards.length > 0 || weatherCards.length > 0;
 
-  // Requirement 11.3: zero correlations without insufficiency → no-correlations-found.
-  if (outcome && outcome.status === 'no-significant-correlations') {
+  if (!hasAnyCards) {
+    const medMessage =
+      medOutcome?.status === 'insufficient-data'
+        ? INSUFFICIENT_HISTORY_MESSAGE
+        : medOutcome?.status === 'no-significant-correlations'
+          ? NO_SIGNIFICANT_CORRELATIONS_MESSAGE
+          : null;
+    const weatherMessage =
+      weatherOutcome?.status === 'insufficient-data'
+        ? WEATHER_INSUFFICIENT_HISTORY_MESSAGE
+        : weatherOutcome?.status === 'no-significant-correlations'
+          ? WEATHER_NO_SIGNIFICANT_CORRELATIONS_MESSAGE
+          : null;
+
     return (
       <View style={styles.container} accessibilityRole="none" accessibilityLabel="Insights">
         <Text style={styles.title}>Insights</Text>
-        <Text style={styles.messageText} testID="insights-no-correlations">
-          {NO_SIGNIFICANT_CORRELATIONS_MESSAGE}
-        </Text>
-        <Pressable style={styles.reportButton} onPress={onNavigateToReport} accessibilityRole="button" testID="insights-generate-report">
+        {medMessage && (
+          <Text style={styles.messageText} testID="insights-med-message">
+            {medMessage}
+          </Text>
+        )}
+        {weatherMessage && (
+          <Text style={styles.messageText} testID="insights-weather-message">
+            {weatherMessage}
+          </Text>
+        )}
+        <Pressable
+          style={styles.reportButton}
+          onPress={onNavigateToReport}
+          accessibilityRole="button"
+          testID="insights-generate-report"
+        >
           <Text style={styles.reportButtonText}>Generate Physician Report</Text>
         </Pressable>
         <Pressable style={styles.backButton} onPress={onBack} accessibilityRole="button" testID="insights-back">
@@ -134,46 +212,30 @@ export function InsightsScreen({ onNavigateToReport, onBack }: InsightsScreenPro
     );
   }
 
-  // Error from correlation detection (analysis failed).
-  if (outcome && outcome.status === 'error') {
-    return (
-      <View style={styles.container} accessibilityRole="none" accessibilityLabel="Insights">
-        <Text style={styles.title}>Insights</Text>
-        <Text style={styles.errorText} accessibilityRole="alert" testID="insights-data-unavailable">
-          {outcome.message}
-        </Text>
-        <Pressable style={styles.backButton} onPress={onBack} accessibilityRole="button" testID="insights-back">
-          <Text style={styles.backButtonText}>Back to Home</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  // Requirement 11.1: render AI insight cards.
-  const cards: AIInsightCard[] = outcome && outcome.status === 'ok' ? outcome.cards : [];
-
   return (
     <ScrollView style={styles.container} accessibilityRole="none" accessibilityLabel="Insights">
       <Text style={styles.title}>Insights</Text>
-      <Text style={styles.subtitle}>Correlation Analysis</Text>
 
-      <View style={styles.cardsContainer} testID="insights-cards">
-        {cards.map((card, index) => (
-          <View key={`${card.variables[0]}-${card.variables[1]}-${index}`} style={styles.card} testID={`insight-card-${index}`}>
-            <Text style={styles.cardTitle}>
-              {card.variables[0]} ↔ {card.variables[1]}
-            </Text>
-            <Text style={styles.cardDetail}>
-              Direction: {card.direction}
-            </Text>
-            <Text style={styles.cardDetail}>
-              Lag: {card.lagDays} day{card.lagDays !== 1 ? 's' : ''}
-            </Text>
-          </View>
-        ))}
-      </View>
+      {medCards.length > 0 && (
+        <>
+          <Text style={styles.subtitle}>Medication correlations</Text>
+          <InsightCardList cards={medCards} testIdPrefix="insights-med" />
+        </>
+      )}
 
-      <Pressable style={styles.reportButton} onPress={onNavigateToReport} accessibilityRole="button" testID="insights-generate-report">
+      {weatherCards.length > 0 && (
+        <>
+          <Text style={styles.subtitle}>Weather correlations</Text>
+          <InsightCardList cards={weatherCards} testIdPrefix="insights-weather" />
+        </>
+      )}
+
+      <Pressable
+        style={styles.reportButton}
+        onPress={onNavigateToReport}
+        accessibilityRole="button"
+        testID="insights-generate-report"
+      >
         <Text style={styles.reportButtonText}>Generate Physician Report</Text>
       </Pressable>
       <Pressable style={styles.backButton} onPress={onBack} accessibilityRole="button" testID="insights-back">
@@ -198,7 +260,8 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#555',
-    marginBottom: 20,
+    marginBottom: 12,
+    marginTop: 8,
   },
   errorText: {
     color: '#c00',

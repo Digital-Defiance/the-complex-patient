@@ -35,6 +35,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { View, Platform, AppState, type AppStateStatus, StyleSheet } from 'react-native';
 import type { HomeEntryController } from '../app/home-entry';
+import { isExportSessionActive } from './export-session';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,6 +87,9 @@ export function ActivityResponder({
     if (Platform.OS === 'web') {
       // Web: visibilitychange → hidden triggers lock (Requirement 13.4)
       const handleVisibilityChange = () => {
+        if (document.visibilityState === 'hidden' && isExportSessionActive()) {
+          return;
+        }
         if (document.visibilityState === 'hidden') {
           // Fire and forget — on failure we still route to unlock (13.6)
           void home.lock.lock().catch(() => {
@@ -120,15 +124,12 @@ export function ActivityResponder({
   // -------------------------------------------------------------------------
 
   useEffect(() => {
-    // Subscribe to the coordinator's syncStatus store — any state change
-    // (including lock-triggered clears) notifies us. We then check home status.
-    const unsubscribe = home.coordinator.syncStatus.subscribe(() => {
-      if (home.getStatus() === 'locked') {
+    const unsubscribe = home.subscribeStatus((status) => {
+      if (status === 'locked') {
         onLockedRef.current();
       }
     });
 
-    // Also check initial status in case we mounted while already locked.
     if (home.getStatus() === 'locked') {
       onLockedRef.current();
     }

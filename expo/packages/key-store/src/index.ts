@@ -34,4 +34,20 @@ export {
 } from './native-key-store';
 export type { NativeKeyStoreDeps } from './native-key-store';
 export { WebSessionKeyStore } from './web-key-store';
-export type { WebKeyStoreDeps } from './web-key-store';
+export type { WebKeyStoreDeps, WebPasskeyUnlockDeps } from './web-key-store';
+export {
+  clearPasskeyUnlock,
+  createBrowserPasskeyStorage,
+  formatPasskeyUnlockError,
+  hasStoredPasskeyUnlock,
+  isPasskeyUnlockSupported,
+  registerPasskeyUnlock,
+  resolveBrowserPasskeyUnlockDeps,
+  unlockKekWithPasskey,
+  wrapKekWithPrfKey,
+  unwrapKekWithPrfKey,
+  PASSKEY_SETUP_SESSION_KEY,
+  WEB_PASSKEY_UNLOCK_STORAGE_KEY,
+  type BrowserPasskeyUnlockDeps,
+  type PasskeyUnlockStorage,
+} from './web-passkey-unlock';

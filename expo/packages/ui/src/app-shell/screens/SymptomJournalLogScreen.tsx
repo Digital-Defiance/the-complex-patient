@@ -13,6 +13,8 @@ import {
 } from '@complex-patient/symptom-journal';
 import { useAppHost } from '../app-host';
 import { usePartition } from '../hooks';
+import { useWeatherHost } from '../weather-host-context';
+import { captureJournalLocation } from '../journal-location';
 import { createHomeSymptomStore } from '../symptom-journal-stores';
 import {
   DURATION_UNITS,
@@ -94,6 +96,7 @@ function SymptomJournalLogScreenInner({
 
   const journalRef = useRef<SymptomJournal | null>(null);
 
+  const weatherHost = useWeatherHost();
   const existingSymptoms = usePartition(home, 'symptoms');
 
   const typeSuggestions = useMemo(
@@ -134,6 +137,12 @@ function SymptomJournalLogScreenInner({
       active: true,
     };
 
+    const capturedAt = new Date().toISOString();
+    const logLocation = await captureJournalLocation(weatherHost, capturedAt);
+    if (logLocation) {
+      input.location = logLocation;
+    }
+
     try {
       const result = await journal.logSymptom(input);
 
@@ -168,6 +177,7 @@ function SymptomJournalLogScreenInner({
     severity,
     symptomType,
     systemicLocation,
+    weatherHost,
   ]);
 
   return (

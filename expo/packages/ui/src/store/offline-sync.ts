@@ -119,6 +119,12 @@ export interface OfflineSyncCoordinator {
   /** Current sync status for a partition. */
   getSyncStatus(vaultType: VaultType): PartitionSyncStatus;
 
+  /**
+   * Retry sync for every partition stuck in `conflict` or `pending`. Used after
+   * unlock and after a local write so one partition's save also retries others.
+   */
+  retryOutstandingSync(skipVaultType?: VaultType): Promise<void>;
+
   /** Reset every partition's sync status to `idle` (e.g. on lock). */
   resetSyncStatus(): void;
 
@@ -209,6 +215,18 @@ export function createOfflineSyncCoordinator(
     return outcome;
   }
 
+  async function retryOutstandingSync(skipVaultType?: VaultType): Promise<void> {
+    for (const vaultType of PHI_VAULT_TYPES) {
+      if (vaultType === skipVaultType) {
+        continue;
+      }
+      const status = getSyncStatus(vaultType);
+      if (status === 'conflict' || status === 'pending') {
+        await syncNow(vaultType);
+      }
+    }
+  }
+
   async function commit<T extends VaultRecord>(
     vaultType: VaultType,
     mutator: (current: T[]) => T[],
@@ -226,7 +244,10 @@ export function createOfflineSyncCoordinator(
     // The sync is intentionally NOT awaited so the write path never blocks on
     // the Sync_Backend (Requirement 5.2). Outcomes flow to the sync-status store.
     syncWorker.enqueue(vaultType);
-    void syncNow(vaultType);
+    void (async () => {
+      await syncNow(vaultType);
+      await retryOutstandingSync(vaultType);
+    })();
 
     return result;
   }
@@ -267,6 +288,7 @@ export function createOfflineSyncCoordinator(
     syncNow,
     onConnectivityRestored,
     getSyncStatus,
+    retryOutstandingSync,
     resetSyncStatus,
     dispose,
   };
