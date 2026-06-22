@@ -2,6 +2,7 @@
   "name": "complex-patient",
   "private": true,
   "version": "0.0.1",
+  "packageManager": "yarn@4.15.0",
   "main": "expo-router/entry",
   "description": "The Complex Patient – zero-knowledge E2EE health platform",
   "workspaces": [
@@ -21,11 +22,13 @@
     "packages/med-visuals"
   ],
   "scripts": {
+    "eas-build-pre-install": "corepack enable",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "build:web": "EXPO_ROUTER_APP_ROOT=./apps/web/app npx expo export --platform web --output-dir dist/web",
-    "start:web": "EXPO_ROUTER_APP_ROOT=./apps/web/app npx expo start --web"
+    "start:web": "EXPO_ROUTER_APP_ROOT=./apps/web/app npx expo start --web",
+    "build:ios": "eas build --platform ios --profile production"
   },
   "devDependencies": {
     "@fast-check/vitest": "^0.1.3",
