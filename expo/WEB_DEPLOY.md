@@ -28,13 +28,29 @@ This creates `dist/web/` with static HTML/JS/CSS files.
 
 ## Deploy to the WordPress host
 
-Upload the `dist/web/` contents to the `/secure/` directory on your WordPress server:
+From `expo/`, with the `complex` host defined in your SSH config:
 
 ```bash
-scp -r dist/web/* user@yourserver:/var/www/html/secure/
+yarn build:web
+yarn sync:complex
 ```
 
-Adjust the remote path to match your host's document root.
+Or build and upload in one step:
+
+```bash
+yarn deploy:web
+```
+
+`sync:complex` rsyncs `dist/web/` to `complex:/home/thecompl/domains/thecomplexpatient.com/public_html/secure/`. Both sync scripts use `--checksum` (`-c`) so rsync compares file content (not just size/mtime), `--delete` removes stale assets on the destination, and only changed files are transferred. Run `yarn build:web` first if `dist/web/` does not exist.
+
+For local WordPress Studio:
+
+```bash
+yarn build:web
+yarn sync:complex-local
+```
+
+This copies to `/Users/jessica/Studio/the-complex-patient/secure/`.
 
 ### WordPress .htaccess (Apache)
 
