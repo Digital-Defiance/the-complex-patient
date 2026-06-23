@@ -22,17 +22,18 @@
  */
 
 import type { CryptoKeyRef, KdfParams } from '@complex-patient/crypto-engine';
-import { decrypt } from '@complex-patient/crypto-engine';
+import { decrypt, encrypt } from '@complex-patient/crypto-engine';
 import type { LocalVault } from '@complex-patient/local-vault';
 import type { VaultRecord, VaultType } from '@complex-patient/domain';
 import type { SessionKeyStore } from '@complex-patient/key-store';
-import type { VaultHttpClientWithKdf } from './vault-http-client';
+import type { VaultHttpClientWithKdf, DevicePushRegistration } from './vault-http-client';
+import { getOrCreateDeviceId, type DeviceIdStorage } from './device-id';
 import {
   kdfMaterialFromPayload,
   kdfMaterialToPayload,
   type KdfMaterial,
 } from './kdf-material-sync';
-import { pullRemoteVaultPartitions, recoverVaultPartitionsFromRemote, parseHydrateFailurePartition } from './vault-pull';
+import { pullRemoteVaultPartitions, recoverVaultPartitionsFromRemote, parseHydrateFailurePartition, probeKekAgainstVaultData } from './vault-pull';
 import {
   createOfflineSyncCoordinator,
   type OfflineSyncCoordinator,
@@ -103,6 +104,10 @@ export interface HomeEntryDeps {
   vaultHttp?: VaultHttpClientWithKdf;
   /** Optional shared idle auto-lock controller (Requirement 3.7). */
   idle?: IdleController;
+  /** Returns the active session KEK while unlocked (for background reconcile). */
+  getActiveKek?: () => CryptoKeyRef | null;
+  /** Persists a stable per-install device id for push registration. */
+  deviceIdStorage?: DeviceIdStorage;
 }
 
 /**
@@ -160,6 +165,20 @@ export interface HomeEntryController {
   /** Forward connectivity restoration to the Sync_Worker (Requirement 5.7). */
   onConnectivityRestored(): void;
 
+  /** Hint that another device updated the vault (e.g. push received while locked). */
+  markRemoteReconcilePending(): void;
+
+  /** Register this device for vault-update push notifications (non-PHI hints only). */
+  registerDevicePush(
+    registration: Omit<DevicePushRegistration, 'device_id'>,
+  ): Promise<{ ok: boolean }>;
+
+  /** Remove this device from vault-update push notifications. */
+  unregisterDevicePush(): Promise<void>;
+
+  /** Stable per-install device id used for push fan-out exclusion. */
+  getDeviceId(): Promise<string | null>;
+
   /** Reset the idle countdown on user interaction (Requirement 3.7). */
   notifyActivity(): void;
 
@@ -174,6 +193,15 @@ export interface HomeEntryController {
 
   /** Publish local KDF material to the Sync_Backend (non-secret). */
   publishKdfMaterial(material: KdfMaterial): Promise<void>;
+
+  /**
+   * Whether `kek` decrypts any remote PHI partition. Used during unlock to pick
+   * the correct KDF when server metadata drifted from the encryption key.
+   */
+  probeRemoteVaultDecrypt(kek: CryptoKeyRef): Promise<boolean>;
+
+  /** Whether any encrypted PHI partition exists on this device. */
+  hasExistingVaultData(): Promise<boolean>;
 
   /** Web-only: whether passkey fast unlock is supported in this browser. */
   isPasskeyUnlockAvailable?(): boolean;
@@ -195,10 +223,98 @@ export interface HomeEntryController {
  * platforms (Requirement 22.2).
  */
 export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
-  const { keyStore, store, syncWorker, auth, idle, vault, vaultHttp } = deps;
+  const {
+    keyStore,
+    store,
+    syncWorker,
+    auth,
+    idle,
+    vault,
+    vaultHttp,
+    getActiveKek,
+    deviceIdStorage,
+  } = deps;
 
   const coordinator = createOfflineSyncCoordinator({ store, syncWorker });
   const lock = bindStoreToLock({ store, keyStore, idle });
+  let remoteReconcilePending = false;
+
+  async function reconcileRemotePartitions(): Promise<void> {
+    const kek = getActiveKek?.() ?? null;
+    if (kek === null || vault === undefined || vaultHttp === undefined || auth.getAuth() === null) {
+      return;
+    }
+    if (!store.isUnlocked()) {
+      return;
+    }
+
+    try {
+      await pullRemoteVaultPartitions({
+        vault,
+        http: vaultHttp,
+        verifyDecrypt: { kek, crypto: { decrypt, encrypt } },
+        onPartitionApplied: async ({ vaultType, outcome }) => {
+          await store.refreshPartition(vaultType);
+          if (outcome.needsPush) {
+            syncWorker.enqueue(vaultType);
+          }
+        },
+      });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.warn('[HomeEntry] remote reconcile failed:', message);
+    }
+  }
+
+  async function resolveDeviceId(): Promise<string | null> {
+    if (deviceIdStorage === undefined) {
+      return null;
+    }
+    return getOrCreateDeviceId(deviceIdStorage);
+  }
+
+  async function registerDevicePush(
+    registration: Omit<DevicePushRegistration, 'device_id'>,
+  ): Promise<{ ok: boolean }> {
+    if (vaultHttp === undefined || auth.getAuth() === null) {
+      return { ok: false };
+    }
+    const deviceId = await resolveDeviceId();
+    if (deviceId === null) {
+      return { ok: false };
+    }
+    try {
+      const response = await vaultHttp.registerDevice({
+        ...registration,
+        device_id: deviceId,
+      });
+      return { ok: response.status >= 200 && response.status < 300 };
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.warn('[HomeEntry] device push registration failed:', message);
+      return { ok: false };
+    }
+  }
+
+  async function unregisterDevicePush(): Promise<void> {
+    if (vaultHttp === undefined || auth.getAuth() === null || deviceIdStorage === undefined) {
+      return;
+    }
+    const deviceId = await deviceIdStorage.getDeviceId();
+    if (deviceId === null || deviceId === '') {
+      return;
+    }
+    try {
+      await vaultHttp.unregisterDevice(deviceId);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.warn('[HomeEntry] device push unregister failed:', message);
+    }
+  }
+
+  async function getDeviceId(): Promise<string | null> {
+    return resolveDeviceId();
+  }
 
   async function pullBeforeHydrate(kek: CryptoKeyRef): Promise<void> {
     if (vault === undefined || vaultHttp === undefined || auth.getAuth() === null) {
@@ -250,6 +366,31 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     }
   }
 
+  async function probeRemoteVaultDecryptForUnlock(kek: CryptoKeyRef): Promise<boolean> {
+    if (vaultHttp === undefined && vault === undefined) {
+      return true;
+    }
+    return probeKekAgainstVaultData({
+      vault,
+      http: vaultHttp,
+      kek,
+      crypto: { decrypt },
+    });
+  }
+
+  async function hasExistingVaultData(): Promise<boolean> {
+    if (vault === undefined) {
+      return false;
+    }
+    for (const vaultType of PHI_VAULT_TYPES) {
+      const blob = await vault.readPartition(vaultType);
+      if (blob !== null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function getStatus(): HomeStatus {
     if (auth.getAuth() === null) {
       return 'signed-out';
@@ -285,12 +426,14 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
 
   function signIn(credential: WordPressAuth): Promise<SignInResult> {
     auth.setAuth(credential);
-    emitStatusIfChanged();
 
     if (vaultHttp === undefined) {
+      emitStatusIfChanged();
       return Promise.resolve({ ok: true });
     }
 
+    // Validate credentials before emitting `locked` so the shell does not route
+    // to unlock while validation is still in flight (avoids mid-unlock sign-out).
     return vaultHttp
       .getKdfMaterial()
       .then((response) => {
@@ -298,6 +441,18 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
           auth.setAuth(null);
           emitStatusIfChanged();
           return { ok: false as const, reason: 'INVALID_CREDENTIALS' as const };
+        }
+        if (response.status === 0) {
+          auth.setAuth(null);
+          emitStatusIfChanged();
+          console.error('[HomeEntry] signIn validation failed: could not reach sync backend');
+          return { ok: false as const, reason: 'NETWORK_ERROR' as const };
+        }
+        if (response.status !== 404 && (response.status < 200 || response.status >= 300)) {
+          auth.setAuth(null);
+          emitStatusIfChanged();
+          console.error(`[HomeEntry] signIn validation failed: HTTP ${response.status}`);
+          return { ok: false as const, reason: 'NETWORK_ERROR' as const };
         }
         emitStatusIfChanged();
         return { ok: true as const };
@@ -312,6 +467,7 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
   }
 
   async function signOut(): Promise<void> {
+    await unregisterDevicePush();
     // Lock first so PHI projections + KEK are discarded together, then drop the
     // backend credential (Requirements 3.6, 4.8).
     await lock.lock();
@@ -340,7 +496,9 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
       try {
         await store.hydrate(kek);
         lock.startIdleTimer();
-        coordinator.onConnectivityRestored();
+        // Pull remote changes (merge) then push any queued local writes.
+        onConnectivityRestored();
+        remoteReconcilePending = false;
         if (quarantinedPartitions.length > 0) {
           console.warn(
             '[HomeEntry] unlocked after quarantining undecryptable partitions:',
@@ -449,7 +607,14 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
   }
 
   function onConnectivityRestored(): void {
-    coordinator.onConnectivityRestored();
+    void reconcileRemotePartitions().finally(() => {
+      coordinator.onConnectivityRestored();
+    });
+  }
+
+  function markRemoteReconcilePending(): void {
+    remoteReconcilePending = true;
+    console.info('[HomeEntry] remote vault update pending — will reconcile on unlock');
   }
 
   function notifyActivity(): void {
@@ -494,10 +659,16 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     read,
     commit,
     onConnectivityRestored,
+    markRemoteReconcilePending,
+    registerDevicePush,
+    unregisterDevicePush,
+    getDeviceId,
     notifyActivity,
     subscribeStatus,
     fetchRemoteKdfMaterial,
     publishKdfMaterial,
+    probeRemoteVaultDecrypt: probeRemoteVaultDecryptForUnlock,
+    hasExistingVaultData,
     isPasskeyUnlockAvailable,
     hasPasskeyUnlock,
     enablePasskeyUnlock,

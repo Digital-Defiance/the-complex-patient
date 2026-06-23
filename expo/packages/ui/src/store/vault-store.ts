@@ -95,6 +95,12 @@ export interface VaultStore {
   applySyncedVersion(vaultType: VaultType, syncVersion: number): Promise<void>;
 
   /**
+   * Re-read one partition from the Local_Vault after a background reconcile
+   * updated the encrypted blob.
+   */
+  refreshPartition(vaultType: VaultType): Promise<void>;
+
+  /**
    * Clear all PHI projections and discard the in-memory KEK together, on lock
    * or idle timeout (Requirements 3.6, 3.7).
    */
@@ -243,6 +249,9 @@ export function createVaultStore(deps: VaultStoreDeps): VaultStore {
     }
 
     if (blob.sync_version === syncVersion) {
+      if (vault.setBase) {
+        await vault.setBase(vaultType, blob);
+      }
       api.setState((state) => ({
         partitions: {
           ...state.partitions,
@@ -260,6 +269,14 @@ export function createVaultStore(deps: VaultStoreDeps): VaultStore {
       sync_version: syncVersion,
     });
 
+    const syncedBlob = {
+      ...blob,
+      sync_version: syncVersion,
+    };
+    if (vault.setBase) {
+      await vault.setBase(vaultType, syncedBlob);
+    }
+
     api.setState((state) => ({
       partitions: {
         ...state.partitions,
@@ -267,6 +284,19 @@ export function createVaultStore(deps: VaultStoreDeps): VaultStore {
           ...state.partitions[vaultType],
           syncVersion,
         },
+      },
+    }));
+  }
+
+  async function refreshPartition(vaultType: VaultType): Promise<void> {
+    if (kek === null || api.getState().status !== 'unlocked') {
+      return;
+    }
+    const projection = await hydratePartition(vaultType);
+    api.setState((state) => ({
+      partitions: {
+        ...state.partitions,
+        [vaultType]: projection,
       },
     }));
   }
@@ -287,6 +317,7 @@ export function createVaultStore(deps: VaultStoreDeps): VaultStore {
     getPartition,
     commit,
     applySyncedVersion,
+    refreshPartition,
     clear,
   };
 }

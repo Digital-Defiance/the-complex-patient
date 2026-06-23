@@ -39,10 +39,13 @@ import {
   createSyncWorker,
   createVaultHttpClient,
   createVaultStore,
+  createDeviceIdStorage,
+  getOrCreateDeviceId,
   type AgeGateOnboardingController,
   type DeviceFlagStorage,
   type HomeEntryController,
 } from '@complex-patient/ui';
+import { nativeFlagStorage } from './adapters';
 
 /**
  * Native platform adapters supplied by the Expo runtime. These are passed in by
@@ -121,10 +124,29 @@ export async function createMobileHome(
   const store = createVaultStore({ vault, crypto: { encrypt, decrypt } });
 
   const auth = createAuthProvider();
-  const http = createVaultHttpClient({ baseUrl: options.baseUrl, auth, fetch: options.fetch });
+  const deviceIdStorage = createDeviceIdStorage(
+    options.ineligibilityStorage ?? nativeFlagStorage,
+  );
+  const deviceId = await getOrCreateDeviceId(deviceIdStorage);
+  const http = createVaultHttpClient({
+    baseUrl: options.baseUrl,
+    auth,
+    fetch: options.fetch,
+    getDeviceId: () => deviceId,
+  });
   const syncWorker = createSyncWorker({ http, vault, keyStore });
 
-  controller = createHomeEntry({ keyStore, store, syncWorker, auth, idle, vault, vaultHttp: http });
+  controller = createHomeEntry({
+    keyStore,
+    store,
+    syncWorker,
+    auth,
+    idle,
+    vault,
+    vaultHttp: http,
+    getActiveKek: () => keyStore.getKek(),
+    deviceIdStorage,
+  });
 
   return controller;
 }

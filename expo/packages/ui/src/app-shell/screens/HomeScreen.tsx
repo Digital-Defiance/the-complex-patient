@@ -10,7 +10,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PASSKEY_SETUP_SESSION_KEY } from '@complex-patient/key-store';
 import { useAppHost } from '../app-host';
 
@@ -37,6 +38,7 @@ interface HomeSummary {
 
 export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.ReactElement {
   const { home } = useAppHost();
+  const insets = useSafeAreaInsets();
 
   const [summary, setSummary] = useState<HomeSummary | null>(null);
   const [readError, setReadError] = useState(false);
@@ -134,7 +136,13 @@ export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.
   }
 
   return (
-    <View style={styles.container} accessibilityRole="none" accessibilityLabel="Home">
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 24) }]}
+      keyboardShouldPersistTaps="handled"
+      accessibilityRole="none"
+      accessibilityLabel="Home"
+    >
       <Text style={styles.title}>Home</Text>
 
       {passkeySetupSuccess && (
@@ -273,11 +281,19 @@ export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.
       >
         <Text style={styles.signOutText}>Sign Out</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  content: {
+    padding: 24,
+    gap: 12,
+  },
   container: {
     flex: 1,
     padding: 24,
@@ -364,7 +380,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   navContainer: {
-    flex: 1,
     gap: 12,
   },
   navButton: {
@@ -385,7 +400,7 @@ const styles = StyleSheet.create({
     color: '#555',
   },
   signOutButton: {
-    marginTop: 24,
+    marginTop: 12,
     padding: 16,
     alignItems: 'center',
     borderRadius: 8,

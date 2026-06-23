@@ -155,6 +155,7 @@ function createMockHomeController(opts: {
     }),
     fetchRemoteKdfMaterial: vi.fn(async () => null),
     publishKdfMaterial: vi.fn(async () => {}),
+    probeRemoteVaultDecrypt: vi.fn(async () => true),
     dispose: vi.fn(),
     // Test helpers
     _setStatus(s: HomeStatus) { status = s; },

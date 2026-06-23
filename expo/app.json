@@ -2,7 +2,7 @@
   "expo": {
     "name": "The Complex Patient",
     "slug": "the-complex-patient",
-    "sdkVersion": "54.0.0",
+    "icon": "./assets/images/18065-NRMCEE-white.png",
     "scheme": "thecomplexpatient",
     "platforms": [
       "ios",
@@ -10,8 +10,26 @@
       "web"
     ],
     "plugins": [
-      ["expo-router", { "root": "./apps/mobile/app" }],
+      [
+        "expo-router",
+        {
+          "root": "./apps/mobile/app"
+        }
+      ],
       "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow The Complex Patient to use Face ID to unlock your vault."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/18065-NRMCEE-white.png",
+          "color": "#1a5276"
+        }
+      ],
       [
         "expo-location",
         {
@@ -31,6 +49,17 @@
       "eas": {
         "projectId": "03afbce3-092b-4382-ba04-8a0b4b34eef9"
       }
+    },
+    "ios": {
+      "bundleIdentifier": "org.digitaldefiance.com.complexpatient",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSFaceIDUsageDescription": "Allow The Complex Patient to use Face ID to unlock your vault.",
+        "NSUserNotificationsUsageDescription": "Allow notifications when your health vault is updated on another device."
+      }
+    },
+    "android": {
+      "package": "org.digitaldefiance.com.complexpatient"
     }
   }
 }

@@ -110,6 +110,60 @@ describe('createHomeEntry — auth + unlock lifecycle (4.1, 22.1, 22.2)', () => 
     expect(controller.getStatus()).toBe('signed-out');
     expect(store.isUnlocked()).toBe(false);
   });
+
+  it('does not emit locked status until credential validation succeeds', async () => {
+    let resolveValidation!: (response: { status: number }) => void;
+    const validation = new Promise<{ status: number }>((resolve) => {
+      resolveValidation = resolve;
+    });
+    const vaultHttp = {
+      getKdfMaterial: () => validation,
+      putKdfMaterial: vi.fn(async () => ({ status: 200 })),
+      postVault: vi.fn(),
+      getVault: vi.fn(),
+    };
+    const keyedController = createHomeEntry({
+      keyStore: new WebSessionKeyStore(),
+      store,
+      syncWorker: fakeWorker(),
+      auth: createAuthProvider(),
+      vaultHttp,
+    });
+
+    const seen: HomeStatus[] = [];
+    keyedController.subscribeStatus((status) => {
+      seen.push(status);
+    });
+
+    const signInPromise = keyedController.signIn({ kind: 'jwt', token: 'jwt' });
+    await Promise.resolve();
+    expect(seen).toEqual(['signed-out']);
+
+    resolveValidation({ status: 200 });
+    await signInPromise;
+    expect(seen).toContain('locked');
+    expect(keyedController.getStatus()).toBe('locked');
+  });
+
+  it('rejects sign-in when KDF validation hits a transport error', async () => {
+    const vaultHttp = {
+      getKdfMaterial: vi.fn(async () => ({ status: 0 })),
+      putKdfMaterial: vi.fn(),
+      postVault: vi.fn(),
+      getVault: vi.fn(),
+    };
+    const keyedController = createHomeEntry({
+      keyStore: new WebSessionKeyStore(),
+      store,
+      syncWorker: fakeWorker(),
+      auth: createAuthProvider(),
+      vaultHttp,
+    });
+
+    const result = await keyedController.signIn({ kind: 'jwt', token: 'jwt' });
+    expect(result).toEqual({ ok: false, reason: 'NETWORK_ERROR' });
+    expect(keyedController.getStatus()).toBe('signed-out');
+  });
 });
 
 describe('createHomeEntry — offline-first feature surface (5.2, 5.3, 5.4)', () => {

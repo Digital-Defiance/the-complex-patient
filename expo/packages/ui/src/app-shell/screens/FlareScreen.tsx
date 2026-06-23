@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import {
   createFlareJournal,
   type FlareJournal,
@@ -52,8 +52,10 @@ function FlareScreenInner({
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const journalRef = useRef<FlareJournal | null>(null);
+  const submittingRef = useRef(false);
   const weatherHost = useWeatherHost();
   const symptomRecords = usePartition<SymptomEntry>(home, 'symptoms');
 
@@ -84,21 +86,29 @@ function FlareScreenInner({
   }, []);
 
   const handleSubmit = useCallback(async () => {
+    if (submittingRef.current) {
+      return;
+    }
+
     const journal = getJournal();
     if (!journal) return;
+
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    setCommitError(null);
 
     const input: FlareUpInput = {
       symptomIds: selectedIds,
       trigger: trigger.trim(),
     };
 
-    const capturedAt = new Date().toISOString();
-    const logLocation = await captureJournalLocation(weatherHost, capturedAt);
-    if (logLocation) {
-      input.location = logLocation;
-    }
-
     try {
+      const capturedAt = new Date().toISOString();
+      const logLocation = await captureJournalLocation(weatherHost, capturedAt);
+      if (logLocation) {
+        input.location = logLocation;
+      }
+
       const result = await journal.logFlare(input);
 
       if (!result.ok) {
@@ -117,10 +127,13 @@ function FlareScreenInner({
       const message = cause instanceof Error ? cause.message : 'Flare-up was not saved. Please try again.';
       setCommitError(message);
       setSuccessMessage(null);
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   }, [getJournal, selectedIds, trigger, weatherHost]);
 
-  const canSubmit = selectedIds.length >= 2;
+  const canSubmit = selectedIds.length >= 2 && !isSubmitting;
 
   return (
     <ScrollView style={styles.container} testID="flare-screen">
@@ -200,13 +213,20 @@ function FlareScreenInner({
 
       <Pressable
         style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
-        onPress={handleSubmit}
+        onPress={() => {
+          void handleSubmit();
+        }}
         disabled={!canSubmit}
         accessibilityRole="button"
         accessibilityLabel="Log flare-up"
+        accessibilityState={{ disabled: !canSubmit, busy: isSubmitting }}
         testID="flare-submit"
       >
-        <Text style={styles.submitText}>Log Flare-Up</Text>
+        {isSubmitting ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.submitText}>Log Flare-Up</Text>
+        )}
       </Pressable>
 
       {onBack && (

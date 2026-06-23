@@ -117,6 +117,7 @@ export function AppHostProvider({ factory, children }: AppHostProviderProps): Re
 
   // Home controller — set after `enterHome()` resolves.
   const [home, setHome] = useState<HomeEntryController | null>(null);
+  const enterHomeInFlightRef = useRef(false);
 
   // Whether onboarding.start() rejected (Requirement 5.3).
   const [startFailed, setStartFailed] = useState(false);
@@ -176,9 +177,13 @@ export function AppHostProvider({ factory, children }: AppHostProviderProps): Re
       // Requirement 3.7: reject if not eligible — never build before eligible.
       throw new Error('enterHome() called before onboarding = eligible (Requirement 3.7)');
     }
+    if (home !== null || enterHomeInFlightRef.current) {
+      return;
+    }
+    enterHomeInFlightRef.current = true;
     try {
       const controller = await app.createHome();
-      setHome(controller);
+      setHome((current) => current ?? controller);
       setNavState((prev) => ({ ...prev, home: controller.getStatus() }));
     } catch (err: unknown) {
       console.error('[AppHost] enterHome failed:', err);
@@ -189,8 +194,10 @@ export function AppHostProvider({ factory, children }: AppHostProviderProps): Re
         const msg = err instanceof Error ? err.message : String(err);
         setNavState((prev) => ({ ...prev, compositionFailed: true, _errorMessage: msg }));
       }
+    } finally {
+      enterHomeInFlightRef.current = false;
     }
-  }, [app]);
+  }, [app, home]);
 
   // Compute the current route from the nav state.
   const route = resolveRoute(navState);

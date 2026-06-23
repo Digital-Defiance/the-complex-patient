@@ -43,8 +43,25 @@ function canonicalize(value: unknown): string {
 /**
  * Deep structural equality for two vault records.
  */
-function recordsEqual<T extends VaultRecord>(a: T, b: T): boolean {
+export function recordsEqual<T extends VaultRecord>(a: T, b: T): boolean {
   return canonicalize(a) === canonicalize(b);
+}
+
+/**
+ * Deep structural equality for two record sets, order-independent.
+ */
+export function recordsSetsEqual(a: readonly VaultRecord[], b: readonly VaultRecord[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  const sortedA = [...a].sort((left, right) => left.id.localeCompare(right.id));
+  const sortedB = [...b].sort((left, right) => left.id.localeCompare(right.id));
+  for (let i = 0; i < sortedA.length; i += 1) {
+    if (!recordsEqual(sortedA[i]!, sortedB[i]!)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**

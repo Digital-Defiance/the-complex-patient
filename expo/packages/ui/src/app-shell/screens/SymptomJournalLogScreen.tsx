@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import {
   createSymptomJournal,
   type SymptomJournal,
@@ -93,8 +93,10 @@ function SymptomJournalLogScreenInner({
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const journalRef = useRef<SymptomJournal | null>(null);
+  const submittingRef = useRef(false);
 
   const weatherHost = useWeatherHost();
   const existingSymptoms = usePartition(home, 'symptoms');
@@ -118,32 +120,40 @@ function SymptomJournalLogScreenInner({
   }, [home]);
 
   const handleSubmit = useCallback(async () => {
+    if (submittingRef.current) {
+      return;
+    }
+
     const journal = getJournal();
     if (!journal) return;
 
-    const matchedType = resolveSymptomTypeMatch(existingSymptoms, symptomType);
-    const normalizedType = matchedType ?? normalizeSymptomLabel(symptomType);
-    const normalizedLocation = normalizeSymptomLabel(systemicLocation);
-
-    const input: SymptomEntryInput = {
-      symptomType: normalizedType,
-      systemicLocation: normalizedLocation,
-      severity: severity !== '' ? Number(severity) : undefined,
-      duration: {
-        value: durationValue !== '' ? Number(durationValue) : undefined,
-        unit: durationUnit,
-      },
-      notes: notes || undefined,
-      active: true,
-    };
-
-    const capturedAt = new Date().toISOString();
-    const logLocation = await captureJournalLocation(weatherHost, capturedAt);
-    if (logLocation) {
-      input.location = logLocation;
-    }
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    setCommitError(null);
 
     try {
+      const matchedType = resolveSymptomTypeMatch(existingSymptoms, symptomType);
+      const normalizedType = matchedType ?? normalizeSymptomLabel(symptomType);
+      const normalizedLocation = normalizeSymptomLabel(systemicLocation);
+
+      const input: SymptomEntryInput = {
+        symptomType: normalizedType,
+        systemicLocation: normalizedLocation,
+        severity: severity !== '' ? Number(severity) : undefined,
+        duration: {
+          value: durationValue !== '' ? Number(durationValue) : undefined,
+          unit: durationUnit,
+        },
+        notes: notes || undefined,
+        active: true,
+      };
+
+      const capturedAt = new Date().toISOString();
+      const logLocation = await captureJournalLocation(weatherHost, capturedAt);
+      if (logLocation) {
+        input.location = logLocation;
+      }
+
       const result = await journal.logSymptom(input);
 
       if (!result.ok) {
@@ -167,6 +177,9 @@ function SymptomJournalLogScreenInner({
       const message = cause instanceof Error ? cause.message : 'Symptom was not saved. Please try again.';
       setCommitError(message);
       setSuccessMessage(null);
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   }, [
     durationUnit,
@@ -305,13 +318,21 @@ function SymptomJournalLogScreenInner({
       />
 
       <Pressable
-        style={styles.submitButton}
-        onPress={handleSubmit}
+        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+        onPress={() => {
+          void handleSubmit();
+        }}
+        disabled={isSubmitting}
         accessibilityRole="button"
         accessibilityLabel="Log symptom"
+        accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
         testID="journal-log-submit"
       >
-        <Text style={styles.submitText}>Log Symptom</Text>
+        {isSubmitting ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.submitText}>Log Symptom</Text>
+        )}
       </Pressable>
 
       {onBack && (
@@ -446,6 +467,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#0066cc',
     borderRadius: 8,
     alignItems: 'center',
+    minHeight: 52,
+    justifyContent: 'center',
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitText: {
     color: '#fff',

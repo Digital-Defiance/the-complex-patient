@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { Platform, View, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Slot, useRouter } from 'expo-router';
 import {
   ActivityResponder,
@@ -19,21 +20,24 @@ import {
 import { mobileWeatherHost } from '../../src/adapters/weather-host';
 import { LocationTrailSampler } from '../../src/location-trail-sampler';
 import { MedicationNotificationSync } from '../../src/medication-notification-sync';
+import { VaultUpdatePushSync } from '../../src/vault-update-push-sync';
 
 function AuthenticatedHomeStack(): React.ReactElement {
   const { home, refreshHomeStatus } = useAppHost();
   const router = useRouter();
   const { isOffline } = useConnectivityWatcher();
+  const insets = useSafeAreaInsets();
 
   const content = (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]}>
         <SyncStatusIndicator isOffline={isOffline} />
       </View>
       <View style={styles.content}>
         <ConnectivityProvider isOffline={isOffline}>
           <WeatherHostProvider deps={mobileWeatherHost}>
             <MedicationNotificationSync />
+            <VaultUpdatePushSync />
             {Platform.OS !== 'web' && <LocationTrailSampler />}
             <Slot screenOptions={{ headerShown: false }} />
           </WeatherHostProvider>
@@ -69,7 +73,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
-    paddingTop: 8,
     paddingBottom: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e0e0e0',

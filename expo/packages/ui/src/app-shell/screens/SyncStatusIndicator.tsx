@@ -172,9 +172,26 @@ export function useConnectivityWatcher(): { isOffline: boolean } {
       window.addEventListener('online', updateOnline);
       window.addEventListener('offline', updateOnline);
 
+      const onVisible = () => {
+        if (
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'visible' &&
+          navigator.onLine &&
+          home.getStatus() === 'ready'
+        ) {
+          home.onConnectivityRestored();
+        }
+      };
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', onVisible);
+      }
+
       cleanup = () => {
         window.removeEventListener('online', updateOnline);
         window.removeEventListener('offline', updateOnline);
+        if (typeof document !== 'undefined') {
+          document.removeEventListener('visibilitychange', onVisible);
+        }
       };
     } else {
       // Native: use a periodic connectivity probe via fetch.
@@ -213,12 +230,15 @@ export function useConnectivityWatcher(): { isOffline: boolean } {
       // Check connectivity every 5 seconds (within the 5s budget)
       intervalId = setInterval(checkConnectivity, 5000);
 
-      // Also check when app state changes to active
+      // Also reconcile when the app returns to the foreground while online.
       appStateSubscription = AppState.addEventListener(
         'change',
         (nextState: string) => {
           if (nextState === 'active') {
             void checkConnectivity();
+            if (home.getStatus() === 'ready' && !wasOfflineRef.current) {
+              home.onConnectivityRestored();
+            }
           }
         },
       );

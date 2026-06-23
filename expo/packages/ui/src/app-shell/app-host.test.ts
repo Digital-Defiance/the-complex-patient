@@ -79,6 +79,7 @@ function createMockHomeController(): HomeEntryController {
     subscribeStatus: vi.fn(() => () => {}),
     fetchRemoteKdfMaterial: vi.fn(async () => null),
     publishKdfMaterial: vi.fn(async () => {}),
+    probeRemoteVaultDecrypt: vi.fn(async () => true),
     dispose: vi.fn(),
   } as unknown as HomeEntryController;
 }

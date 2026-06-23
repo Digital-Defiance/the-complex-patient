@@ -41,6 +41,8 @@ export interface VaultStoreCrypto {
 export interface VaultStorePersistence {
   readPartition(vaultType: VaultType): Promise<VaultBlobLike | null>;
   writePartition(vaultType: VaultType, blob: VaultBlobLike): Promise<void>;
+  /** Last known server-synced base blob for three-way merge. */
+  setBase?(vaultType: VaultType, blob: VaultBlobLike): Promise<void>;
 }
 
 /**

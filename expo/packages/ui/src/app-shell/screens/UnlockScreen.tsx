@@ -26,11 +26,11 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
 import { PASSKEY_SETUP_SESSION_KEY } from '@complex-patient/key-store';
 import { useAppHost } from '../app-host';
 import { deriveKEK, type KdfParams, type CryptoKeyRef } from '@complex-patient/crypto-engine';
-import { resolveKdfMaterial, bytesFromBase64, base64FromBytes, KdfMaterialMissingError, normalizeKdfParams } from '../../app/kdf-material-sync';
+import { resolveKdfMaterialForUnlock, bytesFromBase64, base64FromBytes, KdfMaterialMissingError, normalizeKdfParams } from '../../app/kdf-material-sync';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -100,6 +100,8 @@ export interface PassphraseScreenDeps {
     ) => Promise<{ ok: boolean; reason?: string; partition?: string; quarantinedPartitions?: string[] }>;
     fetchRemoteKdfMaterial?: () => Promise<{ salt: Uint8Array; params: KdfParams } | null>;
     publishKdfMaterial?: (material: { salt: Uint8Array; params: KdfParams }) => Promise<void>;
+    probeRemoteVaultDecrypt?: (kek: CryptoKeyRef) => Promise<boolean>;
+    hasExistingVaultData?: () => Promise<boolean>;
   };
   loadKdfMaterial(): Promise<{ salt: Uint8Array; params: KdfParams } | null>;
   saveKdfMaterial(m: { salt: Uint8Array; params: KdfParams }): Promise<void>;
@@ -125,12 +127,14 @@ export async function submitPassphrase(
   // Resolve shared KDF material (local + Sync_Backend) before deriving the KEK.
   let material;
   try {
-    material = await resolveKdfMaterial({
+    material = await resolveKdfMaterialForUnlock({
+      passphrase,
       loadLocal: deps.loadKdfMaterial,
       saveLocal: deps.saveKdfMaterial,
       fetchRemote: deps.home.fetchRemoteKdfMaterial,
       publishRemote: deps.home.publishKdfMaterial,
-      hasExistingVaultData: deps.hasExistingVaultData,
+      hasExistingVaultData: deps.home.hasExistingVaultData ?? deps.hasExistingVaultData,
+      verifyKekAgainstRemote: deps.home.probeRemoteVaultDecrypt,
     });
   } catch (error) {
     if (error instanceof KdfMaterialMissingError) {
@@ -307,11 +311,18 @@ export function UnlockScreen({
 
     refreshPasskeyState();
 
-    if (typeof globalThis.window === 'undefined') {
+    if (Platform.OS !== 'web') {
       return undefined;
     }
 
     const win = globalThis.window;
+    if (
+      typeof win?.addEventListener !== 'function' ||
+      typeof win.document?.addEventListener !== 'function'
+    ) {
+      return undefined;
+    }
+
     win.addEventListener('focus', refreshPasskeyState);
     win.document.addEventListener('visibilitychange', refreshPasskeyState);
     return () => {

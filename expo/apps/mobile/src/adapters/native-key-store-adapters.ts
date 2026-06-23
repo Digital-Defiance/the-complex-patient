@@ -28,29 +28,29 @@ const KEK_KEY = 'complex-patient.kek';
 /**
  * `expo-secure-store`-backed {@link SecureStoreAdapter} (Requirement 3.3).
  *
- * The KEK is stored inside the device Secure Enclave with:
- * - `requireAuthentication: true` — release of the entry is gated behind the
- *   device biometric / passcode challenge.
- * - `keychainAccessible: WHEN_UNLOCKED_THIS_DEVICE_ONLY` — the entry is only
- *   accessible while the device is unlocked and is never migrated to another
- *   device via backup.
+ * The KEK is stored inside the device Secure Enclave with
+ * `keychainAccessible: WHEN_UNLOCKED_THIS_DEVICE_ONLY` — accessible only while
+ * the device is unlocked and never migrated to another device via backup.
+ *
+ * Biometric gating is handled by {@link NativeSessionKeyStore} via
+ * `expo-local-authentication`, not `requireAuthentication` on SecureStore writes.
+ * Requiring authentication on `setItemAsync` breaks first-time passphrase unlock
+ * (no Face ID permission / no enrolled biometrics yet) and double-prompts on read.
  */
 export function createExpoSecureStoreAdapter(): SecureStoreAdapter {
-  const options: SecureStore.SecureStoreOptions = {
+  const storageOptions: SecureStore.SecureStoreOptions = {
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-    requireAuthentication: true,
-    authenticationPrompt: 'Unlock your vault',
   };
 
   return {
     async setKek(serialized: string): Promise<void> {
-      await SecureStore.setItemAsync(KEK_KEY, serialized, options);
+      await SecureStore.setItemAsync(KEK_KEY, serialized, storageOptions);
     },
     getKek(): Promise<string | null> {
-      return SecureStore.getItemAsync(KEK_KEY, options);
+      return SecureStore.getItemAsync(KEK_KEY, storageOptions);
     },
     deleteKek(): Promise<void> {
-      return SecureStore.deleteItemAsync(KEK_KEY, options);
+      return SecureStore.deleteItemAsync(KEK_KEY, storageOptions);
     },
   };
 }

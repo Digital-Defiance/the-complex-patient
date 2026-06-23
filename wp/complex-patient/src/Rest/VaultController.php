@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ComplexPatient\Rest;
 
 use ComplexPatient\Auth\AuthMiddleware;
+use ComplexPatient\Notification\VaultUpdateNotifier;
 use ComplexPatient\VaultRepository;
 
 /**
@@ -73,7 +74,8 @@ final class VaultController
 
     public function __construct(
         private readonly VaultRepository $repository,
-        private readonly AuthMiddleware $auth
+        private readonly AuthMiddleware $auth,
+        private readonly ?VaultUpdateNotifier $notifier = null
     ) {
     }
 
@@ -239,8 +241,39 @@ final class VaultController
             );
         }
 
+        $originatingDeviceId = $this->resolveOriginatingDeviceId($request);
+
+        try {
+            $this->notifier?->notifyVaultUpdated($userId, $vaultType, $newVersion, $originatingDeviceId);
+        } catch (\Throwable $exception) {
+            if (function_exists('error_log')) {
+                error_log(
+                    '[Complex Patient] vault push notification fan-out failed: '
+                    . $exception->getMessage()
+                );
+            }
+        }
+
         // Requirement 6.3 / 7.5: confirm persistence with the resulting version.
         return new \WP_REST_Response(['sync_version' => $newVersion], 200);
+    }
+
+    /**
+     * Optional client device id sent on vault writes to exclude self from push fan-out.
+     */
+    private function resolveOriginatingDeviceId($request): ?string
+    {
+        $header = $request->get_header('x_device_id');
+        if (is_string($header) && '' !== $header && strlen($header) <= 64) {
+            return $header;
+        }
+
+        $param = $request->get_param('device_id');
+        if (is_string($param) && '' !== $param && strlen($param) <= 64) {
+            return $param;
+        }
+
+        return null;
     }
 
     /**

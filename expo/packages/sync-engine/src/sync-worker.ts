@@ -74,6 +74,12 @@ export interface VaultPushPayload {
 export interface VaultPushResponse {
   status: number;
   sync_version?: number;
+  /** WordPress REST error code when status is 4xx (e.g. complex_patient_unrecognized_vault_type). */
+  errorCode?: string;
+  /** Human-readable server rejection reason. */
+  errorMessage?: string;
+  /** Field named in a validation error, when present. */
+  errorField?: string;
 }
 
 /**
@@ -186,6 +192,32 @@ export interface SyncWorkerDeps {
   onSyncPending?: (vaultType: VaultType, attempts: number) => void;
 }
 
+/** WordPress rejects vault types the deployed plugin does not yet recognize. */
+export const UNRECOGNIZED_VAULT_TYPE_ERROR = 'complex_patient_unrecognized_vault_type';
+
+function isUnsupportedVaultTypeResponse(response: VaultPushResponse): boolean {
+  return response.status === 400 && response.errorCode === UNRECOGNIZED_VAULT_TYPE_ERROR;
+}
+
+function isNonRetryableTransportError(message: string | undefined): boolean {
+  if (!message) {
+    return false;
+  }
+  return /not authenticated/i.test(message);
+}
+
+function formatPushFailure(response: VaultPushResponse | null, vaultType: VaultType): string {
+  if (response === null) {
+    return `[SyncWorker] push for ${vaultType} failed (network error)`;
+  }
+  const detail = response.errorMessage
+    ? `: ${response.errorMessage}`
+    : response.errorField
+      ? ` (field: ${response.errorField})`
+      : '';
+  return `[SyncWorker] push for ${vaultType} failed with HTTP ${response.status}${detail}`;
+}
+
 /**
  * The background Sync_Worker.
  */
@@ -202,6 +234,11 @@ export class SyncWorker {
   private readonly queue = new Set<VaultType>();
   /** Partitions whose sync is pending after exhausting retries (Requirement 5.8). */
   private readonly pending = new Set<VaultType>();
+  /**
+   * Partitions the Sync_Backend permanently rejects (e.g. unrecognized vault_type
+   * on an older WordPress deploy). Kept locally only; not retried every sync.
+   */
+  private readonly unsupportedOnServer = new Set<VaultType>();
   /** Pending connectivity-triggered scheduling handle, if any. */
   private connectivityHandle: TimerHandle | null = null;
 
@@ -231,6 +268,9 @@ export class SyncWorker {
    * Enqueuing is idempotent — a partition is queued at most once.
    */
   enqueue(vaultType: VaultType): void {
+    if (this.unsupportedOnServer.has(vaultType)) {
+      return;
+    }
     this.queue.add(vaultType);
     // A fresh local change clears any stale "pending" indication; the partition
     // will be attempted again on the next sync pass.
@@ -290,6 +330,13 @@ export class SyncWorker {
    * sync and dequeued.
    */
   async syncPartition(vaultType: VaultType): Promise<SyncOutcome> {
+    if (this.unsupportedOnServer.has(vaultType)) {
+      this.queue.delete(vaultType);
+      this.pending.delete(vaultType);
+      const blob = await this.vault.readPartition(vaultType);
+      return { status: 'synced', newVersion: blob?.sync_version ?? 0 };
+    }
+
     const blob = await this.vault.readPartition(vaultType);
     if (blob === null) {
       // Nothing to push; consider the partition reconciled.
@@ -307,19 +354,33 @@ export class SyncWorker {
 
     let attempts = 0;
     let lastFailureStatus: number | null = null;
+    let lastFailureResponse: VaultPushResponse | null = null;
+    let lastNetworkError: string | null = null;
     while (attempts < this.maxAttempts) {
       attempts += 1;
       let response: VaultPushResponse | null = null;
       try {
         response = await this.http.postVault(vaultType, payload);
-      } catch {
-        // Transient failure (e.g. network drop). Retain the blob unchanged and
-        // retry until the attempt budget is exhausted.
+      } catch (cause) {
+        // Transient failure (e.g. network drop, CORS, auth header build). Retain the
+        // blob unchanged and retry until the attempt budget is exhausted.
         response = null;
         lastFailureStatus = null;
+        lastFailureResponse = null;
+        lastNetworkError = cause instanceof Error ? cause.message : String(cause);
       }
 
       if (response !== null) {
+        if (response.status === 0) {
+          lastFailureStatus = null;
+          lastFailureResponse = response;
+          lastNetworkError = response.errorMessage ?? 'network request failed before HTTP response';
+          if (isNonRetryableTransportError(response.errorMessage)) {
+            break;
+          }
+          continue;
+        }
+
         if (response.status >= 200 && response.status < 300) {
           // Accepted by the backend; the server returns the incremented version.
           this.queue.delete(vaultType);
@@ -342,7 +403,19 @@ export class SyncWorker {
           return outcome;
         }
 
+        if (isUnsupportedVaultTypeResponse(response)) {
+          this.unsupportedOnServer.add(vaultType);
+          this.queue.delete(vaultType);
+          this.pending.delete(vaultType);
+          console.warn(
+            `${formatPushFailure(response, vaultType)}. ` +
+              'Deploy the latest WordPress plugin to sync this partition; keeping data on device only.',
+          );
+          return { status: 'synced', newVersion: blob.sync_version };
+        }
+
         lastFailureStatus = response.status;
+        lastFailureResponse = response;
       }
 
       // Otherwise: a retryable failure. Loop again until attempts are exhausted.
@@ -354,13 +427,21 @@ export class SyncWorker {
     this.onSyncPending?.(vaultType, attempts);
     if (lastFailureStatus === 401 || lastFailureStatus === 403) {
       console.error(
-        `[SyncWorker] push for ${vaultType} failed with HTTP ${lastFailureStatus}. ` +
+        `${formatPushFailure(lastFailureResponse, vaultType)}. ` +
           'Check WordPress sign-in: use an Application Password from your user profile, not your login password.',
       );
+    } else if (lastFailureResponse?.status === 0) {
+      const detail = lastFailureResponse.errorMessage ?? lastNetworkError ?? 'network request failed';
+      console.error(
+        `[SyncWorker] push for ${vaultType} failed after ${attempts} attempts (transport error): ${detail}`,
+      );
     } else if (lastFailureStatus !== null) {
-      console.error(`[SyncWorker] push for ${vaultType} failed with HTTP ${lastFailureStatus}`);
+      console.error(formatPushFailure(lastFailureResponse, vaultType));
     } else {
-      console.error(`[SyncWorker] push for ${vaultType} failed after ${attempts} attempts (network error)`);
+      const detail = lastNetworkError ? `: ${lastNetworkError}` : '';
+      console.error(
+        `[SyncWorker] push for ${vaultType} failed after ${attempts} attempts (network error)${detail}`,
+      );
     }
     return { status: 'pending', attempts };
   }
