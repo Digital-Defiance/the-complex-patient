@@ -31,16 +31,21 @@ import {
   createAgeGateOnboarding,
   createAuthProvider,
   createDeviceIneligibilityFlagStore,
+  type MutableAuthProvider,
   createHomeEntry,
   createSyncWorker,
   createVaultHttpClient,
   createVaultStore,
+  createDeviceIdStorage,
+  getOrCreateDeviceId,
   type AgeGateOnboardingController,
   type DeviceFlagStorage,
   type FetchLike,
   type HomeEntryController,
 } from '@complex-patient/ui';
+import { createLocalStorageFlagStorage } from '../../device-flag-storage';
 import { inferAgeEligibleFromWebVault } from './infer-age-eligible';
+import { loadAuthFromSession, saveAuthToSession } from './auth-session-storage';
 
 /** Raised when the web app is loaded outside a secure (HTTPS) context (1.8). */
 export class SecureContextRequiredError extends Error {
@@ -124,11 +129,30 @@ export async function createWebHome(options: WebEntryOptions): Promise<HomeEntry
   // constructed with the centralized Crypto_Engine (Requirement 22.3).
   const store = createVaultStore({ vault, crypto: { encrypt, decrypt } });
 
-  const auth = createAuthProvider();
-  const http = createVaultHttpClient({ baseUrl: options.baseUrl, auth, fetch: options.fetch });
+  const auth = createWebAuthProvider();
+  const deviceIdStorage = createDeviceIdStorage(
+    options.ineligibilityStorage ?? createLocalStorageFlagStorage(),
+  );
+  const deviceId = await getOrCreateDeviceId(deviceIdStorage);
+  const http = createVaultHttpClient({
+    baseUrl: options.baseUrl,
+    auth,
+    fetch: options.fetch,
+    getDeviceId: () => deviceId,
+  });
   const syncWorker = createSyncWorker({ http, vault, keyStore });
 
-  controller = createHomeEntry({ keyStore, store, syncWorker, auth, idle, vault, vaultHttp: http });
+  controller = createHomeEntry({
+    keyStore,
+    store,
+    syncWorker,
+    auth,
+    idle,
+    vault,
+    vaultHttp: http,
+    getActiveKek: () => keyStore.getKek(),
+    deviceIdStorage,
+  });
 
   return controller;
 }
@@ -169,6 +193,18 @@ export function createWebApp(options: WebEntryOptions): WebApp {
   }
 
   return { onboarding, createHome };
+}
+
+/** Tab-session auth so reload within the same tab keeps sync credentials. */
+function createWebAuthProvider(): MutableAuthProvider {
+  const base = createAuthProvider(loadAuthFromSession());
+  return {
+    getAuth: () => base.getAuth(),
+    setAuth: (credential) => {
+      base.setAuth(credential);
+      saveAuthToSession(credential);
+    },
+  };
 }
 
 /**

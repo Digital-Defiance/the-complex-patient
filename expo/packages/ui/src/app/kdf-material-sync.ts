@@ -6,7 +6,7 @@
  * and KEK never cross the network (Requirements 1.3, 1.4).
  */
 
-import { generateSalt, type KdfParams } from '@complex-patient/crypto-engine';
+import { generateSalt, deriveKEK, type KdfParams, type CryptoKeyRef } from '@complex-patient/crypto-engine';
 
 export interface KdfMaterial {
   salt: Uint8Array;
@@ -61,6 +61,124 @@ function saltsEqual(left: Uint8Array, right: Uint8Array): boolean {
   return true;
 }
 
+function kdfParamsEqual(left: KdfParams, right: KdfParams): boolean {
+  const a = normalizeKdfParams(left);
+  const b = normalizeKdfParams(right);
+  if (a.algorithm !== b.algorithm) {
+    return false;
+  }
+  if (a.algorithm === 'PBKDF2' && b.algorithm === 'PBKDF2') {
+    return a.pbkdf2Iterations === b.pbkdf2Iterations;
+  }
+  return true;
+}
+
+function materialsEqual(left: KdfMaterial, right: KdfMaterial): boolean {
+  return saltsEqual(left.salt, right.salt) && kdfParamsEqual(left.params, right.params);
+}
+
+function uniqueMaterials(materials: KdfMaterial[]): KdfMaterial[] {
+  const seen = new Set<string>();
+  const out: KdfMaterial[] = [];
+  for (const material of materials) {
+    const normalized = {
+      salt: material.salt,
+      params: normalizeKdfParams(material.params),
+    };
+    const key = `${base64FromBytes(normalized.salt)}|${JSON.stringify(normalized.params)}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function orderKdfCandidates(
+  candidates: KdfMaterial[],
+  remote: KdfMaterial | null,
+  local: KdfMaterial | null,
+): KdfMaterial[] {
+  const ordered: KdfMaterial[] = [];
+  const pushUnique = (material: KdfMaterial | null) => {
+    if (!material) {
+      return;
+    }
+    if (!ordered.some((candidate) => materialsEqual(candidate, material))) {
+      ordered.push(material);
+    }
+  };
+  pushUnique(remote);
+  pushUnique(local);
+  for (const candidate of candidates) {
+    pushUnique(candidate);
+  }
+  return ordered;
+}
+
+export interface ResolveKdfMaterialForUnlockDeps extends ResolveKdfMaterialDeps {
+  passphrase: string;
+  /** When set, prefer the KDF candidate whose derived KEK decrypts remote vault blobs. */
+  verifyKekAgainstRemote?: (kek: CryptoKeyRef) => Promise<boolean>;
+}
+
+/**
+ * Resolve KDF material for unlock, optionally proving against remote ciphertext.
+ *
+ * Server-published KDF metadata can drift from the key that actually encrypted
+ * vault blobs (e.g. a device overwrote KDF settings but symptoms were encrypted
+ * earlier on web). When that happens, try every local/remote candidate and
+ * keep the one that decrypts server data.
+ */
+export async function resolveKdfMaterialForUnlock(
+  deps: ResolveKdfMaterialForUnlockDeps,
+): Promise<KdfMaterial> {
+  const local = await deps.loadLocal();
+  let remote: KdfMaterial | null = null;
+
+  try {
+    remote = (await deps.fetchRemote?.()) ?? null;
+  } catch {
+    // Offline or backend unavailable — fall back to standard resolution.
+  }
+
+  if (deps.verifyKekAgainstRemote) {
+    const candidates = orderKdfCandidates(
+      uniqueMaterials([local, remote].filter((material): material is KdfMaterial => material !== null)),
+      remote,
+      local,
+    );
+
+    for (const candidate of candidates) {
+      const derived = await deriveKEK(deps.passphrase, candidate.salt, candidate.params);
+      if (!derived.ok) {
+        continue;
+      }
+      if (await deps.verifyKekAgainstRemote(derived.kek)) {
+        if (!local || !materialsEqual(candidate, local)) {
+          await deps.saveLocal(candidate);
+        }
+        if (remote && !materialsEqual(candidate, remote)) {
+          try {
+            await deps.publishRemote?.(candidate);
+          } catch {
+            // Best effort: repair server KDF metadata for other devices.
+          }
+        }
+        console.log('[KdfMaterial] selected KDF that decrypts remote vault data');
+        return candidate;
+      }
+    }
+
+    console.warn(
+      '[KdfMaterial] no KDF candidate decrypts remote vault; falling back to standard resolution',
+    );
+  }
+
+  return resolveKdfMaterial(deps);
+}
+
 /**
  * Resolve the KDF material to use for this unlock attempt.
  *
@@ -77,13 +195,19 @@ export async function resolveKdfMaterial(deps: ResolveKdfMaterialDeps): Promise<
     // Offline or backend unavailable — fall back to local-only resolution.
   }
 
+  if (remote && local && saltsEqual(local.salt, remote.salt)) {
+    const params = normalizeKdfParams(remote.params);
+    const merged = { salt: local.salt, params };
+    if (!kdfParamsEqual(local.params, params)) {
+      await deps.saveLocal(merged);
+    }
+    return merged;
+  }
+
   if (remote && local && !saltsEqual(local.salt, remote.salt)) {
     if (deps.hasExistingVaultData && (await deps.hasExistingVaultData())) {
-      try {
-        await deps.publishRemote?.(local);
-      } catch {
-        // Best effort: keep unlocking with the local salt that matches this vault.
-      }
+      // Keep the local salt that matches on-device blobs; never publish it over
+      // the server copy (that orphans data encrypted on other devices).
       return local;
     }
     await deps.saveLocal(remote);

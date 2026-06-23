@@ -21,6 +21,10 @@ import { isWithinHomeArea } from '../../home-route-guard';
 
 const SYNC_BACKEND_BASE_URL = resolveSyncBackendBaseUrl();
 
+if (typeof console !== 'undefined' && typeof console.info === 'function') {
+  console.info(`[ComplexPatient] sync backend: ${SYNC_BACKEND_BASE_URL}`);
+}
+
 const webFactory: AppHostFactory = {
   createApp() {
     return createWebApp({

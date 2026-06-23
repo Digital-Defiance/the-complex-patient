@@ -90,6 +90,7 @@ function createMockDeps(overrides?: {
       unlockWithKek,
       fetchRemoteKdfMaterial: vi.fn(async () => null),
       publishKdfMaterial: vi.fn(async () => {}),
+      probeRemoteVaultDecrypt: vi.fn(async () => true),
     },
     loadKdfMaterial: vi.fn(async () => overrides?.kdfMaterial ?? null),
     saveKdfMaterial: vi.fn(async () => {}),

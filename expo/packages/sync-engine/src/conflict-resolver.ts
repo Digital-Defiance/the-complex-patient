@@ -28,14 +28,14 @@
  * new live partition and the new last-common-synced base.
  */
 
-import type { VaultRecord, VaultType, PartitionPayload } from '@complex-patient/domain';
+import type { VaultRecord, VaultType } from '@complex-patient/domain';
 import type { VaultBlob } from '@complex-patient/local-vault';
 import type {
   CryptoKeyRef,
   EncryptedPayload,
-  DecryptResult,
 } from '@complex-patient/crypto-engine';
 import { threeWayMerge } from './merge';
+import { decryptPartitionRecords, toEncryptedPayload } from './vault-blob-records';
 import {
   realTimer,
   type ConflictResolver,
@@ -174,39 +174,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number, timer: Timer): Promise<
 }
 
 /** Map a stored {@link VaultBlob} to the Crypto_Engine {@link EncryptedPayload}. */
-function toEncryptedPayload(blob: {
+function toEncryptedPayloadFromBlob(blob: {
   iv: string;
   auth_tag: string;
   ciphertext: string;
 }): EncryptedPayload {
-  return { iv: blob.iv, authTag: blob.auth_tag, ciphertext: blob.ciphertext };
-}
-
-/**
- * Decrypt + verify an encrypted envelope and parse its partition records.
- * Returns `null` when verification fails or the plaintext is not a valid
- * {@link PartitionPayload}; never returns partial plaintext (Requirements 8.3,
- * 8.4, mirroring 2.4–2.6).
- */
-async function decryptRecords(
-  envelope: EncryptedPayload,
-  crypto: ConflictCrypto,
-  kek: CryptoKeyRef,
-): Promise<VaultRecord[] | null> {
-  const result = await crypto.decrypt(envelope, kek);
-  if (!result.ok) {
-    return null;
-  }
-  try {
-    const text = new TextDecoder().decode(result.plaintext);
-    const parsed = JSON.parse(text) as PartitionPayload<VaultRecord>;
-    if (parsed == null || typeof parsed !== 'object' || !Array.isArray(parsed.records)) {
-      return null;
-    }
-    return parsed.records;
-  } catch {
-    return null;
-  }
+  return toEncryptedPayload(blob);
 }
 
 /**
@@ -243,7 +216,11 @@ export function createConflictResolver(deps: ConflictResolverDeps): ConflictReso
       // retain (there is nothing to lose).
       return fail(vaultType, 'LOCAL_DECRYPT_FAILED');
     }
-    const localRecords = await decryptRecords(toEncryptedPayload(localBlob), deps.crypto, deps.kek);
+    const localRecords = await decryptPartitionRecords(
+      toEncryptedPayloadFromBlob(localBlob),
+      deps.crypto,
+      deps.kek,
+    );
     if (localRecords === null) {
       return fail(vaultType, 'LOCAL_DECRYPT_FAILED');
     }
@@ -252,8 +229,8 @@ export function createConflictResolver(deps: ConflictResolverDeps): ConflictReso
     const baseBlob = await deps.vault.readBase(vaultType);
     let baseRecords: VaultRecord[] = [];
     if (baseBlob !== null) {
-      const decodedBase = await decryptRecords(
-        toEncryptedPayload(baseBlob),
+      const decodedBase = await decryptPartitionRecords(
+        toEncryptedPayloadFromBlob(baseBlob),
         deps.crypto,
         deps.kek,
       );
@@ -285,8 +262,8 @@ export function createConflictResolver(deps: ConflictResolverDeps): ConflictReso
       }
 
       // -- Step 2: decrypt + integrity-verify the fetched blob (8.3, 8.4) -----
-      const remoteRecords = await decryptRecords(
-        toEncryptedPayload({
+      const remoteRecords = await decryptPartitionRecords(
+        toEncryptedPayloadFromBlob({
           iv: fetched.iv,
           auth_tag: fetched.auth_tag,
           ciphertext: fetched.ciphertext,

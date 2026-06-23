@@ -91,7 +91,7 @@ final class ActivationTest extends TestCase
 
         Activation::ensureSchema();
 
-        $this->assertCount(2, $wpdb->dbDeltaCalls);
+        $this->assertCount(3, $wpdb->dbDeltaCalls);
         $this->assertSame([], $wpdb->droppedTables);
     }
 
@@ -102,10 +102,11 @@ final class ActivationTest extends TestCase
 
         Activation::activate();
 
-        // Requirement 9.1: dbDelta is invoked to create the vault and KDF tables.
-        $this->assertCount(2, $wpdb->dbDeltaCalls);
+        // Requirement 9.1: dbDelta is invoked to create the vault, KDF, and device tables.
+        $this->assertCount(3, $wpdb->dbDeltaCalls);
         $this->assertStringContainsString('wp_complex_patient_vault', $wpdb->dbDeltaCalls[0]);
         $this->assertStringContainsString('wp_complex_patient_kdf', $wpdb->dbDeltaCalls[1]);
+        $this->assertStringContainsString('wp_complex_patient_device', $wpdb->dbDeltaCalls[2]);
         // No partial-table cleanup needed on success.
         $this->assertSame([], $wpdb->droppedTables);
     }

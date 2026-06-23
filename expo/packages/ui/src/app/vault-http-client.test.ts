@@ -92,7 +92,9 @@ describe('createVaultHttpClient — authentication (4.1, 4.3)', () => {
       fetch: fetchImpl,
     });
 
-    await expect(client.postVault('medications', ENVELOPE)).rejects.toThrow(/not authenticated/i);
+    const res = await client.postVault('medications', ENVELOPE);
+    expect(res.status).toBe(0);
+    expect(res.errorMessage).toMatch(/not authenticated/i);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
@@ -113,6 +115,25 @@ describe('createVaultHttpClient — blind envelope only (4.6, 4.8)', () => {
     const parsed = JSON.parse(init.body as string);
     expect(Object.keys(parsed).sort()).toEqual(['auth_tag', 'ciphertext', 'iv', 'sync_version']);
     expect(parsed).toEqual(ENVELOPE);
+    expect(init.headers['X-Device-Id']).toBeUndefined();
+  });
+
+  it('includes device_id in the POST body when getDeviceId is set', async () => {
+    const fetchImpl = okFetch({ sync_version: 4 });
+    const auth = createAuthProvider({ kind: 'jwt', token: 't' });
+    const client = createVaultHttpClient({
+      baseUrl: 'https://patient.example.com',
+      auth,
+      fetch: fetchImpl,
+      getDeviceId: () => 'device-abc',
+    });
+
+    await client.postVault('symptoms', ENVELOPE);
+
+    const [, init] = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0];
+    const parsed = JSON.parse(init.body as string);
+    expect(parsed.device_id).toBe('device-abc');
+    expect(init.headers['X-Device-Id']).toBeUndefined();
   });
 
   it('returns the server sync_version from a 200 POST', async () => {

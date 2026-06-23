@@ -73,9 +73,10 @@ export interface KekCodec {
 }
 
 /**
- * Secure, biometric-gated key persistence — modeled on `expo-secure-store`
- * with `requireAuthentication`. Stores the serialized KEK inside the device
- * Secure Enclave (Requirement 3.1).
+ * Secure key persistence — modeled on `expo-secure-store`. Stores the serialized
+ * KEK inside the device Secure Enclave (Requirement 3.1). Biometric gating is
+ * enforced by {@link NativeSessionKeyStore} via {@link BiometricAdapter}, not
+ * necessarily by SecureStore `requireAuthentication`.
  */
 export interface SecureStoreAdapter {
   setKek(serialized: string): Promise<void>;

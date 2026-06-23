@@ -18,8 +18,15 @@ export type {
   FetchLike,
   FetchLikeResponse,
   VaultHttpClientDeps,
+  DevicePushRegistration,
 } from './vault-http-client';
-export { createVaultHttpClient } from './vault-http-client';
+export { createVaultHttpClient, VAULT_HTTP_TRANSPORT_ERROR } from './vault-http-client';
+export {
+  DEVICE_ID_STORAGE_KEY,
+  createDeviceIdStorage,
+  getOrCreateDeviceId,
+} from './device-id';
+export type { DeviceIdStorage } from './device-id';
 export { createSyncWorker } from './sync-worker';
 export type { ActiveKekSource, CreateSyncWorkerDeps } from './sync-worker';
 

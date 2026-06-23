@@ -4,7 +4,20 @@
  * Sync_Worker, offline queue, three-way merge, and optimistic concurrency.
  */
 
-export { threeWayMerge } from './merge';
+export { threeWayMerge, recordsSetsEqual } from './merge';
+
+export {
+  reconcilePartitionWithRemote,
+} from './partition-reconcile';
+export type {
+  ReconcileVault,
+  ReconcileCrypto,
+  ReconcilePartitionOutcome,
+  ReconcilePartitionFailureReason,
+} from './partition-reconcile';
+
+export { decryptPartitionRecords, toEncryptedPayload } from './vault-blob-records';
+export type { VaultBlobCrypto } from './vault-blob-records';
 
 export {
   SyncWorker,

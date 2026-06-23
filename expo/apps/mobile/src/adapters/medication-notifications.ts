@@ -2,6 +2,8 @@
  * Native local notification scheduling for medication doses.
  */
 
+import { isRunningInExpoGo } from 'expo';
+import { Platform } from 'react-native';
 import type { MedicationProfile } from '@complex-patient/domain';
 import {
   buildMedicationNotificationTriggers,
@@ -11,6 +13,11 @@ import {
 export async function syncMedicationNotifications(
   medications: readonly MedicationProfile[],
 ): Promise<void> {
+  // expo-notifications throws on import in Expo Go on Android (SDK 53+).
+  if (Platform.OS === 'android' && isRunningInExpoGo()) {
+    return;
+  }
+
   try {
     const Notifications = await import('expo-notifications');
     await Notifications.requestPermissionsAsync();

@@ -246,6 +246,21 @@ describe('SyncWorker — retry then pending (Requirement 5.8)', () => {
     worker.enqueue(VAULT);
     expect(worker.isPending(VAULT)).toBe(false);
   });
+
+  it('does not retry when the transport error is not authenticated', async () => {
+    const http: VaultHttpClient = {
+      async postVault() {
+        return {
+          status: 0,
+          errorCode: 'transport_error',
+          errorMessage: 'not authenticated: a Sync_Backend credential is required',
+        };
+      },
+    };
+    const worker = new SyncWorker({ http, vault: stubVault(makeBlob()) });
+    const outcome = await worker.syncPartition(VAULT);
+    expect(outcome).toEqual({ status: 'pending', attempts: 1 });
+  });
 });
 
 describe('SyncWorker — 409 delegates to the conflict resolver seam (task 8.7)', () => {
@@ -276,6 +291,33 @@ describe('SyncWorker — 409 delegates to the conflict resolver seam (task 8.7)'
     const worker = new SyncWorker({ http, vault: stubVault(makeBlob()) });
     const outcome = await worker.syncPartition(VAULT);
     expect(outcome).toEqual({ status: 'conflict-failed' });
+  });
+});
+
+describe('SyncWorker — unsupported vault types on older backends', () => {
+  it('stops retrying when the server does not recognize the partition', async () => {
+    const http: VaultHttpClient & { calls: number } = {
+      calls: 0,
+      async postVault() {
+        this.calls += 1;
+        return {
+          status: 400,
+          errorCode: 'complex_patient_unrecognized_vault_type',
+          errorMessage: '"locationTrail" is not a recognized vault_type.',
+        };
+      },
+    };
+    const worker = new SyncWorker({ http, vault: stubVault(makeBlob({ sync_version: 2 })) });
+    worker.enqueue('locationTrail');
+    const outcome = await worker.syncPartition('locationTrail');
+
+    expect(http.calls).toBe(1);
+    expect(outcome).toEqual({ status: 'synced', newVersion: 2 });
+    expect(worker.isQueued('locationTrail')).toBe(false);
+    expect(worker.isPending('locationTrail')).toBe(false);
+
+    worker.enqueue('locationTrail');
+    expect(worker.isQueued('locationTrail')).toBe(false);
   });
 });
 

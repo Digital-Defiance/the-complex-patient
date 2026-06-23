@@ -3,7 +3,7 @@
  * Plugin Name: The Complex Patient
  * Plugin URI:  https://thecomplexpatient.com
  * Description: Zero-knowledge blind sync backend for The Complex Patient encrypted health platform. Stores and serves opaque encrypted vault blobs without access to plaintext PHI.
- * Version:     0.0.1
+ * Version:     0.0.2
  * Author:      The Complex Patient
  * Author URI:  https://thecomplexpatient.com
  * License:     GPL-2.0-or-later
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'COMPLEX_PATIENT_VERSION', '0.0.1' );
+define( 'COMPLEX_PATIENT_VERSION', '0.0.2' );
 define( 'COMPLEX_PATIENT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'COMPLEX_PATIENT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -75,15 +75,25 @@ add_action(
 
         $auth = new \ComplexPatient\Auth\AuthMiddleware();
 
+        $deviceRepository = new \ComplexPatient\DeviceRepository( $wpdb );
+        $vaultNotifier    = new \ComplexPatient\Notification\ExpoPushVaultUpdateNotifier( $deviceRepository );
+
         $kdfController = new \ComplexPatient\Rest\KdfMaterialController(
             new \ComplexPatient\KdfMaterialRepository( $wpdb ),
             $auth
         );
         $kdfController->registerRoutes();
 
+        $deviceController = new \ComplexPatient\Rest\DeviceController(
+            $deviceRepository,
+            $auth
+        );
+        $deviceController->registerRoutes();
+
         $vaultController = new \ComplexPatient\Rest\VaultController(
             new \ComplexPatient\VaultRepository( $wpdb ),
-            $auth
+            $auth,
+            $vaultNotifier
         );
         $vaultController->registerRoutes();
     }

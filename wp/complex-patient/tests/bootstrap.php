@@ -184,6 +184,9 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
         /** @var array<string,mixed> */
         private array $params;
 
+        /** @var array<string,string> */
+        private array $headers = [];
+
         /**
          * @param array<string,mixed> $params
          */
@@ -200,6 +203,19 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
         public function set_param( string $key, $value ): void
         {
             $this->params[ $key ] = $value;
+        }
+
+        public function get_header( string $key )
+        {
+            $normalized = strtolower( str_replace( '_', '-', $key ) );
+
+            return $this->headers[ $normalized ] ?? null;
+        }
+
+        public function set_header( string $key, string $value ): void
+        {
+            $normalized = strtolower( str_replace( '_', '-', $key ) );
+            $this->headers[ $normalized ] = $value;
         }
     }
 }

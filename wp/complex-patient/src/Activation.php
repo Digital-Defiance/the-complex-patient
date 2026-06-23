@@ -29,6 +29,11 @@ final class Activation
     public const KDF_TABLE_BASENAME = 'complex_patient_kdf';
 
     /**
+     * Unprefixed base name of the device push registration table.
+     */
+    public const DEVICE_TABLE_BASENAME = 'complex_patient_device';
+
+    /**
      * Build the CREATE TABLE statement for the vault table.
      *
      * This is a pure function (no WordPress dependencies) so the schema can be
@@ -83,6 +88,30 @@ final class Activation
     }
 
     /**
+     * Build the CREATE TABLE statement for the device registration table.
+     *
+     * @param string $tableName      Fully prefixed table name.
+     * @param string $charsetCollate Result of wpdb::get_charset_collate(), may be empty.
+     */
+    public static function buildDeviceSchemaSql(string $tableName, string $charsetCollate = ''): string
+    {
+        $suffix = '' === $charsetCollate ? '' : ' ' . $charsetCollate;
+
+        return "CREATE TABLE {$tableName} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  wp_user_id bigint(20) unsigned NOT NULL,
+  device_id varchar(64) NOT NULL,
+  platform varchar(16) NOT NULL,
+  push_token varchar(512) NOT NULL,
+  push_provider varchar(32) NOT NULL,
+  last_seen_at datetime NOT NULL,
+  server_updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY  (id),
+  UNIQUE KEY uniq_user_device (wp_user_id, device_id)
+){$suffix};";
+    }
+
+    /**
      * Resolve the fully prefixed vault table name from the global $wpdb.
      */
     public static function tableName(\wpdb $wpdb): string
@@ -96,6 +125,14 @@ final class Activation
     public static function kdfTableName(\wpdb $wpdb): string
     {
         return $wpdb->prefix . self::KDF_TABLE_BASENAME;
+    }
+
+    /**
+     * Resolve the fully prefixed device registration table name.
+     */
+    public static function deviceTableName(\wpdb $wpdb): string
+    {
+        return $wpdb->prefix . self::DEVICE_TABLE_BASENAME;
     }
 
     /**
@@ -139,12 +176,28 @@ final class Activation
 
         $charsetCollate = $wpdb->get_charset_collate();
         $tables         = [
-            self::tableName($wpdb)    => self::buildSchemaSql(self::tableName($wpdb), $charsetCollate),
-            self::kdfTableName($wpdb) => self::buildKdfSchemaSql(self::kdfTableName($wpdb), $charsetCollate),
+            self::tableName($wpdb)       => self::buildSchemaSql(self::tableName($wpdb), $charsetCollate),
+            self::kdfTableName($wpdb)    => self::buildKdfSchemaSql(self::kdfTableName($wpdb), $charsetCollate),
+            self::deviceTableName($wpdb) => self::buildDeviceSchemaSql(self::deviceTableName($wpdb), $charsetCollate),
         ];
 
         foreach ($tables as $tableName => $sql) {
-            self::ensureTable($wpdb, $tableName, $sql, $haltOnFailure);
+            try {
+                self::ensureTable($wpdb, $tableName, $sql, $haltOnFailure);
+            } catch (\Throwable $exception) {
+                if ($haltOnFailure) {
+                    throw $exception;
+                }
+
+                if (function_exists('error_log')) {
+                    error_log(
+                        '[Complex Patient] ensureSchema failed for '
+                        . $tableName
+                        . ': '
+                        . $exception->getMessage()
+                    );
+                }
+            }
         }
     }
 

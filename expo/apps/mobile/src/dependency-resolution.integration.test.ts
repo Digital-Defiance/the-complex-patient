@@ -101,9 +101,8 @@ describe('app.json Schema Load (Requirements 2.6, 2.7)', () => {
       expect(expoConfig.slug.length).toBeGreaterThan(0);
     });
 
-    it('has an sdkVersion', () => {
-      expect(expoConfig.sdkVersion).toBeDefined();
-      expect(expoConfig.sdkVersion.length).toBeGreaterThan(0);
+    it('does not declare a stale sdkVersion (SDK comes from the expo package)', () => {
+      expect(expoConfig.sdkVersion).toBeUndefined();
     });
 
     it('declares ios, android, and web as platforms', () => {
@@ -130,13 +129,12 @@ describe('app.json Schema Load (Requirements 2.6, 2.7)', () => {
     });
   });
 
-  describe('sdkVersion major matches installed expo major (2.2)', () => {
-    it('sdkVersion major equals the expo package major version', () => {
+  describe('installed expo major matches SDK 56 (2.2)', () => {
+    it('expo package major is 56', () => {
       const rootPkg = JSON.parse(readFileSync(ROOT_PKG_PATH, 'utf-8'));
       const expoVersion: string = rootPkg.dependencies.expo;
       const expoMajor = parseInt(expoVersion.split('.')[0], 10);
-      const sdkMajor = parseInt(expoConfig.sdkVersion.split('.')[0], 10);
-      expect(sdkMajor).toBe(expoMajor);
+      expect(expoMajor).toBe(56);
     });
   });
 
@@ -151,15 +149,8 @@ describe('app.json Schema Load (Requirements 2.6, 2.7)', () => {
       expect(modified.slug).toBeUndefined();
     });
 
-    it('removing sdkVersion from config is detectable', () => {
-      const modified = { ...expoConfig, sdkVersion: undefined };
-      expect(modified.sdkVersion).toBeUndefined();
-    });
-
-    it('validates that all three fields are required for a valid config', () => {
-      // A valid Expo config requires name, slug, and sdkVersion.
-      // This test asserts the structural requirement.
-      const requiredFields = ['name', 'slug', 'sdkVersion'] as const;
+    it('validates that name and slug are required for a valid config', () => {
+      const requiredFields = ['name', 'slug'] as const;
       const missingFields = requiredFields.filter((f) => !expoConfig[f]);
       expect(
         missingFields,
