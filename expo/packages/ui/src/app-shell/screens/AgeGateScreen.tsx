@@ -16,8 +16,116 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ActivityIndicator,
+  StyleSheet,
+  KeyboardAvoidingView,
+  ScrollView,
+  Keyboard,
+  Platform,
+} from 'react-native';
 import { useAppHost } from '../app-host';
+import {
+  IosKeyboardDoneAccessory,
+  keyboardDoneAccessoryProps,
+} from '../ios-keyboard-done-accessory';
+
+function AgeGateForm({
+  reprompt,
+  submitting,
+  birthMonth,
+  birthYear,
+  onChangeBirthMonth,
+  onChangeBirthYear,
+  onSubmit,
+}: {
+  reprompt: boolean;
+  submitting: boolean;
+  birthMonth: string;
+  birthYear: string;
+  onChangeBirthMonth: (value: string) => void;
+  onChangeBirthYear: (value: string) => void;
+  onSubmit: () => void;
+}): React.ReactElement {
+  return (
+    <>
+      <IosKeyboardDoneAccessory />
+
+      <Text style={styles.title}>Age Verification</Text>
+      <Text style={styles.subtitle}>
+        Please enter your birth month and year to continue.
+      </Text>
+
+      {reprompt && (
+        <Text
+          style={styles.reprompt}
+          accessibilityRole="alert"
+          testID="age-gate-reprompt"
+        >
+          The information entered is not valid. Please check your birth month and
+          year and try again.
+        </Text>
+      )}
+
+      <View style={styles.inputColumn}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label} nativeID="birth-month-label">
+            Birth Month (1–12)
+          </Text>
+          <TextInput
+            style={styles.input}
+            value={birthMonth}
+            onChangeText={onChangeBirthMonth}
+            keyboardType="number-pad"
+            maxLength={2}
+            placeholder="MM"
+            accessibilityLabelledBy={'birth-month-label' as unknown as string}
+            accessibilityLabel="Birth month"
+            testID="age-gate-birth-month"
+            {...keyboardDoneAccessoryProps()}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label} nativeID="birth-year-label">
+            Birth Year (4 digits)
+          </Text>
+          <TextInput
+            style={styles.input}
+            value={birthYear}
+            onChangeText={onChangeBirthYear}
+            keyboardType="number-pad"
+            maxLength={4}
+            placeholder="YYYY"
+            accessibilityLabelledBy={'birth-year-label' as unknown as string}
+            accessibilityLabel="Birth year"
+            testID="age-gate-birth-year"
+            {...keyboardDoneAccessoryProps()}
+          />
+        </View>
+      </View>
+
+      <Pressable
+        style={[styles.button, submitting && styles.buttonDisabled]}
+        onPress={onSubmit}
+        disabled={submitting}
+        accessibilityRole="button"
+        accessibilityLabel="Submit age verification"
+        testID="age-gate-submit"
+      >
+        {submitting ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Continue</Text>
+        )}
+      </Pressable>
+    </>
+  );
+}
 
 export function AgeGateScreen(): React.ReactElement {
   const { onboarding, enterHome, startFailed, submitAge } = useAppHost();
@@ -28,6 +136,7 @@ export function AgeGateScreen(): React.ReactElement {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = useCallback(async () => {
+    Keyboard.dismiss();
     setReprompt(false);
     setSubmitting(true);
 
@@ -69,78 +178,49 @@ export function AgeGateScreen(): React.ReactElement {
   }
 
   return (
-    <View style={styles.container} testID="age-gate-screen">
-      <Text style={styles.title}>Age Verification</Text>
-      <Text style={styles.subtitle}>
-        Please enter your birth month and year to continue.
-      </Text>
-
-      {reprompt && (
-        <Text
-          style={styles.reprompt}
-          accessibilityRole="alert"
-          testID="age-gate-reprompt"
-        >
-          The information entered is not valid. Please check your birth month and
-          year and try again.
-        </Text>
-      )}
-
-      <View style={styles.inputRow}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label} nativeID="birth-month-label">
-            Birth Month (1–12)
-          </Text>
-          <TextInput
-            style={styles.input}
-            value={birthMonth}
-            onChangeText={setBirthMonth}
-            keyboardType="number-pad"
-            maxLength={2}
-            placeholder="MM"
-            accessibilityLabelledBy={'birth-month-label' as unknown as string}
-            accessibilityLabel="Birth month"
-            testID="age-gate-birth-month"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label} nativeID="birth-year-label">
-            Birth Year (4 digits)
-          </Text>
-          <TextInput
-            style={styles.input}
-            value={birthYear}
-            onChangeText={setBirthYear}
-            keyboardType="number-pad"
-            maxLength={4}
-            placeholder="YYYY"
-            accessibilityLabelledBy={'birth-year-label' as unknown as string}
-            accessibilityLabel="Birth year"
-            testID="age-gate-birth-year"
-          />
-        </View>
-      </View>
-
-      <Pressable
-        style={[styles.button, submitting && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={submitting}
-        accessibilityRole="button"
-        accessibilityLabel="Submit age verification"
-        testID="age-gate-submit"
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      testID="age-gate-screen"
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       >
-        {submitting ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Continue</Text>
-        )}
-      </Pressable>
-    </View>
+        <View style={styles.scrollInner}>
+          <AgeGateForm
+            reprompt={reprompt}
+            submitting={submitting}
+            birthMonth={birthMonth}
+            birthYear={birthYear}
+            onChangeBirthMonth={setBirthMonth}
+            onChangeBirthYear={setBirthYear}
+            onSubmit={handleSubmit}
+          />
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 32,
+    paddingBottom: 48,
+  },
+  scrollInner: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    alignItems: 'stretch',
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -164,7 +244,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#555',
     marginBottom: 24,
-    maxWidth: 400,
   },
   reprompt: {
     fontSize: 14,
@@ -174,16 +253,14 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
     textAlign: 'center',
-    maxWidth: 400,
   },
-  inputRow: {
-    flexDirection: 'row',
+  inputColumn: {
+    width: '100%',
     gap: 16,
     marginBottom: 24,
   },
   inputGroup: {
-    flex: 1,
-    maxWidth: 160,
+    width: '100%',
   },
   label: {
     fontSize: 14,
@@ -200,6 +277,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'center',
     color: '#1a1a1a',
+    minHeight: 48,
   },
   button: {
     backgroundColor: '#0066cc',
@@ -208,6 +286,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     minWidth: 160,
     alignItems: 'center',
+    alignSelf: 'center',
   },
   buttonDisabled: {
     opacity: 0.6,

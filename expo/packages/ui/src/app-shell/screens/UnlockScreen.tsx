@@ -26,9 +26,25 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  KeyboardAvoidingView,
+  ScrollView,
+  Keyboard,
+} from 'react-native';
 import { PASSKEY_SETUP_SESSION_KEY } from '@complex-patient/key-store';
 import { useAppHost } from '../app-host';
+import {
+  IosKeyboardDoneAccessory,
+  keyboardDoneAccessoryProps,
+} from '../ios-keyboard-done-accessory';
 import { deriveKEK, type KdfParams, type CryptoKeyRef } from '@complex-patient/crypto-engine';
 import { resolveKdfMaterialForUnlock, bytesFromBase64, base64FromBytes, KdfMaterialMissingError, normalizeKdfParams } from '../../app/kdf-material-sync';
 
@@ -387,6 +403,7 @@ export function UnlockScreen({
   const handleSubmit = useCallback(async () => {
     if (!home) return;
 
+    Keyboard.dismiss();
     setError(null);
     setLoading(true);
     setLoadingMessage('Deriving encryption key… This can take a minute or so.');
@@ -548,11 +565,21 @@ export function UnlockScreen({
   }, [home, refreshHomeStatus]);
 
   return (
-    <View
-      style={styles.container}
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       accessibilityRole="none"
       accessibilityLabel="Unlock vault"
     >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        testID="unlock-screen"
+      >
+        <View style={styles.form}>
+          <IosKeyboardDoneAccessory />
+
       <Text style={styles.title}>Unlock Your Vault</Text>
       <Text style={styles.subtitle}>
         {showPassphraseInput
@@ -670,8 +697,13 @@ export function UnlockScreen({
             autoCapitalize="none"
             autoCorrect={false}
             editable={!loading}
+            returnKeyType="done"
+            onSubmitEditing={() => {
+              void handleSubmit();
+            }}
             accessibilityLabel="Master Passphrase"
             testID="unlock-passphrase"
+            {...keyboardDoneAccessoryProps()}
           />
 
           <Pressable
@@ -706,7 +738,9 @@ export function UnlockScreen({
           <Text style={styles.linkText}>Use passphrase instead</Text>
         </Pressable>
       )}
-    </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -715,6 +749,22 @@ export function UnlockScreen({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 32,
+    paddingBottom: 48,
+  },
+  form: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    alignItems: 'stretch',
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -727,13 +777,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 8,
     color: '#1a1a1a',
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     color: '#555',
     marginBottom: 12,
     textAlign: 'center',
-    maxWidth: 320,
   },
   hint: {
     fontSize: 14,
@@ -758,12 +808,12 @@ const styles = StyleSheet.create({
   },
   input: {
     width: '100%',
-    maxWidth: 320,
-    height: 48,
+    minHeight: 48,
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 8,
     paddingHorizontal: 16,
+    paddingVertical: 12,
     marginBottom: 12,
     fontSize: 16,
     backgroundColor: '#fafafa',
