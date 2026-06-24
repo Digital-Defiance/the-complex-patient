@@ -340,6 +340,7 @@ export function UnlockScreen({
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const [showPassphraseInput, setShowPassphraseInput] = useState(!quickUnlockAvailable);
+  const [hasStoredUnlockKey, setHasStoredUnlockKey] = useState(false);
   const [preferPassphrase, setPreferPassphrase] = useState(false);
   const [enablePasskeyAfterUnlock, setEnablePasskeyAfterUnlock] = useState(true);
   const [corruptPartitionOffer, setCorruptPartitionOffer] = useState<string | null>(null);
@@ -349,6 +350,28 @@ export function UnlockScreen({
       setShowPassphraseInput(false);
     }
   }, [passkeyAvailable, preferPassphrase]);
+
+  useEffect(() => {
+    if (!home || !biometricAvailable || preferPassphrase) {
+      setHasStoredUnlockKey(false);
+      return;
+    }
+
+    let cancelled = false;
+    void home.hasStoredUnlockKey().then((stored) => {
+      if (cancelled) {
+        return;
+      }
+      setHasStoredUnlockKey(stored);
+      if (stored) {
+        setShowPassphraseInput(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [home, biometricAvailable, preferPassphrase]);
 
   const queuePasskeySetupOffer = useCallback(() => {
     if (!enablePasskeyAfterUnlock || !offerPasskeySetup) {
@@ -392,6 +415,16 @@ export function UnlockScreen({
           return;
         }
         queuePasskeySetupOffer();
+        if (Platform.OS !== 'web' && biometricAvailable) {
+          void home.hasStoredUnlockKey().then((stored) => {
+            if (stored) {
+              Alert.alert(
+                'Biometric unlock ready',
+                'Next time, use Unlock with Biometrics instead of re-entering your master passphrase.',
+              );
+            }
+          });
+        }
         refreshHomeStatus();
         return;
       }
@@ -596,6 +629,23 @@ export function UnlockScreen({
       {/* Passphrase re-entry path — shown initially (no quick unlock) or on fallback */}
       {showPassphraseInput && (
         <>
+          {hasStoredUnlockKey && biometricAvailable && (
+            <Pressable
+              style={[styles.secondaryButton, loading && styles.buttonDisabled]}
+              onPress={handleBiometric}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Unlock with biometrics"
+              testID="unlock-biometric-inline"
+            >
+              {loading ? (
+                <ActivityIndicator color="#0066cc" />
+              ) : (
+                <Text style={styles.secondaryButtonText}>Unlock with Biometrics</Text>
+              )}
+            </Pressable>
+          )}
+
           {offerPasskeySetup && (
             <Pressable
               style={styles.checkboxRow}

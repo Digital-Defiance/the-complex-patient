@@ -40,6 +40,7 @@ import {
   type SyncWorkerLike,
 } from '../store/offline-sync';
 import { bindStoreToLock, type IdleController, type LockBinding } from '../store/lock-binding';
+import { suspendBackgroundLock } from '../app-shell/background-lock-session';
 import type { CommitResult, VaultStore } from '../store/vault-store';
 import { PHI_VAULT_TYPES, type PartitionProjection } from '../store/types';
 import type { MutableAuthProvider, WordPressAuth } from './auth';
@@ -202,6 +203,9 @@ export interface HomeEntryController {
 
   /** Whether any encrypted PHI partition exists on this device. */
   hasExistingVaultData(): Promise<boolean>;
+
+  /** Whether a platform quick-unlock key is stored (biometrics on native). */
+  hasStoredUnlockKey(): Promise<boolean>;
 
   /** Web-only: whether passkey fast unlock is supported in this browser. */
   isPasskeyUnlockAvailable?(): boolean;
@@ -569,6 +573,7 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     if (auth.getAuth() === null) {
       return { ok: false, reason: 'NOT_AUTHENTICATED' };
     }
+    const endBackgroundLockSuspension = suspendBackgroundLock();
     try {
       await keyStore.store(kek);
       const result = await hydrateReady(kek, options?.quarantinePartitions ?? []);
@@ -581,6 +586,8 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
       const message = cause instanceof Error ? cause.message : String(cause);
       console.error('[HomeEntry] unlockWithKek failed:', message);
       return { ok: false, reason: 'PASSPHRASE_REQUIRED' };
+    } finally {
+      endBackgroundLockSuspension();
     }
   }
 
@@ -588,11 +595,16 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     if (auth.getAuth() === null) {
       return { ok: false, reason: 'NOT_AUTHENTICATED' };
     }
-    const result = await keyStore.unlock();
-    if (!result.ok) {
-      return { ok: false, reason: result.reason };
+    const endBackgroundLockSuspension = suspendBackgroundLock();
+    try {
+      const result = await keyStore.unlock();
+      if (!result.ok) {
+        return { ok: false, reason: result.reason };
+      }
+      return hydrateReady(result.kek);
+    } finally {
+      endBackgroundLockSuspension();
     }
-    return hydrateReady(result.kek);
   }
 
   function read<T extends VaultRecord>(vaultType: VaultType) {
@@ -625,6 +637,7 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     isPasskeyUnlockAvailable?: () => boolean;
     hasPasskeyUnlock?: () => boolean;
     enablePasskeyUnlock?: () => Promise<{ ok: true } | { ok: false; message: string }>;
+    hasStoredUnlockKey?: () => Promise<boolean>;
   };
 
   const passkeyKeyStore = keyStore as PasskeyCapableKeyStore;
@@ -642,6 +655,13 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
       return { ok: false, message: 'Passkey unlock is not available on this platform.' };
     }
     return passkeyKeyStore.enablePasskeyUnlock();
+  }
+
+  async function hasStoredUnlockKey(): Promise<boolean> {
+    if (passkeyKeyStore.hasStoredUnlockKey) {
+      return passkeyKeyStore.hasStoredUnlockKey();
+    }
+    return false;
   }
 
   function dispose(): void {
@@ -669,6 +689,7 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     publishKdfMaterial,
     probeRemoteVaultDecrypt: probeRemoteVaultDecryptForUnlock,
     hasExistingVaultData,
+    hasStoredUnlockKey,
     isPasskeyUnlockAvailable,
     hasPasskeyUnlock,
     enablePasskeyUnlock,

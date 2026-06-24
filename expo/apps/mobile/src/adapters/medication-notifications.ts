@@ -4,6 +4,7 @@
 
 import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
+import { suspendBackgroundLock } from '@complex-patient/ui';
 import type { MedicationProfile } from '@complex-patient/domain';
 import {
   buildMedicationNotificationTriggers,
@@ -20,7 +21,16 @@ export async function syncMedicationNotifications(
 
   try {
     const Notifications = await import('expo-notifications');
-    await Notifications.requestPermissionsAsync();
+    const endBackgroundLockSuspension = suspendBackgroundLock();
+    let permission;
+    try {
+      permission = await Notifications.requestPermissionsAsync();
+    } finally {
+      endBackgroundLockSuspension();
+    }
+    if (!permission.granted) {
+      return;
+    }
     await Notifications.cancelAllScheduledNotificationsAsync();
 
     const triggers = buildMedicationNotificationTriggers(medications);

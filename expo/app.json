@@ -10,6 +10,7 @@
       "web"
     ],
     "plugins": [
+      "./plugins/with-android-gradle8.js",
       [
         "expo-router",
         {

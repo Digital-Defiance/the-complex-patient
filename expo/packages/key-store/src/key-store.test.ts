@@ -266,6 +266,14 @@ describe('Requirement 3.3 — biometric-failure lockout', () => {
     const r = await store.unlock();
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe('NO_KEY_STORED');
+    await expect(store.hasStoredUnlockKey()).resolves.toBe(false);
+  });
+
+  it('reports stored unlock keys without releasing them', async () => {
+    const secureStore = makeSecureStore('serialized-kek');
+    const { store } = makeNative({ secureStore });
+    await expect(store.hasStoredUnlockKey()).resolves.toBe(true);
+    expect(store.isUnlocked()).toBe(false);
   });
 });
 

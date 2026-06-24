@@ -32,10 +32,16 @@
  * Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6
  */
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { View, Platform, AppState, type AppStateStatus, StyleSheet } from 'react-native';
-import type { HomeEntryController } from '../app/home-entry';
+import type { HomeEntryController, HomeStatus } from '../app/home-entry';
 import { isExportSessionActive } from './export-session';
+import { isBackgroundLockSuspended } from './background-lock-session';
+
+/** Ignore background transitions right after unlock (permission prompts on home mount). */
+const POST_UNLOCK_BACKGROUND_GRACE_MS = 10_000;
+/** Do not register lock-on-background until the vault has been ready this long. */
+const BACKGROUND_LOCK_ARM_DELAY_MS = 8_000;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,6 +76,9 @@ export function ActivityResponder({
 }: ActivityResponderProps): React.ReactElement {
   const onLockedRef = useRef(onLocked);
   onLockedRef.current = onLocked;
+  const unlockedAtRef = useRef(0);
+  const previousStatusRef = useRef<HomeStatus | null>(null);
+  const [backgroundLockArmed, setBackgroundLockArmed] = useState(false);
 
   // -------------------------------------------------------------------------
   // Activity forwarding (Requirement 13.1)
@@ -103,38 +112,92 @@ export function ActivityResponder({
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
     } else {
-      // Native: AppState background → lock within 1s (Requirement 13.3)
+      // Native: AppState background → lock within 1s (Requirement 13.3).
+      // Do not lock on `inactive` — Android uses it for permission/biometric overlays.
       const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-        if (nextState !== 'active') {
-          // Fire and forget — on failure we still route to unlock (13.6)
-          void home.lock.lock().catch(() => {
-            // Defense in depth: even if lock() fails, route to unlock
-            onLockedRef.current();
-          });
+        if (!backgroundLockArmed) {
+          return;
         }
+        if (nextState !== 'background') {
+          return;
+        }
+        if (isExportSessionActive() || isBackgroundLockSuspended()) {
+          return;
+        }
+        if (Date.now() - unlockedAtRef.current < POST_UNLOCK_BACKGROUND_GRACE_MS) {
+          return;
+        }
+        // Fire and forget — on failure we still route to unlock (13.6)
+        void home.lock.lock().catch(() => {
+          // Defense in depth: even if lock() fails, route to unlock
+          onLockedRef.current();
+        });
       });
       return () => {
         subscription.remove();
       };
     }
-  }, [home]);
+  }, [home, backgroundLockArmed]);
 
   // -------------------------------------------------------------------------
   // React to locked status (Requirements 13.2, 13.5)
   // -------------------------------------------------------------------------
 
   useEffect(() => {
+    let armTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const scheduleBackgroundLockArm = () => {
+      if (armTimer) {
+        clearTimeout(armTimer);
+        armTimer = undefined;
+      }
+
+      if (home.getStatus() !== 'ready') {
+        setBackgroundLockArmed(false);
+        return;
+      }
+
+      unlockedAtRef.current = Date.now();
+      setBackgroundLockArmed(false);
+      armTimer = setTimeout(() => {
+        if (home.getStatus() === 'ready') {
+          setBackgroundLockArmed(true);
+        }
+      }, BACKGROUND_LOCK_ARM_DELAY_MS);
+    };
+
     const unsubscribe = home.subscribeStatus((status) => {
-      if (status === 'locked') {
+      const previous = previousStatusRef.current;
+      previousStatusRef.current = status;
+
+      if (status === 'ready') {
+        scheduleBackgroundLockArm();
+        return;
+      }
+
+      setBackgroundLockArmed(false);
+      if (armTimer) {
+        clearTimeout(armTimer);
+        armTimer = undefined;
+      }
+
+      if (previous === 'ready' && status === 'locked') {
         onLockedRef.current();
       }
     });
 
-    if (home.getStatus() === 'locked') {
-      onLockedRef.current();
+    const initial = home.getStatus();
+    previousStatusRef.current = initial;
+    if (initial === 'ready') {
+      scheduleBackgroundLockArm();
     }
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (armTimer) {
+        clearTimeout(armTimer);
+      }
+    };
   }, [home]);
 
   // -------------------------------------------------------------------------

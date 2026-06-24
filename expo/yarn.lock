@@ -975,6 +975,7 @@ __metadata:
     "@types/react": "npm:~19.2.14"
   peerDependencies:
     react: ">=18.0.0"
+    react-native-safe-area-context: ">=5.0.0"
   languageName: unknown
   linkType: soft
 

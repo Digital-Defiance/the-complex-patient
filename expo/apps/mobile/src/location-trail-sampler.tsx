@@ -13,7 +13,7 @@ import {
   pruneTrailSamples,
   shouldAppendTrailSample,
 } from '@complex-patient/weather';
-import { useAppHost } from '@complex-patient/ui';
+import { useAppHost, suspendBackgroundLock } from '@complex-patient/ui';
 import { mobileWeatherHost } from './adapters/weather-host';
 
 const SAMPLE_INTERVAL_MS = 30 * 60 * 1000;
@@ -97,7 +97,13 @@ export function LocationTrailSampler(): React.ReactElement | null {
         }
 
         const Location = await import('expo-location');
-        const permission = await Location.requestForegroundPermissionsAsync();
+        const endBackgroundLockSuspension = suspendBackgroundLock();
+        let permission;
+        try {
+          permission = await Location.requestForegroundPermissionsAsync();
+        } finally {
+          endBackgroundLockSuspension();
+        }
         if (permission.status !== 'granted' || cancelled) {
           return;
         }

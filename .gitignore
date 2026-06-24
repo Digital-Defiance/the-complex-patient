@@ -8,6 +8,8 @@ expo/.yarn/unplugged/
 expo/.yarn/install-state.gz
 # Keep .yarnrc.yml and .yarn/releases/ (if used) tracked
 
+expo/credentials.json
+
 # Expo
 expo/.expo/
 expo/dist/

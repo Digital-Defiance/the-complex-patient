@@ -32,7 +32,11 @@
     "deploy:web": "yarn build:web && yarn sync:complex && yarn sync:complex-local",
     "start:web": "EXPO_ROUTER_APP_ROOT=./apps/web/app npx expo start --web",
     "build:ios": "eas build --platform ios --profile production",
+    "build:ios:local": "eas build --local --platform ios --profile production",
     "build:android": "eas build --platform android --profile production",
+    "build:android:local": "eas build --local --platform android --profile production",
+    "build:local": "yarn build:ios:local && yarn build:android:local",
+    "build:local-rev": "yarn build:android:local && yarn build:ios:local",
     "build:clean": "rm -rf android ios && npx expo prebuild --clean",
     "android": "expo run:android",
     "ios": "expo run:ios"

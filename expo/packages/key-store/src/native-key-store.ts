@@ -151,6 +151,12 @@ export class NativeSessionKeyStore implements SessionKeyStore {
     return this.kek;
   }
 
+  /** Whether a KEK is persisted for biometric quick unlock (native only). */
+  async hasStoredUnlockKey(): Promise<boolean> {
+    const serialized = await this.secureStore.getKek();
+    return serialized !== null;
+  }
+
   /** Idle expiry when this store owns its idle timer (standalone / tests). */
   private onIdleLock(): void {
     if (!this.ownsIdle) {

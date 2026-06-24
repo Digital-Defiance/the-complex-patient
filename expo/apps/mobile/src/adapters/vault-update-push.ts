@@ -6,6 +6,7 @@ import Constants from 'expo-constants';
 import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 import type { HomeEntryController } from '@complex-patient/ui';
+import { suspendBackgroundLock } from '@complex-patient/ui';
 
 const VAULT_UPDATED_TYPE = 'vault_updated';
 
@@ -48,7 +49,13 @@ export async function startVaultUpdatePushSession(
       }),
     });
 
-    const permission = await Notifications.requestPermissionsAsync();
+    const endBackgroundLockSuspension = suspendBackgroundLock();
+    let permission;
+    try {
+      permission = await Notifications.requestPermissionsAsync();
+    } finally {
+      endBackgroundLockSuspension();
+    }
     if (!permission.granted) {
       return null;
     }

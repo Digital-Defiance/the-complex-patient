@@ -14,6 +14,7 @@
 
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { suspendBackgroundLock } from '@complex-patient/ui';
 import type {
   BiometricAdapter,
   SecureStoreAdapter,
@@ -70,11 +71,16 @@ export function createExpoBiometricAdapter(): BiometricAdapter {
       return hasHardware && isEnrolled;
     },
     async authenticate(): Promise<boolean> {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Unlock your vault',
-        disableDeviceFallback: false,
-      });
-      return result.success;
+      const endBackgroundLockSuspension = suspendBackgroundLock();
+      try {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Unlock your vault',
+          disableDeviceFallback: false,
+        });
+        return result.success;
+      } finally {
+        endBackgroundLockSuspension();
+      }
     },
   };
 }

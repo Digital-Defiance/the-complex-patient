@@ -16,6 +16,7 @@ import {
   ConnectivityProvider,
   WeatherHostProvider,
   useAppHost,
+  useDeferredHomeServicesReady,
 } from '@complex-patient/ui';
 import { mobileWeatherHost } from '../../src/adapters/weather-host';
 import { LocationTrailSampler } from '../../src/location-trail-sampler';
@@ -27,6 +28,7 @@ function AuthenticatedHomeStack(): React.ReactElement {
   const router = useRouter();
   const { isOffline } = useConnectivityWatcher();
   const insets = useSafeAreaInsets();
+  const homeServicesReady = useDeferredHomeServicesReady(home);
 
   const content = (
     <View style={styles.container}>
@@ -36,9 +38,9 @@ function AuthenticatedHomeStack(): React.ReactElement {
       <View style={styles.content}>
         <ConnectivityProvider isOffline={isOffline}>
           <WeatherHostProvider deps={mobileWeatherHost}>
-            <MedicationNotificationSync />
-            <VaultUpdatePushSync />
-            {Platform.OS !== 'web' && <LocationTrailSampler />}
+            {homeServicesReady && <MedicationNotificationSync />}
+            {homeServicesReady && <VaultUpdatePushSync />}
+            {homeServicesReady && Platform.OS !== 'web' && <LocationTrailSampler />}
             <Slot screenOptions={{ headerShown: false }} />
           </WeatherHostProvider>
         </ConnectivityProvider>
