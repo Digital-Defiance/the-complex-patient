@@ -24,6 +24,7 @@ import {
   ScrollView,
   Keyboard,
   Platform,
+  type TextInputProps,
 } from 'react-native';
 import { useAppHost } from '../app-host';
 import type { WordPressAuth } from '../../app';
@@ -31,6 +32,45 @@ import {
   IosKeyboardDoneAccessory,
   keyboardDoneAccessoryProps,
 } from '../ios-keyboard-done-accessory';
+
+/** Strip invisible characters Android autofill sometimes injects. */
+function normalizeSignInUsername(value: string): string {
+  return value
+    .trim()
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '');
+}
+
+function normalizeApplicationPassword(value: string): string {
+  return value
+    .trim()
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, '');
+}
+
+const applicationPasswordAutofillProps = (): Pick<
+  TextInputProps,
+  'autoComplete' | 'importantForAutofill' | 'textContentType' | 'passwordRules'
+> => {
+  if (Platform.OS === 'android') {
+    return {
+      autoComplete: 'new-password',
+      importantForAutofill: 'no',
+      textContentType: 'password',
+    };
+  }
+  if (Platform.OS === 'ios') {
+    return {
+      autoComplete: 'off',
+      textContentType: 'newPassword',
+      passwordRules: '',
+    };
+  }
+  return {
+    autoComplete: 'off',
+    textContentType: 'password',
+  };
+};
 
 export function SignInScreen(): React.ReactElement {
   const { home, refreshHomeStatus } = useAppHost();
@@ -44,8 +84,8 @@ export function SignInScreen(): React.ReactElement {
   const handleSignIn = useCallback(async () => {
     if (!home) return;
 
-    const trimmedUsername = username.trim();
-    const trimmedPassword = password.trim();
+    const trimmedUsername = normalizeSignInUsername(username);
+    const trimmedPassword = normalizeApplicationPassword(password);
 
     if (!trimmedUsername || !trimmedPassword) {
       setError('Please enter your username and application password.');
@@ -66,11 +106,14 @@ export function SignInScreen(): React.ReactElement {
       const result = await home.signIn(auth);
       if (!result.ok) {
         if (result.reason === 'INVALID_CREDENTIALS') {
-          setError(
-            result.detail
-              ? result.detail
-              : 'WordPress did not accept those credentials. Use an Application Password from Users → Profile → Application Passwords — not your regular login password. Use your WordPress username (login name), not your email.',
-          );
+          const baseMessage =
+            result.detail ??
+            'WordPress did not accept those credentials. Use an Application Password from Users → Profile → Application Passwords — not your regular login password. Use your WordPress username (login name), not your email.';
+          const androidAutofillHint =
+            Platform.OS === 'android'
+              ? ' Android password managers often autofill your regular wp-admin password — clear the password field and paste the Application Password manually.'
+              : '';
+          setError(baseMessage + androidAutofillHint);
         } else {
           setError('Could not reach the sync server. Check your network and backend URL.');
         }
@@ -124,10 +167,12 @@ export function SignInScreen(): React.ReactElement {
           <TextInput
             style={styles.input}
             placeholder="Username"
+            placeholderTextColor="#888"
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
             autoCorrect={false}
+            autoComplete="username"
             textContentType="username"
             returnKeyType="next"
             blurOnSubmit={false}
@@ -141,18 +186,19 @@ export function SignInScreen(): React.ReactElement {
             ref={passwordRef}
             style={styles.input}
             placeholder="Application Password"
+            placeholderTextColor="#888"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
-            textContentType="password"
             returnKeyType="done"
             onSubmitEditing={() => {
               void handleSignIn();
             }}
             accessibilityLabel="Application Password"
             testID="sign-in-password"
+            {...applicationPasswordAutofillProps()}
             {...keyboardDoneAccessoryProps()}
           />
 
@@ -231,6 +277,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 12,
     fontSize: 16,
+    color: '#1a1a1a',
     backgroundColor: '#fafafa',
   },
   button: {

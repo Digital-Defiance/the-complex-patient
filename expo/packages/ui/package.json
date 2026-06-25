@@ -27,6 +27,7 @@
   },
   "peerDependencies": {
     "expo-camera": ">=56.0.0",
+    "expo-file-system": ">=56.0.0",
     "expo-print": ">=56.0.0",
     "expo-sharing": ">=56.0.0",
     "react": ">=18.0.0",
@@ -34,6 +35,9 @@
   },
   "peerDependenciesMeta": {
     "expo-camera": {
+      "optional": true
+    },
+    "expo-file-system": {
       "optional": true
     },
     "expo-print": {

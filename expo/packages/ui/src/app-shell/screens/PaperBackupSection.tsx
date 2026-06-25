@@ -21,6 +21,7 @@ import type { PaperBackupSummary } from '../../app/home-entry';
 import { useAppHost } from '../app-host';
 import { createKdfMaterialStorage, type KdfMaterialStorage } from './kdf-material-storage';
 import { PaperBackupTemplateView } from './PaperBackupTemplateView';
+import { PaperBackupNativeSheet } from './PaperBackupNativeSheet';
 import { PaperBackupVerificationStep } from './PaperBackupVerificationStep';
 import { printPaperBackupSheet, sharePaperBackupSheet } from './print-paper-backup';
 import { showAppAlert, confirmAppAction } from '../app-alert';
@@ -74,6 +75,7 @@ export function PaperBackupSection({ kdfStorage }: PaperBackupSectionProps): Rea
     qrDataUrl: string;
     words: readonly string[];
   } | null>(null);
+  const [createdTemplateReady, setCreatedTemplateReady] = useState(false);
   const [createdFlow, setCreatedFlow] = useState<CreatedBackupFlow>('template');
   const [backupVerified, setBackupVerified] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
@@ -103,6 +105,19 @@ export function PaperBackupSection({ kdfStorage }: PaperBackupSectionProps): Rea
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!createdBackup) {
+      setCreatedTemplateReady(false);
+      return;
+    }
+    setCreatedTemplateReady(false);
+    const frame = requestAnimationFrame(() => {
+      setCreatedTemplateReady(true);
+      console.log('[PaperBackup] template ready');
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [createdBackup]);
+
   const loadKdfMaterial = useCallback(async (): Promise<KdfMaterial | null> => {
     const { loadKdfMaterial: load } = createKdfMaterialStorage(kdfStorage);
     const stored = await load();
@@ -128,6 +143,7 @@ export function PaperBackupSection({ kdfStorage }: PaperBackupSectionProps): Rea
     setCreating(true);
     try {
       const label = labelDraft.trim() || undefined;
+      console.log('[PaperBackup] creating backup…');
       const result = await home.createPaperBackup(material, label);
       if (!result.ok) {
         console.error('[PaperBackupSection] create failed', {
@@ -143,6 +159,10 @@ export function PaperBackupSection({ kdfStorage }: PaperBackupSectionProps): Rea
       setLabelDraft('');
       setCreatedFlow('template');
       setBackupVerified(false);
+      console.log('[PaperBackup] created', {
+        backupId: result.backupId,
+        qrBytes: result.qrDataUrl.length,
+      });
       setCreatedBackup({
         template: result.template,
         templateText: result.templateText,
@@ -150,11 +170,8 @@ export function PaperBackupSection({ kdfStorage }: PaperBackupSectionProps): Rea
         words: result.template.words,
       });
       setStatusMessage('Paper backup created. Write down your 24 words and Backup ID now — they will not be shown again.');
-      await refresh();
-      showAppAlert(
-        'Paper backup created',
-        'Write down your 24 recovery words and Backup ID now. They will not be shown again.',
-      );
+      // Defer list refresh so the one-time template mount is not competing with re-render.
+      setTimeout(() => void refresh(), 1000);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Paper backup creation failed unexpectedly.';
       console.error('[PaperBackupSection] create failed:', message);
@@ -237,6 +254,7 @@ export function PaperBackupSection({ kdfStorage }: PaperBackupSectionProps): Rea
     setCreatedBackup(null);
     setCreatedFlow('template');
     setBackupVerified(false);
+    setCreatedTemplateReady(false);
   }, []);
 
   if (!home || home.getStatus() !== 'ready') {
@@ -301,11 +319,26 @@ export function PaperBackupSection({ kdfStorage }: PaperBackupSectionProps): Rea
             ) : null}
 
             {createdFlow === 'template' ? (
-              <PaperBackupTemplateView
-                template={createdBackup.template}
-                templateText={createdBackup.templateText}
-                qrDataUrl={createdBackup.qrDataUrl}
-              />
+              createdTemplateReady ? (
+                Platform.OS === 'web' ? (
+                  <PaperBackupTemplateView
+                    template={createdBackup.template}
+                    templateText={createdBackup.templateText}
+                    qrDataUrl={createdBackup.qrDataUrl}
+                  />
+                ) : (
+                  <PaperBackupNativeSheet
+                    template={createdBackup.template}
+                    qrDataUrl={createdBackup.qrDataUrl}
+                  />
+                )
+              ) : (
+                <ActivityIndicator
+                  size="large"
+                  accessibilityLabel="Preparing paper backup sheet"
+                  testID="paper-backup-template-loading"
+                />
+              )
             ) : (
               <PaperBackupVerificationStep
                 words={createdBackup.words}

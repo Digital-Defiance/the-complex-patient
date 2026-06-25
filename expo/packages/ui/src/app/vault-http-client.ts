@@ -21,6 +21,7 @@
 
 import type { VaultType } from '@complex-patient/domain';
 import type { KdfParams } from '@complex-patient/crypto-engine';
+import { Platform } from 'react-native';
 import type {
   VaultGetResponse,
   VaultHttpClient,
@@ -133,10 +134,26 @@ export interface WordPressAuthValidationResponse {
   code?: string;
 }
 
+export interface AppSessionExchangeResponse {
+  ok: true;
+  sessionToken: string;
+  expiresIn: number;
+}
+
+export interface AppSessionExchangeFailure {
+  ok: false;
+  status: number;
+  message?: string;
+}
+
+export type AppSessionExchangeResult = AppSessionExchangeResponse | AppSessionExchangeFailure;
+
 /** Extended client surface including cross-device KDF material sync. */
 export interface VaultHttpClientWithKdf extends VaultHttpClient {
   /** Validate the active credential against WordPress `/wp/v2/users/me`. */
   validateWordPressAuth(): Promise<WordPressAuthValidationResponse>;
+  /** Exchange username + application password for a native app session token. */
+  exchangeAppSession(username: string, applicationPassword: string): Promise<AppSessionExchangeResult>;
   getKdfMaterial(): Promise<KdfMaterialGetResponse>;
   putKdfMaterial(payload: KdfMaterialPutPayload): Promise<{ status: number }>;
   registerDevice(registration: DevicePushRegistration): Promise<{ status: number }>;
@@ -222,8 +239,25 @@ export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClien
         error: 'not authenticated: a Sync_Backend credential is required (Requirement 4.1)',
       };
     }
+    if (credential.kind === 'app-session') {
+      if (credential.sessionToken.length === 0) {
+        return { error: 'app session token must not be empty' };
+      }
+      return {
+        headers: {
+          'X-Complex-Patient-Session': credential.sessionToken,
+        },
+      };
+    }
     try {
-      return { headers: { Authorization: buildAuthorizationHeader(credential) } };
+      const authorization = buildAuthorizationHeader(credential);
+      const headers: Record<string, string> = { Authorization: authorization };
+      // LiteSpeed / some Android stacks drop Authorization before PHP; native-only
+      // duplicate avoids web CORS preflight on a custom header.
+      if (Platform.OS !== 'web') {
+        headers['X-WP-Authorization'] = authorization;
+      }
+      return { headers };
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       return { error: message };
@@ -312,8 +346,7 @@ export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClien
       return { status: VAULT_HTTP_AUTH_ERROR, message: auth.error };
     }
 
-    const url = `${base}/wp-json/wp/v2/users/me`;
-    const transport = await performRequest('wp-users-me', url, {
+    const transport = await performRequest('kdf-material-auth-check', kdfEndpoint(), {
       method: 'GET',
       headers: auth.headers,
     });
@@ -321,12 +354,63 @@ export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClien
       return { status: VAULT_HTTP_TRANSPORT_ERROR, message: transport.message };
     }
 
+    const status = transport.response.status;
+    if (status === 404) {
+      // Authenticated user with no KDF row yet (new account).
+      return { status: 200 };
+    }
+
     const json = await safeJson(transport.response);
     const error = readWpRestError(json);
     return {
-      status: transport.response.status,
+      status,
       message: error.message,
       code: error.code,
+    };
+  }
+
+  async function exchangeAppSession(
+    username: string,
+    applicationPassword: string,
+  ): Promise<AppSessionExchangeResult> {
+    const transport = await performRequest(
+      'auth-exchange',
+      `${base}/wp-json/complex-patient/v1/auth/exchange`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: username.trim(),
+          application_password: applicationPassword.replace(/\s+/g, ''),
+        }),
+      },
+    );
+    if (!transport.ok) {
+      return { ok: false, status: VAULT_HTTP_TRANSPORT_ERROR, message: transport.message };
+    }
+
+    const status = transport.response.status;
+    const json = await safeJson(transport.response);
+    if (status < 200 || status >= 300) {
+      const error = readWpRestError(json);
+      return {
+        ok: false,
+        status,
+        message: error.message,
+      };
+    }
+
+    const record = isRecord(json) ? json : {};
+    const sessionToken = readString(record, 'session_token');
+    const expiresIn = readNumber(record, 'expires_in');
+    if (!sessionToken) {
+      return { ok: false, status: 500, message: 'Session exchange returned no token.' };
+    }
+
+    return {
+      ok: true,
+      sessionToken,
+      expiresIn: expiresIn ?? 86_400,
     };
   }
 
@@ -512,6 +596,7 @@ export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClien
     postVault,
     getVault,
     validateWordPressAuth,
+    exchangeAppSession,
     getKdfMaterial,
     putKdfMaterial,
     registerDevice,
@@ -584,6 +669,11 @@ function readSyncVersion(value: unknown): number | undefined {
 function readString(record: Record<string, unknown>, key: string): string | undefined {
   const v = record[key];
   return typeof v === 'string' ? v : undefined;
+}
+
+function readNumber(record: Record<string, unknown>, key: string): number | undefined {
+  const v = record[key];
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
 
 function readWpRestError(value: unknown): { code?: string; message?: string } {

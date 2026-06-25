@@ -26,13 +26,13 @@ import {
   createPaperBackupWrap,
   deriveKEK,
   formatPaperBackupTemplateText,
-  generatePaperBackupQrDataUrl,
   generateSalt,
   normalizePaperBackupMnemonic,
   unwrapKekFromPaperBackup,
   validatePaperBackupMnemonic,
   wrapKekForPaperBackup,
 } from '@complex-patient/crypto-engine';
+import { generatePaperBackupQrPngDataUrl } from '@complex-patient/crypto-engine/paper-backup-qr-png';
 import { decrypt, encrypt } from '@complex-patient/crypto-engine';
 import type { LocalVault } from '@complex-patient/local-vault';
 import type { VaultRecord, VaultType } from '@complex-patient/domain';
@@ -114,6 +114,9 @@ function formatWordPressSignInDetail(response: {
     return (
       'WordPress did not receive your Application Password. Use your WordPress username (login name) and an Application Password from Users → Profile → Application Passwords — not your regular wp-admin password. Being logged into wp-admin in the browser does not sign the app in.'
     );
+  }
+  if (response.code === 'complex_patient_invalid_credentials') {
+    return 'WordPress did not accept those credentials. Check your username and Application Password.';
   }
   return response.message;
 }
@@ -539,8 +542,6 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
       return Promise.resolve({ ok: true });
     }
 
-    // Validate credentials before emitting `locked` so the shell does not route
-    // to unlock while validation is still in flight (avoids mid-unlock sign-out).
     const validate =
       vaultHttp.validateWordPressAuth?.bind(vaultHttp) ??
       (() =>
@@ -549,7 +550,22 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
         })));
 
     return validate()
-      .then((response) => {
+      .then(async (response) => {
+        if (
+          (response.status === 401 || response.status === 403) &&
+          credential.kind === 'application-password' &&
+          vaultHttp.exchangeAppSession
+        ) {
+          const exchanged = await vaultHttp.exchangeAppSession(
+            credential.username,
+            credential.applicationPassword,
+          );
+          if (exchanged.ok) {
+            auth.setAuth({ kind: 'app-session', sessionToken: exchanged.sessionToken });
+            response = await validate();
+          }
+        }
+
         if (response.status === 401 || response.status === 403) {
           auth.setAuth(null);
           emitStatusIfChanged();
@@ -871,7 +887,7 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
 
     let qrDataUrl: string;
     try {
-      qrDataUrl = generatePaperBackupQrDataUrl(backupId, mnemonic);
+      qrDataUrl = generatePaperBackupQrPngDataUrl(backupId, mnemonic);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       console.error('[HomeEntry] paper backup QR render failed:', message);

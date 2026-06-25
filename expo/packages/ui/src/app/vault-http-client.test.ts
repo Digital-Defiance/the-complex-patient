@@ -193,20 +193,20 @@ describe('createVaultHttpClient — blind envelope only (4.6, 4.8)', () => {
     expect(res.sync_version).toBeUndefined();
   });
 
-  it('validates WordPress credentials against /wp/v2/users/me', async () => {
+  it('validates WordPress credentials against kdf-material', async () => {
     const auth = createAuthProvider({
       kind: 'application-password',
       username: 'alice',
       applicationPassword: 'abcd efgh',
     });
     const fetch = vi.fn(async (url: string, init: { headers: Record<string, string> }) => {
-      expect(url).toBe('http://localhost:8881/wp-json/wp/v2/users/me');
+      expect(url).toBe('http://localhost:8881/wp-json/complex-patient/v1/vault/kdf-material');
       expect(init.headers.Authorization).toBe(
         `Basic ${Buffer.from('alice:abcdefgh', 'utf8').toString('base64')}`,
       );
       return {
         status: 200,
-        json: async () => ({ id: 1, name: 'alice' }),
+        json: async () => ({ salt_base64: 'c2FsdA==', params: { algorithm: 'PBKDF2' } }),
       };
     });
     const client = createVaultHttpClient({

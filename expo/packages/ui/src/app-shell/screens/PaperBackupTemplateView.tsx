@@ -2,7 +2,7 @@
  * Printable paper-backup sheet with numbered word grid and QR code.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import type { PaperBackupTemplate } from '@complex-patient/crypto-engine';
 import { PaperBackupQrCode } from './PaperBackupQrCode';
@@ -19,6 +19,16 @@ export function PaperBackupTemplateView({
   qrDataUrl,
 }: PaperBackupTemplateViewProps): React.ReactElement {
   const mnemonic = template.words.join(' ');
+  const [showQr, setShowQr] = useState(false);
+
+  useEffect(() => {
+    setShowQr(false);
+    const frame = requestAnimationFrame(() => {
+      setShowQr(true);
+      console.log('[PaperBackup] showing qr block');
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [template.backupId]);
 
   return (
     <View style={styles.container} testID="paper-backup-template-view">
@@ -37,14 +47,16 @@ export function PaperBackupTemplateView({
         ))}
       </View>
 
-      <View style={styles.qrBlock}>
-        <Text style={styles.qrLabel}>Scan to recover on another device</Text>
-        <PaperBackupQrCode
-          backupId={template.backupId}
-          mnemonic={mnemonic}
-          qrDataUrl={qrDataUrl}
-        />
-      </View>
+      {showQr ? (
+        <View style={styles.qrBlock}>
+          <Text style={styles.qrLabel}>Scan to recover on another device</Text>
+          <PaperBackupQrCode
+            backupId={template.backupId}
+            mnemonic={mnemonic}
+            qrDataUrl={qrDataUrl}
+          />
+        </View>
+      ) : null}
 
       <Text style={styles.warningTitle}>Warnings</Text>
       {template.warnings.map((warning) => (

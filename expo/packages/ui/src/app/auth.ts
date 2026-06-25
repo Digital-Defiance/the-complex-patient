@@ -22,7 +22,8 @@
  */
 export type WordPressAuth =
   | { kind: 'jwt'; token: string }
-  | { kind: 'application-password'; username: string; applicationPassword: string };
+  | { kind: 'application-password'; username: string; applicationPassword: string }
+  | { kind: 'app-session'; sessionToken: string };
 
 /** Read-only access to the current Sync_Backend credential, if any. */
 export interface AuthProvider {
@@ -45,13 +46,14 @@ export function encodeBase64Utf8(input: string): string {
   const bytes = new TextEncoder().encode(input);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const g = globalThis as any;
+  // Prefer Buffer over btoa — Hermes exposes both, but Buffer matches Node test vectors.
+  if (typeof g.Buffer !== 'undefined') {
+    return g.Buffer.from(bytes).toString('base64');
+  }
   if (typeof g.btoa === 'function') {
     let binary = '';
     for (const b of bytes) binary += String.fromCharCode(b);
     return g.btoa(binary);
-  }
-  if (typeof g.Buffer !== 'undefined') {
-    return g.Buffer.from(bytes).toString('base64');
   }
   return pureBase64(bytes);
 }
@@ -83,6 +85,9 @@ function pureBase64(bytes: Uint8Array): string {
  * "not authenticated" instead (Requirement 4.3).
  */
 export function buildAuthorizationHeader(auth: WordPressAuth): string {
+  if (auth.kind === 'app-session') {
+    throw new Error('app-session credentials use X-Complex-Patient-Session instead of Authorization');
+  }
   if (auth.kind === 'jwt') {
     if (auth.token.length === 0) {
       throw new Error('JWT token must not be empty');

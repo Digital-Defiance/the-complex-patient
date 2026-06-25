@@ -1,5 +1,8 @@
 /**
  * QR payload encoding and SVG rendering for paper backup sheets.
+ *
+ * PNG rendering lives in `paper-backup-qr-png.ts` so native release builds do
+ * not eagerly load fast-png (Buffer latin1) when importing crypto-engine.
  */
 
 import { toQR } from 'toqr';

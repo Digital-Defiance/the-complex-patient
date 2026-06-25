@@ -7,6 +7,7 @@ import {
   qrMatrixSide,
   renderQrSvgDataUrl,
 } from './paper-backup-qr';
+import { renderQrPngDataUrl } from './paper-backup-qr-png';
 import { toQR } from 'toqr';
 
 describe('paper-backup-qr', () => {
@@ -27,5 +28,13 @@ describe('paper-backup-qr', () => {
     const matrix = toQR(encodePaperBackupQrPayload(backupId, mnemonic));
     expect(qrMatrixSide(matrix)).toBeGreaterThan(20);
     expect(renderQrSvgDataUrl(matrix)).toContain('data:image/svg+xml');
+  });
+
+  it('renders a QR matrix to a PNG data URL', () => {
+    const mnemonic = generatePaperBackupMnemonic();
+    const matrix = toQR(encodePaperBackupQrPayload(backupId, mnemonic));
+    const png = renderQrPngDataUrl(matrix);
+    expect(png.startsWith('data:image/png;base64,')).toBe(true);
+    expect(png.length).toBeGreaterThan(100);
   });
 });

@@ -73,28 +73,7 @@ add_action(
     5
 );
 
-// PHP / reverse-proxy stacks (including WordPress Studio) often omit HTTP_AUTHORIZATION
-// from $_SERVER even when the client sends Authorization: Basic. WordPress core reads
-// that variable for Application Password auth on REST requests.
-add_action(
-    'plugins_loaded',
-    static function () {
-        if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-            return;
-        }
-        if ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-            $_SERVER['HTTP_AUTHORIZATION'] = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-            return;
-        }
-        if ( function_exists( 'apache_request_headers' ) ) {
-            $headers = apache_request_headers();
-            if ( ! empty( $headers['Authorization'] ) ) {
-                $_SERVER['HTTP_AUTHORIZATION'] = (string) $headers['Authorization'];
-            }
-        }
-    },
-    0
-);
+\ComplexPatient\Auth\AuthorizationHeaderBootstrap::register();
 
 // WordPress disables Application Passwords on plain HTTP unless the site is marked
 // "local". Studio sites on http://localhost:8881 need this for app sign-in.
@@ -152,5 +131,8 @@ add_action(
 
         $schemaController = new \ComplexPatient\Rest\SchemaController();
         $schemaController->registerRoutes();
+
+        $sessionController = new \ComplexPatient\Rest\SessionController();
+        $sessionController->registerRoutes();
     }
 );
