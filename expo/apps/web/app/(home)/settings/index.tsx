@@ -1,11 +1,12 @@
 /**
- * @complex-patient/web — Weather & location settings
+ * @complex-patient/web — Vault & device settings
  */
 
 import React, { useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { WeatherSettingsSection } from '@complex-patient/ui';
+import { VaultSettingsScreen } from '@complex-patient/ui/screens';
+import { webFlagStorage } from '../../../src/adapters';
 
 export default function SettingsScreen(): React.ReactElement {
   const router = useRouter();
@@ -15,8 +16,7 @@ export default function SettingsScreen(): React.ReactElement {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.screenTitle}>Settings</Text>
-      <WeatherSettingsSection />
+      <VaultSettingsScreen kdfStorage={webFlagStorage} />
       <Pressable style={styles.backButton} onPress={handleBack} accessibilityRole="button" testID="settings-back">
         <Text style={styles.backButtonText}>Back</Text>
       </Pressable>
@@ -32,12 +32,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 24,
     gap: 16,
-  },
-  screenTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
   },
   backButton: {
     marginTop: 24,

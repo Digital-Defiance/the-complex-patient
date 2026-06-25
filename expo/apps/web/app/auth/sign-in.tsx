@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { SignInScreen } from '@complex-patient/ui';
+import { SignInScreen } from '@complex-patient/ui/screens';
 
 export default function SignIn(): React.ReactElement {
   return <SignInScreen />;

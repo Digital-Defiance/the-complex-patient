@@ -4,7 +4,7 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { ExportScreen } from '@complex-patient/ui';
+import { ExportScreen } from '@complex-patient/ui/screens';
 
 export default function ExportRoute(): React.ReactElement {
   const router = useRouter();

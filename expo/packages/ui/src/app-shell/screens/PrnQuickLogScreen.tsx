@@ -11,7 +11,8 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import type { MedicationProfile, PrnLog, PrnConfig, VaultRecord } from '@complex-patient/domain';
+import type { DoseRegimen, MedicationProfile, PrnLog, PrnConfig, VaultRecord } from '@complex-patient/domain';
+import { medicationHasPrn } from '@complex-patient/domain';
 import { splitMedicationsPartition } from '@complex-patient/clinical-export';
 import { captureLogLocation } from '@complex-patient/weather';
 import {
@@ -56,6 +57,7 @@ export interface PrnQuickLogScreenProps {
  */
 interface LogAttemptState {
   medicationId: string;
+  regimenId: string;
   drugName: string;
   evaluation: PrnQuickLogEvaluation;
   prn: PrnConfig;
@@ -65,6 +67,12 @@ interface LogAttemptState {
   persistError: string | null;
   /** Whether this was an override-acknowledged log. */
   overrideAcknowledged: boolean;
+}
+
+interface PrnLogTarget {
+  medication: MedicationProfile;
+  regimen: DoseRegimen;
+  prn: PrnConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,9 +126,19 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
     () => splitMedicationsPartition(allRecords),
     [allRecords],
   );
-  const prnMedications = medications.filter(
-    (m) => m.prn !== undefined && m.active === true && m.deleted !== true,
-  );
+  const prnTargets = useMemo((): PrnLogTarget[] => {
+    const targets: PrnLogTarget[] = [];
+    for (const medication of medications) {
+      if (!medicationHasPrn(medication) || medication.active !== true || medication.deleted === true) {
+        continue;
+      }
+      for (const regimen of medication.regimens) {
+        if (regimen.prn === undefined) continue;
+        targets.push({ medication, regimen, prn: regimen.prn });
+      }
+    }
+    return targets;
+  }, [medications]);
 
   // The last log attempt result (evaluation) displayed before accepting another.
   const [lastAttempt, setLastAttempt] = useState<LogAttemptState | null>(null);
@@ -132,21 +150,46 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
    * evaluatePrnQuickLog — no other regimen mutation (Requirement 9.4).
    */
   const handleQuickLog = useCallback(
-    async (medication: MedicationProfile, overrideAcknowledged = false) => {
-      if (!medication.prn) return;
-
-      const prn = medication.prn;
+    async (target: PrnLogTarget, overrideAcknowledged = false) => {
+      const { medication, regimen, prn } = target;
       const nowMs = Date.now();
       const takenAt = new Date(nowMs).toISOString();
 
-      // Compute trailing 24h cumulative from current logs.
+      if (prn.minIntervalHours !== undefined) {
+        const minGapMs = prn.minIntervalHours * 60 * 60 * 1000;
+        const latest = prnLogs
+          .filter((log) => log.regimenId === regimen.id && log.deleted !== true)
+          .map((log) => Date.parse(log.takenAt))
+          .filter((value) => !Number.isNaN(value))
+          .reduce((max, value) => Math.max(max, value), Number.NEGATIVE_INFINITY);
+        if (latest !== Number.NEGATIVE_INFINITY && nowMs - latest < minGapMs) {
+          setLastAttempt({
+            medicationId: medication.id,
+            regimenId: regimen.id,
+            drugName: regimen.label ? `${medication.drugName} (${regimen.label})` : medication.drugName,
+            evaluation: {
+              existingCumulative: 0,
+              projectedCumulative: prn.doseAmount,
+              withinLimit: true,
+              blocked: false,
+              recorded: false,
+              overrideFlag: false,
+            },
+            prn,
+            persisted: false,
+            persistError: `Wait at least ${prn.minIntervalHours}h between doses.`,
+            overrideAcknowledged: false,
+          });
+          return;
+        }
+      }
+
       const existingCumulative = computeTrailing24hCumulative(
         prnLogs,
         medication.id,
         nowMs,
       );
 
-      // Route through evaluatePrnQuickLog exclusively (Requirement 9.4).
       const evaluation = evaluatePrnQuickLog({
         existingCumulative,
         doseAmount: prn.doseAmount,
@@ -154,12 +197,15 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
         overrideAcknowledged,
       });
 
-      // If blocked (safety threshold exceeded), display evaluation and wait
-      // for the user to either override or cancel (Requirement 9.5).
+      const displayName = regimen.label
+        ? `${medication.drugName} (${regimen.label})`
+        : medication.drugName;
+
       if (evaluation.blocked) {
         setLastAttempt({
           medicationId: medication.id,
-          drugName: medication.drugName,
+          regimenId: regimen.id,
+          drugName: displayName,
           evaluation,
           prn,
           persisted: false,
@@ -169,13 +215,13 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
         return;
       }
 
-      // Evaluation says to record — persist through home.commit (Requirement 9.6).
       setIsLogging(true);
 
       const newLog: PrnLog = {
         id: generateId(),
         op_timestamp: takenAt,
         medicationId: medication.id,
+        regimenId: regimen.id,
         amount: prn.doseAmount,
         takenAt,
         ...(evaluation.overrideFlag ? { override: true } : {}),
@@ -199,7 +245,8 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
         if (result.ok) {
           setLastAttempt({
             medicationId: medication.id,
-            drugName: medication.drugName,
+            regimenId: regimen.id,
+            drugName: displayName,
             evaluation,
             prn,
             persisted: true,
@@ -207,10 +254,10 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
             overrideAcknowledged,
           });
         } else {
-          // Commit failure — retain values, show error (Requirement 9.7).
           setLastAttempt({
             medicationId: medication.id,
-            drugName: medication.drugName,
+            regimenId: regimen.id,
+            drugName: displayName,
             evaluation,
             prn,
             persisted: false,
@@ -219,10 +266,10 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
           });
         }
       } catch {
-        // Unexpected commit failure — retain values (Requirement 9.7).
         setLastAttempt({
           medicationId: medication.id,
-          drugName: medication.drugName,
+          regimenId: regimen.id,
+          drugName: displayName,
           evaluation,
           prn,
           persisted: false,
@@ -242,11 +289,15 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
    */
   const handleOverride = useCallback(() => {
     if (!lastAttempt) return;
-    const medication = prnMedications.find((m) => m.id === lastAttempt.medicationId);
-    if (medication) {
-      void handleQuickLog(medication, true);
+    const target = prnTargets.find(
+      (entry) =>
+        entry.medication.id === lastAttempt.medicationId &&
+        entry.regimen.id === lastAttempt.regimenId,
+    );
+    if (target) {
+      void handleQuickLog(target, true);
     }
-  }, [lastAttempt, prnMedications, handleQuickLog]);
+  }, [lastAttempt, prnTargets, handleQuickLog]);
 
   /** Dismiss the last evaluation result and allow another entry. */
   const handleDismiss = useCallback(() => {
@@ -279,7 +330,7 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
   }
 
   // No PRN medications available.
-  if (prnMedications.length === 0) {
+  if (prnTargets.length === 0) {
     return (
       <View style={styles.container} testID="prn-quick-log-screen">
         <Text style={styles.title}>PRN Quick Log</Text>
@@ -301,20 +352,23 @@ function PrnQuickLogScreenInner({ home, onBack }: InnerProps): React.ReactElemen
       <Text style={styles.title}>PRN Quick Log</Text>
       <Text style={styles.subtitle}>Tap a medication to log a dose.</Text>
       <ScrollView style={styles.list}>
-        {prnMedications.map((med) => (
+        {prnTargets.map(({ medication, regimen, prn }) => (
           <Pressable
-            key={med.id}
+            key={`${medication.id}:${regimen.id}`}
             style={styles.medicationCard}
-            onPress={() => void handleQuickLog(med)}
+            onPress={() => void handleQuickLog({ medication, regimen, prn })}
             disabled={isLogging}
             accessibilityRole="button"
-            accessibilityLabel={`Log ${med.drugName} PRN dose`}
-            testID={`prn-log-${med.id}`}
+            accessibilityLabel={`Log ${medication.drugName} PRN dose`}
+            testID={`prn-log-${medication.id}-${regimen.id}`}
           >
-            <Text style={styles.medName}>{med.drugName}</Text>
-            <Text style={styles.medDose}>{med.dosage}</Text>
+            <Text style={styles.medName}>
+              {medication.drugName}
+              {regimen.label ? ` (${regimen.label})` : ''}
+            </Text>
+            <Text style={styles.medDose}>{regimen.dosage}</Text>
             <Text style={styles.medLimit}>
-              24h max: {med.prn!.safetyLimit24h} {med.prn!.doseUnit}
+              24h max: {prn.safetyLimit24h} {prn.doseUnit}
             </Text>
           </Pressable>
         ))}

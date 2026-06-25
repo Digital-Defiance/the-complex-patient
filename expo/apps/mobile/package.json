@@ -19,10 +19,12 @@
     "@complex-patient/sync-engine": "*",
     "@complex-patient/ui": "*",
     "@complex-patient/weather": "*",
+    "expo-camera": "56.0.4",
     "expo-document-picker": "56.0.4",
     "expo-file-system": "56.0.8",
     "expo-local-authentication": "56.0.4",
     "expo-notifications": "56.0.18",
+    "expo-print": "56.0.4",
     "expo-secure-store": "56.0.4",
     "expo-sharing": "56.0.18"
   }

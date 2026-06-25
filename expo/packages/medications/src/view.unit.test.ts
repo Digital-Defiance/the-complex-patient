@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { MedicationProfile, MedicationSchedule } from '@complex-patient/domain';
 import { buildPolypharmacyView } from './index';
+import { makeMedicationProfile } from './test-fixtures';
 
 /**
  * Targeted unit tests for the adaptive polypharmacy view (Task 11.7;
@@ -26,18 +27,12 @@ function med(
   schedule: MedicationSchedule,
   overrides: Partial<MedicationProfile> = {},
 ): MedicationProfile {
-  return {
+  return makeMedicationProfile({
     id: `u-${++seq}`,
-    op_timestamp: '2026-01-01T00:00:00.000Z',
     drugName,
-    dosage: '5mg',
-    form: 'tablet',
-    prescribingPhysician: 'Dr. Smith',
-    conditionTreated: 'Condition',
-    active: true,
     schedule,
     ...overrides,
-  };
+  });
 }
 
 const weekly = (times: string[]): MedicationSchedule => ({

@@ -95,11 +95,18 @@ final class VaultController
      * permission callback, so auth is enforced uniformly before any handler
      * runs.
      */
+    /**
+     * Sub-paths under /vault/ owned by dedicated controllers (not vault partitions).
+     *
+     * @var list<string>
+     */
+    private const RESERVED_VAULT_SUBPATHS = ['kdf-material', 'paper-backups'];
+
     public function registerRoutes(): void
     {
         register_rest_route(
             self::NAMESPACE,
-            '/vault/(?P<vault_type>[a-zA-Z0-9_-]+)',
+            '/vault/(?P<vault_type>(?!' . implode('|', self::RESERVED_VAULT_SUBPATHS) . ')[a-zA-Z0-9_-]+)',
             [
                 [
                     'methods'             => 'GET',

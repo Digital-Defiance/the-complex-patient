@@ -19,6 +19,10 @@ export type {
   FetchLikeResponse,
   VaultHttpClientDeps,
   DevicePushRegistration,
+  PaperBackupRecord,
+  PaperBackupCreatePayload,
+  PaperBackupListResponse,
+  PaperBackupEnvelopeResponse,
 } from './vault-http-client';
 export { createVaultHttpClient, VAULT_HTTP_TRANSPORT_ERROR } from './vault-http-client';
 export {
@@ -36,6 +40,10 @@ export type {
   SignInResult,
   HomeEntryDeps,
   HomeEntryController,
+  PaperBackupSummary,
+  CreatePaperBackupResult,
+  PaperBackupRecoveryResult,
+  ChangePassphraseResult,
 } from './home-entry';
 export { createHomeEntry } from './home-entry';
 

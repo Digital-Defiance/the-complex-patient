@@ -22,7 +22,7 @@ describe('buildAuthorizationHeader (Requirement 4.1)', () => {
       username: 'alice',
       applicationPassword: 'xxxx yyyy zzzz',
     };
-    const expected = `Basic ${encodeBase64Utf8('alice:xxxx yyyy zzzz')}`;
+    const expected = `Basic ${encodeBase64Utf8('alice:xxxxyyyyzzzz')}`;
     expect(buildAuthorizationHeader(auth)).toBe(expected);
   });
 

@@ -28,7 +28,7 @@
  * (property test 11.3, unit tests 11.4).
  */
 
-import type { MedicationProfile, PrnConfig, PrnLog } from '@complex-patient/domain';
+import type { DoseRegimen, MedicationProfile, PrnConfig, PrnLog } from '@complex-patient/domain';
 import type { CryptoKeyRef } from '@complex-patient/crypto-engine';
 import { readMedicationPartition, writeMedicationPartition } from './gateway';
 import type { Clock, IdFactory, MedicationVaultStore, VaultCrypto } from './types';
@@ -142,6 +142,8 @@ export interface PrnQuickLogOptions {
    * again with this set (13.8).
    */
   overrideAcknowledged?: boolean;
+  /** PRN regimen to log; defaults to the first PRN regimen on the medication. */
+  regimenId?: string;
 }
 
 /**
@@ -230,17 +232,28 @@ export class PrnQuickLogEngine {
       return { ok: false, error: 'NOT_FOUND', message: `medication not found: ${medicationId}` };
     }
 
-    const prn = resolvePrnConfig(profile);
-    if (prn === null) {
+    const resolved = resolvePrnRegimen(profile, options.regimenId);
+    if (resolved === null) {
       return {
         ok: false,
         error: 'NOT_PRN',
         message: `medication is not configured as PRN: ${medicationId}`,
       };
     }
+    const { regimen, prn } = resolved;
 
     const takenAt = this.now();
     const nowMs = Date.parse(takenAt);
+
+    const minIntervalBlocked = checkMinIntervalBlocked(state.prnLogs, regimen.id, prn, nowMs);
+    if (minIntervalBlocked) {
+      return {
+        ok: false,
+        error: 'NOT_PRN',
+        message: minIntervalBlocked,
+      };
+    }
+
     const existingCumulative = computeTrailing24hCumulative(
       state.prnLogs,
       medicationId,
@@ -272,6 +285,7 @@ export class PrnQuickLogEngine {
       id: this.newId(),
       op_timestamp: takenAt,
       medicationId,
+      regimenId: regimen.id,
       amount: prn.doseAmount,
       takenAt,
       ...(evaluation.overrideFlag ? { override: true } : {}),
@@ -297,14 +311,43 @@ export class PrnQuickLogEngine {
   }
 }
 
-/**
- * Resolve the effective PRN config for a profile. A medication is PRN when it
- * carries a `prn` config (and, per the domain model, a `prn` schedule). Returns
- * `null` when the medication is not configured as PRN (13.2).
- */
-function resolvePrnConfig(profile: MedicationProfile): PrnConfig | null {
-  if (profile.prn === undefined) return null;
-  return profile.prn;
+function resolvePrnRegimen(
+  profile: MedicationProfile,
+  regimenId?: string,
+): { regimen: DoseRegimen; prn: PrnConfig } | null {
+  const prnRegimens = profile.regimens.filter(
+    (regimen) => regimen.schedule.kind === 'prn' || regimen.prn !== undefined,
+  );
+  if (prnRegimens.length === 0) return null;
+
+  const regimen =
+    (regimenId ? prnRegimens.find((entry) => entry.id === regimenId) : undefined) ??
+    prnRegimens[0];
+  if (!regimen?.prn) return null;
+  return { regimen, prn: regimen.prn };
+}
+
+function checkMinIntervalBlocked(
+  logs: readonly PrnLog[],
+  regimenId: string,
+  prn: PrnConfig,
+  nowMs: number,
+): string | null {
+  if (prn.minIntervalHours === undefined) return null;
+  const minGapMs = prn.minIntervalHours * 60 * 60 * 1000;
+  let latestMs = Number.NEGATIVE_INFINITY;
+  for (const log of logs) {
+    if (log.deleted === true) continue;
+    if (log.regimenId !== undefined && log.regimenId !== regimenId) continue;
+    const takenMs = Date.parse(log.takenAt);
+    if (Number.isNaN(takenMs)) continue;
+    if (takenMs > latestMs) latestMs = takenMs;
+  }
+  if (latestMs === Number.NEGATIVE_INFINITY) return null;
+  if (nowMs - latestMs < minGapMs) {
+    return `Minimum ${prn.minIntervalHours}h between PRN doses has not elapsed`;
+  }
+  return null;
 }
 
 /**

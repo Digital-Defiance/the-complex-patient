@@ -1,11 +1,12 @@
 /**
- * @complex-patient/mobile — Weather & location settings
+ * @complex-patient/mobile — Vault & device settings
  */
 
 import React, { useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { WeatherSettingsSection } from '@complex-patient/ui';
+import { VaultSettingsScreen } from '@complex-patient/ui/screens';
+import { nativeKdfStorage } from '../../../src/adapters';
 
 export default function SettingsScreen(): React.ReactElement {
   const router = useRouter();
@@ -15,10 +16,10 @@ export default function SettingsScreen(): React.ReactElement {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.screenTitle}>Settings</Text>
-      <WeatherSettingsSection
+      <VaultSettingsScreen
+        kdfStorage={nativeKdfStorage}
         showLocationTrailToggle
-        platformNote={
+        weatherPlatformNote={
           <Text style={styles.platformNote} testID="weather-native-permission-note">
             On iPhone and Android, location is requested when you log with attach-location on, or when the
             location trail is enabled. You can change permission any time in system Settings.
@@ -40,12 +41,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 24,
     gap: 16,
-  },
-  screenTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
   },
   platformNote: {
     fontSize: 13,

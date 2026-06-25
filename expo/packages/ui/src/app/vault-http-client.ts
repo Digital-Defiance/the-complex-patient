@@ -32,6 +32,9 @@ import { buildAuthorizationHeader, type AuthProvider } from './auth';
 /** Synthetic status when fetch/auth fails before an HTTP response is received. */
 export const VAULT_HTTP_TRANSPORT_ERROR = 0;
 
+/** Synthetic status when no Sync_Backend credential is available client-side. */
+export const VAULT_HTTP_AUTH_ERROR = 401;
+
 /** Minimal structural `Response` the client consumes (status + JSON body). */
 export interface FetchLikeResponse {
   status: number;
@@ -89,12 +92,63 @@ export interface DevicePushRegistration {
   push_provider: 'expo' | 'webpush';
 }
 
+/** Metadata for a stored paper backup envelope (no ciphertext in list). */
+export interface PaperBackupRecord {
+  backup_id: string;
+  label?: string | null;
+  created_at: string;
+}
+
+/** Payload for POST /vault/paper-backups. */
+export interface PaperBackupCreatePayload {
+  backup_id: string;
+  label?: string;
+  iv: string;
+  auth_tag: string;
+  ciphertext: string;
+}
+
+/** Response from GET /vault/paper-backups. */
+export interface PaperBackupListResponse {
+  status: number;
+  backups?: PaperBackupRecord[];
+}
+
+/** Response from GET /vault/paper-backups/{id}. */
+export interface PaperBackupEnvelopeResponse {
+  status: number;
+  backup_id?: string;
+  label?: string | null;
+  iv?: string;
+  auth_tag?: string;
+  ciphertext?: string;
+  created_at?: string;
+}
+
+/** Response from credential validation against core WordPress REST. */
+export interface WordPressAuthValidationResponse {
+  status: number;
+  /** WordPress REST error message when status is 401/403. */
+  message?: string;
+  code?: string;
+}
+
 /** Extended client surface including cross-device KDF material sync. */
 export interface VaultHttpClientWithKdf extends VaultHttpClient {
+  /** Validate the active credential against WordPress `/wp/v2/users/me`. */
+  validateWordPressAuth(): Promise<WordPressAuthValidationResponse>;
   getKdfMaterial(): Promise<KdfMaterialGetResponse>;
   putKdfMaterial(payload: KdfMaterialPutPayload): Promise<{ status: number }>;
   registerDevice(registration: DevicePushRegistration): Promise<{ status: number }>;
   unregisterDevice(deviceId: string): Promise<{ status: number }>;
+  listPaperBackups(): Promise<PaperBackupListResponse>;
+  createPaperBackup(payload: PaperBackupCreatePayload): Promise<{ status: number }>;
+  getPaperBackup(backupId: string): Promise<PaperBackupEnvelopeResponse>;
+  revokePaperBackup(backupId: string): Promise<{ status: number }>;
+  updatePaperBackup(
+    backupId: string,
+    payload: Omit<PaperBackupCreatePayload, 'backup_id' | 'label'>,
+  ): Promise<{ status: number }>;
 }
 
 /** Resolve the default transport from the host, if any. */
@@ -133,6 +187,13 @@ export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClien
       return `${base}/${DEVICES_PATH}/${encodeURIComponent(deviceId)}`;
     }
     return `${base}/${DEVICES_PATH}`;
+  }
+
+  function paperBackupsEndpoint(backupId?: string): string {
+    if (backupId) {
+      return `${base}/${VAULT_PATH}/paper-backups/${encodeURIComponent(backupId)}`;
+    }
+    return `${base}/${VAULT_PATH}/paper-backups`;
   }
 
   type TransportResult =
@@ -245,6 +306,30 @@ export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClien
     };
   }
 
+  async function validateWordPressAuth(): Promise<WordPressAuthValidationResponse> {
+    const auth = authHeadersOrError();
+    if ('error' in auth) {
+      return { status: VAULT_HTTP_AUTH_ERROR, message: auth.error };
+    }
+
+    const url = `${base}/wp-json/wp/v2/users/me`;
+    const transport = await performRequest('wp-users-me', url, {
+      method: 'GET',
+      headers: auth.headers,
+    });
+    if (!transport.ok) {
+      return { status: VAULT_HTTP_TRANSPORT_ERROR, message: transport.message };
+    }
+
+    const json = await safeJson(transport.response);
+    const error = readWpRestError(json);
+    return {
+      status: transport.response.status,
+      message: error.message,
+      code: error.code,
+    };
+  }
+
   async function getKdfMaterial(): Promise<KdfMaterialGetResponse> {
     const auth = authHeadersOrError();
     if ('error' in auth) {
@@ -313,11 +398,130 @@ export function createVaultHttpClient(deps: VaultHttpClientDeps): VaultHttpClien
     return { status: transport.ok ? transport.response.status : VAULT_HTTP_TRANSPORT_ERROR };
   }
 
+  async function listPaperBackups(): Promise<PaperBackupListResponse> {
+    const auth = authHeadersOrError();
+    if ('error' in auth) {
+      return { status: VAULT_HTTP_TRANSPORT_ERROR };
+    }
+
+    const transport = await performRequest('paper-backups', paperBackupsEndpoint(), {
+      method: 'GET',
+      headers: auth.headers,
+    });
+    if (!transport.ok) {
+      return { status: VAULT_HTTP_TRANSPORT_ERROR };
+    }
+
+    const json = await safeJson(transport.response);
+    const record = isRecord(json) ? json : {};
+    const backups = Array.isArray(record.backups) ? record.backups : [];
+    return {
+      status: transport.response.status,
+      backups: backups
+        .filter(isRecord)
+        .map((entry) => ({
+          backup_id: readString(entry, 'backup_id') ?? '',
+          label: readString(entry, 'label') ?? null,
+          created_at: readString(entry, 'created_at') ?? '',
+        }))
+        .filter((entry) => entry.backup_id !== ''),
+    };
+  }
+
+  async function createPaperBackup(payload: PaperBackupCreatePayload): Promise<{ status: number }> {
+    const auth = authHeadersOrError();
+    if ('error' in auth) {
+      console.warn(`[VaultHttp] POST ${paperBackupsEndpoint()} blocked: ${auth.error}`);
+      return { status: VAULT_HTTP_AUTH_ERROR };
+    }
+
+    const transport = await performRequest('paper-backups', paperBackupsEndpoint(), {
+      method: 'POST',
+      headers: { ...auth.headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!transport.ok) {
+      console.warn(`[VaultHttp] paper-backups POST transport error: ${transport.message}`);
+      return { status: VAULT_HTTP_TRANSPORT_ERROR };
+    }
+    return { status: transport.response.status };
+  }
+
+  async function getPaperBackup(backupId: string): Promise<PaperBackupEnvelopeResponse> {
+    const auth = authHeadersOrError();
+    if ('error' in auth) {
+      return { status: VAULT_HTTP_TRANSPORT_ERROR };
+    }
+
+    const transport = await performRequest('paper-backups', paperBackupsEndpoint(backupId), {
+      method: 'GET',
+      headers: auth.headers,
+    });
+    if (!transport.ok) {
+      return { status: VAULT_HTTP_TRANSPORT_ERROR };
+    }
+
+    const json = await safeJson(transport.response);
+    const record = isRecord(json) ? json : {};
+    return {
+      status: transport.response.status,
+      backup_id: readString(record, 'backup_id'),
+      label: readString(record, 'label') ?? null,
+      iv: readString(record, 'iv'),
+      auth_tag: readString(record, 'auth_tag'),
+      ciphertext: readString(record, 'ciphertext'),
+      created_at: readString(record, 'created_at'),
+    };
+  }
+
+  async function revokePaperBackup(backupId: string): Promise<{ status: number }> {
+    const auth = authHeadersOrError();
+    if ('error' in auth) {
+      return { status: VAULT_HTTP_TRANSPORT_ERROR };
+    }
+
+    const transport = await performRequest('paper-backups', paperBackupsEndpoint(backupId), {
+      method: 'DELETE',
+      headers: auth.headers,
+    });
+    return { status: transport.ok ? transport.response.status : VAULT_HTTP_TRANSPORT_ERROR };
+  }
+
+  async function updatePaperBackup(
+    backupId: string,
+    payload: Omit<PaperBackupCreatePayload, 'backup_id' | 'label'>,
+  ): Promise<{ status: number }> {
+    const auth = authHeadersOrError();
+    if ('error' in auth) {
+      return { status: VAULT_HTTP_TRANSPORT_ERROR };
+    }
+
+    const transport = await performRequest('paper-backups', paperBackupsEndpoint(backupId), {
+      method: 'PUT',
+      headers: { ...auth.headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { status: transport.ok ? transport.response.status : VAULT_HTTP_TRANSPORT_ERROR };
+  }
+
   if (typeof __DEV__ !== 'undefined' && __DEV__) {
     console.info(`[VaultHttp] sync backend: ${base}`);
   }
 
-  return { postVault, getVault, getKdfMaterial, putKdfMaterial, registerDevice, unregisterDevice };
+  return {
+    postVault,
+    getVault,
+    validateWordPressAuth,
+    getKdfMaterial,
+    putKdfMaterial,
+    registerDevice,
+    unregisterDevice,
+    listPaperBackups,
+    createPaperBackup,
+    getPaperBackup,
+    revokePaperBackup,
+    updatePaperBackup,
+  };
 }
 
 /** Enforce HTTPS for the Sync_Backend origin (Requirement 22.1). */
@@ -382,6 +586,18 @@ function readString(record: Record<string, unknown>, key: string): string | unde
   return typeof v === 'string' ? v : undefined;
 }
 
+function readWpRestError(value: unknown): { code?: string; message?: string } {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const data = isRecord(value.data) ? value.data : undefined;
+  const nestedMessage = data ? readString(data, 'message') : undefined;
+  return {
+    code: readString(value, 'code'),
+    message: readString(value, 'message') ?? nestedMessage,
+  };
+}
+
 /** Parse WordPress REST API error bodies returned on failed vault writes. */
 function readVaultApiError(value: unknown): {
   errorCode?: string;
@@ -391,9 +607,8 @@ function readVaultApiError(value: unknown): {
   if (!isRecord(value)) {
     return {};
   }
-  const errorCode = readString(value, 'code');
-  const errorMessage = readString(value, 'message');
+  const { code, message } = readWpRestError(value);
   const data = isRecord(value.data) ? value.data : undefined;
   const errorField = data ? readString(data, 'field') : undefined;
-  return { errorCode, errorMessage, errorField };
+  return { errorCode: code, errorMessage: message, errorField };
 }

@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { MedicationsScreen } from '@complex-patient/ui';
+import { MedicationsScreen } from '@complex-patient/ui/screens';
 
 export default function MedicationsCabinetRoute(): React.ReactElement {
   const router = useRouter();

@@ -91,8 +91,23 @@ final class ActivationTest extends TestCase
 
         Activation::ensureSchema();
 
-        $this->assertCount(3, $wpdb->dbDeltaCalls);
+        $this->assertCount(4, $wpdb->dbDeltaCalls);
         $this->assertSame([], $wpdb->droppedTables);
+    }
+
+    public function testRepairMissingTablesCreatesOnlyAbsentTables(): void
+    {
+        $wpdb = new FakeWpdb();
+        $wpdb->dbDeltaCreatesTables = false;
+        $wpdb->directQueryCreatesTables = true;
+        $GLOBALS['wpdb'] = $wpdb;
+
+        $report = Activation::repairMissingTables($wpdb);
+
+        $this->assertSame('created', $report['vault']);
+        $this->assertSame('created', $report['kdf']);
+        $this->assertSame('created', $report['device']);
+        $this->assertSame('created', $report['paper_backup']);
     }
 
     public function testActivateSucceedsWhenTableIsCreated(): void
@@ -102,11 +117,12 @@ final class ActivationTest extends TestCase
 
         Activation::activate();
 
-        // Requirement 9.1: dbDelta is invoked to create the vault, KDF, and device tables.
-        $this->assertCount(3, $wpdb->dbDeltaCalls);
+        // Requirement 9.1: dbDelta is invoked to create the vault, KDF, device, and paper-backup tables.
+        $this->assertCount(4, $wpdb->dbDeltaCalls);
         $this->assertStringContainsString('wp_complex_patient_vault', $wpdb->dbDeltaCalls[0]);
         $this->assertStringContainsString('wp_complex_patient_kdf', $wpdb->dbDeltaCalls[1]);
         $this->assertStringContainsString('wp_complex_patient_device', $wpdb->dbDeltaCalls[2]);
+        $this->assertStringContainsString('wp_complex_patient_paper_backup', $wpdb->dbDeltaCalls[3]);
         // No partial-table cleanup needed on success.
         $this->assertSame([], $wpdb->droppedTables);
     }

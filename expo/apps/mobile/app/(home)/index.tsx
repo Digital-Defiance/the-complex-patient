@@ -11,7 +11,7 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { HomeScreen } from '@complex-patient/ui';
+import { HomeScreen } from '@complex-patient/ui/screens';
 
 export default function Home(): React.ReactElement {
   const router = useRouter();

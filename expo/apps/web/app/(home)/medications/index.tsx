@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { MedicationsHubScreen } from '@complex-patient/ui';
+import { MedicationsHubScreen } from '@complex-patient/ui/screens';
 
 export default function MedicationsHubRoute(): React.ReactElement {
   const router = useRouter();

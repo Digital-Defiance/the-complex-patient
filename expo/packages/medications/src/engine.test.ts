@@ -56,16 +56,33 @@ const weeklySchedule: MedicationSchedule = {
   times: ['08:00'],
 };
 
-function makeInput(overrides: Partial<MedicationProfileInput> = {}): MedicationProfileInput {
+function makeInput(overrides: Partial<MedicationProfileInput> & { dosage?: string; form?: string; schedule?: MedicationSchedule; prn?: PrnConfig } = {}): MedicationProfileInput {
+  const {
+    dosage = '15mg',
+    form = 'tablet',
+    schedule = weeklySchedule,
+    prn,
+    regimens,
+    ...rest
+  } = overrides;
+
   return {
     drugName: 'Methotrexate',
-    dosage: '15mg',
-    form: 'tablet',
     prescribingPhysician: 'Dr. Smith',
     conditionTreated: 'Rheumatoid Arthritis',
     active: true,
-    schedule: weeklySchedule,
-    ...overrides,
+    regimens:
+      regimens ??
+      [
+        {
+          id: 'reg-1',
+          dosage,
+          form,
+          schedule,
+          ...(prn !== undefined ? { prn } : {}),
+        },
+      ],
+    ...rest,
   };
 }
 
@@ -97,12 +114,16 @@ describe('MedicationProfileEngine.create — valid profiles (10.1, 10.3, 11.5)',
     expect(result.profile).toMatchObject({
       id: 'med-1',
       drugName: 'Methotrexate',
-      dosage: '15mg',
-      form: 'tablet',
       prescribingPhysician: 'Dr. Smith',
       conditionTreated: 'Rheumatoid Arthritis',
       active: true,
-      schedule: weeklySchedule,
+      regimens: [
+        expect.objectContaining({
+          dosage: '15mg',
+          form: 'tablet',
+          schedule: weeklySchedule,
+        }),
+      ],
     });
 
     // Persisted and readable back from the vault.
@@ -133,7 +154,7 @@ describe('MedicationProfileEngine.create — valid profiles (10.1, 10.3, 11.5)',
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.profile.prn).toEqual(prn);
+    expect(result.profile.regimens[0]?.prn).toEqual(prn);
   });
 
   it('appends multiple profiles without losing earlier records', async () => {
@@ -164,9 +185,7 @@ describe('MedicationProfileEngine.create — invalid profiles (10.2)', () => {
   it('reports every invalid field at once', async () => {
     const engine = makeEngine();
     const tooLong = 'x'.repeat(201);
-    const result = await engine.create(
-      makeInput({ drugName: '', dosage: tooLong, form: '' }),
-    );
+    const result = await engine.create(makeInput({ drugName: '', dosage: tooLong, form: '' }));
     expect(result.ok).toBe(false);
     if (result.ok || result.error !== 'INVALID_PROFILE') return;
     const fields = result.fieldErrors.map((e) => e.field).sort();
@@ -176,7 +195,7 @@ describe('MedicationProfileEngine.create — invalid profiles (10.2)', () => {
   it('rejects an invalid schedule (rotating interval out of range) and stores nothing', async () => {
     const engine = makeEngine();
     const result = await engine.create(
-      makeInput({ schedule: { kind: 'rotating-interval', everyNDays: 31, times: ['08:00'] } }),
+      makeInput({ schedule: { kind: 'rotating-interval', everyNDays: 366, times: ['08:00'] } }),
     );
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -206,15 +225,19 @@ describe('MedicationProfileEngine.update — editing existing profiles (10.4, 10
     expect(created.ok).toBe(true);
     if (!created.ok) return;
 
-    const result = await engine.update(created.profile.id, { dosage: '20mg' });
+    const updatedRegimens = created.profile.regimens.map((regimen) => ({
+      ...regimen,
+      dosage: '20mg',
+    }));
+    const result = await engine.update(created.profile.id, { regimens: updatedRegimens });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.profile.dosage).toBe('20mg');
+    expect(result.profile.regimens[0]?.dosage).toBe('20mg');
     // Other fields retained.
     expect(result.profile.drugName).toBe('Methotrexate');
 
     const reread = await engine.get(created.profile.id);
-    expect(reread?.dosage).toBe('20mg');
+    expect(reread?.regimens[0]?.dosage).toBe('20mg');
   });
 
   it('records a new op_timestamp on update (10.5)', async () => {
@@ -228,7 +251,11 @@ describe('MedicationProfileEngine.update — editing existing profiles (10.4, 10
     expect(created.profile.op_timestamp).toBe('2026-01-01T00:00:00.000Z');
 
     clock.set('2026-02-02T12:00:00.000Z');
-    const updated = await engine.update(created.profile.id, { dosage: '25mg' });
+    const updatedRegimens = created.profile.regimens.map((regimen) => ({
+      ...regimen,
+      dosage: '25mg',
+    }));
+    const updated = await engine.update(created.profile.id, { regimens: updatedRegimens });
     expect(updated.ok).toBe(true);
     if (!updated.ok) return;
     expect(updated.profile.op_timestamp).toBe('2026-02-02T12:00:00.000Z');
@@ -257,7 +284,11 @@ describe('MedicationProfileEngine.update — non-existent profiles (10.6)', () =
     await engine.create(makeInput({ drugName: 'Aspirin' }));
 
     const before = await engine.list();
-    const result = await engine.update('does-not-exist', { dosage: '99mg' });
+    const updatedRegimens = before[0]!.regimens.map((regimen) => ({
+      ...regimen,
+      dosage: '99mg',
+    }));
+    const result = await engine.update('does-not-exist', { regimens: updatedRegimens });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -269,7 +300,16 @@ describe('MedicationProfileEngine.update — non-existent profiles (10.6)', () =
 
   it('rejects an edit against an empty partition with NOT_FOUND and writes nothing', async () => {
     const engine = makeEngine();
-    const result = await engine.update('med-1', { dosage: '5mg' });
+    const result = await engine.update('med-1', {
+      regimens: [
+        {
+          id: 'reg-1',
+          dosage: '5mg',
+          form: 'tablet',
+          schedule: weeklySchedule,
+        },
+      ],
+    });
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toBe('NOT_FOUND');

@@ -22,6 +22,7 @@ export const ScrollView = 'ScrollView';
 export const FlatList = 'FlatList';
 export const ActivityIndicator = 'ActivityIndicator';
 export const Image = 'Image';
+export const Modal = 'Modal';
 export const SafeAreaView = 'SafeAreaView';
 export const StatusBar = 'StatusBar';
 export const Platform = { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default };

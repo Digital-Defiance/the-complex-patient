@@ -77,17 +77,20 @@ export function resolveSyncBackendBaseUrl() {
     if (configured) {
         return configured.replace(/\/+$/, '');
     }
+    const fromBrowser = resolveWebBrowserBackend();
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
         const fromExpoHost = syncBackendUrlFromExpoHostUri(getExpoDevHostUri());
         if (fromExpoHost) {
             return fromExpoHost;
+        }
+        if (fromBrowser) {
+            return fromBrowser;
         }
         if (Platform.OS === 'android') {
             return ANDROID_EMULATOR_SYNC_BACKEND_URL;
         }
         return DEFAULT_LOCAL_SYNC_BACKEND_URL;
     }
-    const fromBrowser = resolveWebBrowserBackend();
     if (fromBrowser) {
         return fromBrowser;
     }

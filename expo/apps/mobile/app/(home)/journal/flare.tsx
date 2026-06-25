@@ -10,7 +10,7 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { FlareScreen } from '@complex-patient/ui';
+import { FlareScreen } from '@complex-patient/ui/screens';
 
 export default function JournalFlare(): React.ReactElement {
   const router = useRouter();

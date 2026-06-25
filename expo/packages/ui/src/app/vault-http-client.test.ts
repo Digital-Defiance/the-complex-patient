@@ -192,4 +192,50 @@ describe('createVaultHttpClient — blind envelope only (4.6, 4.8)', () => {
     expect(res.status).toBe(401);
     expect(res.sync_version).toBeUndefined();
   });
+
+  it('validates WordPress credentials against /wp/v2/users/me', async () => {
+    const auth = createAuthProvider({
+      kind: 'application-password',
+      username: 'alice',
+      applicationPassword: 'abcd efgh',
+    });
+    const fetch = vi.fn(async (url: string, init: { headers: Record<string, string> }) => {
+      expect(url).toBe('http://localhost:8881/wp-json/wp/v2/users/me');
+      expect(init.headers.Authorization).toBe(
+        `Basic ${Buffer.from('alice:abcdefgh', 'utf8').toString('base64')}`,
+      );
+      return {
+        status: 200,
+        json: async () => ({ id: 1, name: 'alice' }),
+      };
+    });
+    const client = createVaultHttpClient({
+      baseUrl: 'http://localhost:8881',
+      auth,
+      fetch,
+    });
+    const res = await client.validateWordPressAuth();
+    expect(res.status).toBe(200);
+  });
+
+  it('paper backups use the same Sync_Backend base URL as vault partitions', async () => {
+    const auth = createAuthProvider({ kind: 'jwt', token: 't' });
+    const fetch = vi.fn(async (url: string) => {
+      expect(url).toBe('http://localhost:8881/wp-json/complex-patient/v1/vault/paper-backups');
+      return { status: 201, json: async () => ({}) };
+    });
+    const client = createVaultHttpClient({
+      baseUrl: 'http://localhost:8881',
+      auth,
+      fetch,
+    });
+    const res = await client.createPaperBackup!({
+      backup_id: '11111111-1111-4111-8111-111111111111',
+      iv: 'aXY=',
+      auth_tag: 'dGFn',
+      ciphertext: 'Y2lwaGVy',
+    });
+    expect(res.status).toBe(201);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
 });

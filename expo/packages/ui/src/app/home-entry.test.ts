@@ -117,10 +117,18 @@ describe('createHomeEntry — auth + unlock lifecycle (4.1, 22.1, 22.2)', () => 
       resolveValidation = resolve;
     });
     const vaultHttp = {
-      getKdfMaterial: () => validation,
+      validateWordPressAuth: () => validation,
+      getKdfMaterial: vi.fn(),
       putKdfMaterial: vi.fn(async () => ({ status: 200 })),
       postVault: vi.fn(),
       getVault: vi.fn(),
+      registerDevice: vi.fn(async () => ({ status: 200 })),
+      unregisterDevice: vi.fn(async () => ({ status: 200 })),
+      listPaperBackups: vi.fn(async () => ({ status: 200, backups: [] })),
+      createPaperBackup: vi.fn(async () => ({ status: 201 })),
+      getPaperBackup: vi.fn(async () => ({ status: 404 })),
+      revokePaperBackup: vi.fn(async () => ({ status: 200 })),
+      updatePaperBackup: vi.fn(async () => ({ status: 200 })),
     };
     const keyedController = createHomeEntry({
       keyStore: new WebSessionKeyStore(),
@@ -147,10 +155,18 @@ describe('createHomeEntry — auth + unlock lifecycle (4.1, 22.1, 22.2)', () => 
 
   it('rejects sign-in when KDF validation hits a transport error', async () => {
     const vaultHttp = {
+      validateWordPressAuth: vi.fn(async () => ({ status: 0 })),
       getKdfMaterial: vi.fn(async () => ({ status: 0 })),
       putKdfMaterial: vi.fn(),
       postVault: vi.fn(),
       getVault: vi.fn(),
+      registerDevice: vi.fn(async () => ({ status: 200 })),
+      unregisterDevice: vi.fn(async () => ({ status: 200 })),
+      listPaperBackups: vi.fn(async () => ({ status: 200, backups: [] })),
+      createPaperBackup: vi.fn(async () => ({ status: 201 })),
+      getPaperBackup: vi.fn(async () => ({ status: 404 })),
+      revokePaperBackup: vi.fn(async () => ({ status: 200 })),
+      updatePaperBackup: vi.fn(async () => ({ status: 200 })),
     };
     const keyedController = createHomeEntry({
       keyStore: new WebSessionKeyStore(),

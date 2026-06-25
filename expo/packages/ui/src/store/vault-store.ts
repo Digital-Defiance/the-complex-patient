@@ -100,6 +100,9 @@ export interface VaultStore {
    */
   refreshPartition(vaultType: VaultType): Promise<void>;
 
+  /** Re-encrypt all persisted partitions with a new KEK (passphrase change). */
+  rekey(nextKek: CryptoKeyRef): Promise<void>;
+
   /**
    * Clear all PHI projections and discard the in-memory KEK together, on lock
    * or idle timeout (Requirements 3.6, 3.7).
@@ -301,6 +304,37 @@ export function createVaultStore(deps: VaultStoreDeps): VaultStore {
     }));
   }
 
+  /**
+   * Re-encrypt every persisted partition with `nextKek` while unlocked.
+   * Plaintext projections are unchanged; only at-rest envelopes rotate.
+   */
+  async function rekey(nextKek: CryptoKeyRef): Promise<void> {
+    if (kek === null || api.getState().status !== 'unlocked') {
+      throw new Error('vault is locked');
+    }
+
+    const oldKek = kek;
+    for (const vaultType of PHI_VAULT_TYPES) {
+      const blob = await vault.readPartition(vaultType);
+      if (blob === null) {
+        continue;
+      }
+      const decrypted = await crypto.decrypt(toEncryptedPayload(blob), oldKek);
+      if (!decrypted.ok) {
+        throw new Error(`failed to decrypt ${vaultType} during rekey: ${decrypted.error}`);
+      }
+      const encrypted = await crypto.encrypt(decrypted.plaintext, nextKek);
+      await vault.writePartition(vaultType, {
+        sync_version: blob.sync_version,
+        iv: encrypted.iv,
+        auth_tag: encrypted.authTag,
+        ciphertext: encrypted.ciphertext,
+      });
+    }
+
+    kek = nextKek;
+  }
+
   function clear(): void {
     // Discard the in-memory KEK and wipe every PHI projection together
     // (Requirements 3.6, 3.7).
@@ -318,6 +352,7 @@ export function createVaultStore(deps: VaultStoreDeps): VaultStore {
     commit,
     applySyncedVersion,
     refreshPartition,
+    rekey,
     clear,
   };
 }

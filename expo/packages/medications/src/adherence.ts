@@ -29,28 +29,40 @@ function upsertMedEvent(
 function findExistingEvent(
   current: readonly VaultRecord[],
   medicationId: string,
+  regimenId: string,
   scheduledAt: string,
 ): MedEvent | undefined {
-  const key = scheduledDoseKey(medicationId, scheduledAt);
+  const key = scheduledDoseKey(medicationId, regimenId, scheduledAt);
   return current.find(
     (record): record is MedEvent =>
       'scheduledAt' in record &&
-      scheduledDoseKey((record as MedEvent).medicationId, (record as MedEvent).scheduledAt) === key,
+      scheduledDoseKey(
+        (record as MedEvent).medicationId,
+        (record as MedEvent).regimenId,
+        (record as MedEvent).scheduledAt,
+      ) === key,
   );
 }
 
 export function recordDoseTaken(deps: {
   current: readonly VaultRecord[];
   medicationId: string;
+  regimenId: string;
   scheduledAt: string;
   takenAt?: string;
 }): MedEventMutationResult {
   const takenAt = deps.takenAt ?? new Date().toISOString();
-  const existing = findExistingEvent(deps.current, deps.medicationId, deps.scheduledAt);
+  const existing = findExistingEvent(
+    deps.current,
+    deps.medicationId,
+    deps.regimenId,
+    deps.scheduledAt,
+  );
   const event: MedEvent = {
     id: existing?.id ?? generateId(),
     op_timestamp: takenAt,
     medicationId: deps.medicationId,
+    regimenId: deps.regimenId,
     scheduledAt: deps.scheduledAt,
     takenAt,
     status: 'taken',
@@ -61,16 +73,23 @@ export function recordDoseTaken(deps: {
 export function recordDoseSkipped(deps: {
   current: readonly VaultRecord[];
   medicationId: string;
+  regimenId: string;
   scheduledAt: string;
   reason?: string;
   skippedAt?: string;
 }): MedEventMutationResult {
   const skippedAt = deps.skippedAt ?? new Date().toISOString();
-  const existing = findExistingEvent(deps.current, deps.medicationId, deps.scheduledAt);
+  const existing = findExistingEvent(
+    deps.current,
+    deps.medicationId,
+    deps.regimenId,
+    deps.scheduledAt,
+  );
   const event: MedEvent = {
     id: existing?.id ?? generateId(),
     op_timestamp: skippedAt,
     medicationId: deps.medicationId,
+    regimenId: deps.regimenId,
     scheduledAt: deps.scheduledAt,
     takenAt: null,
     status: 'skipped',
@@ -82,14 +101,21 @@ export function recordDoseSkipped(deps: {
 export function recordDoseSnoozed(deps: {
   current: readonly VaultRecord[];
   medicationId: string;
+  regimenId: string;
   scheduledAt: string;
   snoozedUntil: string;
 }): MedEventMutationResult {
-  const existing = findExistingEvent(deps.current, deps.medicationId, deps.scheduledAt);
+  const existing = findExistingEvent(
+    deps.current,
+    deps.medicationId,
+    deps.regimenId,
+    deps.scheduledAt,
+  );
   const event: MedEvent = {
     id: existing?.id ?? generateId(),
     op_timestamp: new Date().toISOString(),
     medicationId: deps.medicationId,
+    regimenId: deps.regimenId,
     scheduledAt: deps.scheduledAt,
     takenAt: null,
     status: 'snoozed',

@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { UnlockScreen } from '@complex-patient/ui';
+import { UnlockScreen } from '@complex-patient/ui/screens';
 import { webFlagStorage } from '../../src/adapters';
 import { inferAgeEligibleFromWebVault } from '../../src/infer-age-eligible';
 

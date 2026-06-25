@@ -60,13 +60,14 @@ export type Clock = () => string;
  */
 export type MedicationProfileInput = {
   drugName: string;
-  dosage: string;
-  form: string;
   prescribingPhysician: string;
   conditionTreated: string;
+  notes?: string;
   active: boolean;
-  schedule: import('@complex-patient/domain').MedicationSchedule;
-  prn?: import('@complex-patient/domain').PrnConfig;
+  regimens: import('@complex-patient/domain').DoseRegimen[];
+  appearance?: import('@complex-patient/domain').MedAppearance;
+  refill?: import('@complex-patient/domain').MedRefillTracking;
+  productCode?: string;
 };
 
 /**

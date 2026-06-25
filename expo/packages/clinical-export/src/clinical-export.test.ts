@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { makeTestMedicationProfile } from '@complex-patient/domain';
 import { BlobReader, TextWriter, ZipReader } from './zip-entry';
 import {
   buildFhirBundle,
@@ -17,17 +18,15 @@ import {
 
 const sampleSource: ClinicalExportSource = {
   medications: [
-    {
+    makeTestMedicationProfile({
       id: 'med-1',
       op_timestamp: '2026-06-01T10:00:00.000Z',
       drugName: 'Ibuprofen',
       dosage: '200mg',
-      form: 'tablet',
       prescribingPhysician: 'Dr. Smith',
       conditionTreated: 'Pain',
-      active: true,
       schedule: { kind: 'prn' },
-    },
+    }),
   ],
   prnLogs: [
     {

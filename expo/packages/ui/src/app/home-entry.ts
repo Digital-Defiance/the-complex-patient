@@ -21,7 +21,18 @@
  * platform adapters and render the returned controller's state.
  */
 
-import type { CryptoKeyRef, KdfParams } from '@complex-patient/crypto-engine';
+import type { CryptoKeyRef, KdfParams, PaperBackupTemplate } from '@complex-patient/crypto-engine';
+import {
+  createPaperBackupWrap,
+  deriveKEK,
+  formatPaperBackupTemplateText,
+  generatePaperBackupQrDataUrl,
+  generateSalt,
+  normalizePaperBackupMnemonic,
+  unwrapKekFromPaperBackup,
+  validatePaperBackupMnemonic,
+  wrapKekForPaperBackup,
+} from '@complex-patient/crypto-engine';
 import { decrypt, encrypt } from '@complex-patient/crypto-engine';
 import type { LocalVault } from '@complex-patient/local-vault';
 import type { VaultRecord, VaultType } from '@complex-patient/domain';
@@ -44,6 +55,16 @@ import { suspendBackgroundLock } from '../app-shell/background-lock-session';
 import type { CommitResult, VaultStore } from '../store/vault-store';
 import { PHI_VAULT_TYPES, type PartitionProjection } from '../store/types';
 import type { MutableAuthProvider, WordPressAuth } from './auth';
+import {
+  listRegisteredPaperBackups,
+  registerPaperBackupMnemonic,
+  rekeyPaperBackupRegistry,
+  unregisterPaperBackupMnemonic,
+  type PaperBackupRegistryStorage,
+} from './paper-backup-registry';
+
+const PASSPHRASE_MIN_LENGTH = 12;
+const PASSPHRASE_MAX_LENGTH = 128;
 
 /**
  * Whether the authenticated home is currently presentable.
@@ -83,7 +104,52 @@ export interface UnlockWithKekOptions {
 /** Result of a WordPress sign-in attempt. */
 export type SignInResult =
   | { ok: true }
-  | { ok: false; reason: 'INVALID_CREDENTIALS' | 'NETWORK_ERROR' };
+  | { ok: false; reason: 'INVALID_CREDENTIALS' | 'NETWORK_ERROR'; detail?: string };
+
+function formatWordPressSignInDetail(response: {
+  message?: string;
+  code?: string;
+}): string | undefined {
+  if (response.code === 'rest_not_logged_in') {
+    return (
+      'WordPress did not receive your Application Password. Use your WordPress username (login name) and an Application Password from Users → Profile → Application Passwords — not your regular wp-admin password. Being logged into wp-admin in the browser does not sign the app in.'
+    );
+  }
+  return response.message;
+}
+
+/** Summary of a server-stored paper backup (metadata only). */
+export interface PaperBackupSummary {
+  backupId: string;
+  label?: string;
+  createdAt: string;
+}
+
+export type CreatePaperBackupResult =
+  | {
+      ok: true;
+      mnemonic: string;
+      backupId: string;
+      templateText: string;
+      qrDataUrl: string;
+      template: PaperBackupTemplate;
+    }
+  | { ok: false; reason: 'NOT_UNLOCKED' | 'NO_HTTP' | 'UPLOAD_FAILED' | 'CRYPTO_FAILED'; httpStatus?: number };
+
+export type ChangePassphraseResult =
+  | { ok: true; rewrappedBackups: number }
+  | {
+      ok: false;
+      reason:
+        | 'NOT_UNLOCKED'
+        | 'PASSPHRASE_INVALID'
+        | 'DERIVATION_FAILED'
+        | 'REKEY_FAILED'
+        | 'REWRAP_FAILED'
+        | 'KDF_PUBLISH_FAILED';
+    };
+
+export type PaperBackupRecoveryResult = HomeUnlockResult | { ok: false; reason: 'INVALID_MNEMONIC' | 'NOT_FOUND' | 'DECRYPT_FAILED' | 'NOT_AUTHENTICATED' };
 
 /**
  * Dependencies for {@link createHomeEntry}. Every collaborator is injected so
@@ -109,6 +175,8 @@ export interface HomeEntryDeps {
   getActiveKek?: () => CryptoKeyRef | null;
   /** Persists a stable per-install device id for push registration. */
   deviceIdStorage?: DeviceIdStorage;
+  /** Device-local storage for KEK-encrypted paper-backup mnemonic registry. */
+  paperBackupRegistryStorage?: PaperBackupRegistryStorage;
 }
 
 /**
@@ -207,6 +275,35 @@ export interface HomeEntryController {
   /** Whether a platform quick-unlock key is stored (biometrics on native). */
   hasStoredUnlockKey(): Promise<boolean>;
 
+  /** List active paper backup envelopes stored for this account. */
+  listPaperBackups(): Promise<PaperBackupSummary[]>;
+
+  /** Create a new paper backup wrapping the current session KEK. */
+  createPaperBackup(material: KdfMaterial, label?: string): Promise<CreatePaperBackupResult>;
+
+  /** Revoke a paper backup so it can no longer be used for recovery. */
+  revokePaperBackup(backupId: string): Promise<{ ok: boolean }>;
+
+  /**
+   * Recover the vault using a paper backup mnemonic + backup id printed on the sheet.
+   * Persists recovered KDF material locally before unlocking.
+   */
+  recoverWithPaperBackup(
+    mnemonic: string,
+    backupId: string,
+    saveKdfMaterial: (material: KdfMaterial) => Promise<void>,
+  ): Promise<PaperBackupRecoveryResult>;
+
+  /**
+   * Change the master passphrase: re-encrypt local vault partitions, publish new
+   * KDF material, and re-wrap active paper backups using the device registry.
+   */
+  changeMasterPassphrase(
+    newPassphrase: string,
+    currentMaterial: KdfMaterial,
+    saveKdfMaterial: (material: KdfMaterial) => Promise<void>,
+  ): Promise<ChangePassphraseResult>;
+
   /** Web-only: whether passkey fast unlock is supported in this browser. */
   isPasskeyUnlockAvailable?(): boolean;
 
@@ -214,7 +311,12 @@ export interface HomeEntryController {
   hasPasskeyUnlock?(): boolean;
 
   /** Web-only: register or refresh passkey unlock after a passphrase unlock. */
-  enablePasskeyUnlock?(): Promise<{ ok: true } | { ok: false; message: string }>;
+  enablePasskeyUnlock?(
+    options?: { replace?: boolean },
+  ): Promise<{ ok: true } | { ok: false; message: string }>;
+
+  /** Web-only: remove saved passkey unlock metadata from this browser. */
+  removePasskeyUnlock?(): void;
 
   /** Tear down internal subscriptions. */
   dispose(): void;
@@ -237,6 +339,7 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     vaultHttp,
     getActiveKek,
     deviceIdStorage,
+    paperBackupRegistryStorage,
   } = deps;
 
   const coordinator = createOfflineSyncCoordinator({ store, syncWorker });
@@ -438,13 +541,24 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
 
     // Validate credentials before emitting `locked` so the shell does not route
     // to unlock while validation is still in flight (avoids mid-unlock sign-out).
-    return vaultHttp
-      .getKdfMaterial()
+    const validate =
+      vaultHttp.validateWordPressAuth?.bind(vaultHttp) ??
+      (() =>
+        vaultHttp.getKdfMaterial().then((response) => ({
+          status: response.status,
+        })));
+
+    return validate()
       .then((response) => {
         if (response.status === 401 || response.status === 403) {
           auth.setAuth(null);
           emitStatusIfChanged();
-          return { ok: false as const, reason: 'INVALID_CREDENTIALS' as const };
+          console.error('[HomeEntry] signIn validation failed:', response.status, response.message);
+          return {
+            ok: false as const,
+            reason: 'INVALID_CREDENTIALS' as const,
+            detail: formatWordPressSignInDetail(response),
+          };
         }
         if (response.status === 0) {
           auth.setAuth(null);
@@ -636,7 +750,11 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
   type PasskeyCapableKeyStore = SessionKeyStore & {
     isPasskeyUnlockAvailable?: () => boolean;
     hasPasskeyUnlock?: () => boolean;
-    enablePasskeyUnlock?: () => Promise<{ ok: true } | { ok: false; message: string }>;
+    enablePasskeyUnlock?: (
+      options?: { replace?: boolean },
+    ) => Promise<{ ok: true } | { ok: false; message: string }>;
+    removePasskeyUnlock?: () => void;
+    clearPasskeyUnlock?: () => void;
     hasStoredUnlockKey?: () => Promise<boolean>;
   };
 
@@ -650,11 +768,17 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     return passkeyKeyStore.hasPasskeyUnlock?.() ?? false;
   }
 
-  async function enablePasskeyUnlock(): Promise<{ ok: true } | { ok: false; message: string }> {
+  async function enablePasskeyUnlock(
+    options?: { replace?: boolean },
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
     if (!passkeyKeyStore.enablePasskeyUnlock) {
       return { ok: false, message: 'Passkey unlock is not available on this platform.' };
     }
-    return passkeyKeyStore.enablePasskeyUnlock();
+    return passkeyKeyStore.enablePasskeyUnlock(options);
+  }
+
+  function removePasskeyUnlock(): void {
+    passkeyKeyStore.removePasskeyUnlock?.() ?? passkeyKeyStore.clearPasskeyUnlock?.();
   }
 
   async function hasStoredUnlockKey(): Promise<boolean> {
@@ -662,6 +786,264 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
       return passkeyKeyStore.hasStoredUnlockKey();
     }
     return false;
+  }
+
+  async function listPaperBackups(): Promise<PaperBackupSummary[]> {
+    if (vaultHttp === undefined || auth.getAuth() === null) {
+      return [];
+    }
+    const response = await vaultHttp.listPaperBackups();
+    if (response.status < 200 || response.status >= 300 || !response.backups) {
+      return [];
+    }
+    return response.backups.map((entry) => ({
+      backupId: entry.backup_id,
+      label: entry.label ?? undefined,
+      createdAt: entry.created_at,
+    }));
+  }
+
+  async function createPaperBackup(
+    material: KdfMaterial,
+    label?: string,
+  ): Promise<CreatePaperBackupResult> {
+    const kek = getActiveKek?.() ?? null;
+    if (kek === null || !store.isUnlocked()) {
+      return { ok: false, reason: 'NOT_UNLOCKED' };
+    }
+    if (vaultHttp === undefined) {
+      return { ok: false, reason: 'NO_HTTP' };
+    }
+    if (auth.getAuth() === null) {
+      return { ok: false, reason: 'UPLOAD_FAILED', httpStatus: 401 };
+    }
+
+    let mnemonic: string;
+    let wrapped: Awaited<ReturnType<typeof createPaperBackupWrap>>['wrapped'];
+    let template: Awaited<ReturnType<typeof createPaperBackupWrap>>['template'];
+    let backupId: string;
+
+    try {
+      const created = await createPaperBackupWrap(kek, {
+        salt: material.salt,
+        params: material.params,
+      });
+      mnemonic = created.mnemonic;
+      wrapped = created.wrapped;
+      template = created.template;
+      backupId = created.backupId;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.error('[HomeEntry] paper backup wrap failed:', message);
+      return { ok: false, reason: 'CRYPTO_FAILED' };
+    }
+
+    const response = await vaultHttp.createPaperBackup({
+      backup_id: backupId,
+      label,
+      iv: wrapped.iv,
+      auth_tag: wrapped.authTag,
+      ciphertext: wrapped.ciphertext,
+    });
+
+    if (response.status < 200 || response.status >= 300) {
+      console.error(
+        '[HomeEntry] paper backup upload failed:',
+        `HTTP ${response.status}`,
+        { backupId },
+      );
+      return { ok: false, reason: 'UPLOAD_FAILED', httpStatus: response.status };
+    }
+
+    const templateWithLabel = { ...template, label };
+    if (paperBackupRegistryStorage) {
+      try {
+        await registerPaperBackupMnemonic(paperBackupRegistryStorage, kek, {
+          backupId,
+          mnemonic,
+          label,
+        });
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        console.error('[HomeEntry] paper backup registry write failed:', message);
+      }
+    }
+
+    let qrDataUrl: string;
+    try {
+      qrDataUrl = generatePaperBackupQrDataUrl(backupId, mnemonic);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.error('[HomeEntry] paper backup QR render failed:', message);
+      qrDataUrl = '';
+    }
+
+    return {
+      ok: true,
+      mnemonic,
+      backupId,
+      templateText: formatPaperBackupTemplateText(templateWithLabel),
+      qrDataUrl,
+      template: templateWithLabel,
+    };
+  }
+
+  async function revokePaperBackup(backupId: string): Promise<{ ok: boolean }> {
+    if (vaultHttp === undefined || auth.getAuth() === null) {
+      return { ok: false };
+    }
+    const response = await vaultHttp.revokePaperBackup(backupId);
+    if (response.status >= 200 && response.status < 300) {
+      const kek = getActiveKek?.() ?? null;
+      if (kek !== null && paperBackupRegistryStorage) {
+        await unregisterPaperBackupMnemonic(paperBackupRegistryStorage, kek, backupId);
+      }
+      return { ok: true };
+    }
+    return { ok: false };
+  }
+
+  async function rewrapPaperBackups(
+    oldKek: CryptoKeyRef,
+    newKek: CryptoKeyRef,
+    material: KdfMaterial,
+  ): Promise<number> {
+    if (vaultHttp === undefined || paperBackupRegistryStorage === undefined) {
+      return 0;
+    }
+
+    await rekeyPaperBackupRegistry(paperBackupRegistryStorage, oldKek, newKek);
+    const entries = await listRegisteredPaperBackups(paperBackupRegistryStorage, newKek);
+    let updated = 0;
+
+    for (const entry of entries) {
+      const wrapped = await wrapKekForPaperBackup(entry.mnemonic, newKek, {
+        salt: material.salt,
+        params: material.params,
+      });
+      const response = await vaultHttp.updatePaperBackup(entry.backupId, {
+        iv: wrapped.iv,
+        auth_tag: wrapped.authTag,
+        ciphertext: wrapped.ciphertext,
+      });
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(`failed to re-wrap paper backup ${entry.backupId}`);
+      }
+      updated += 1;
+    }
+
+    return updated;
+  }
+
+  async function changeMasterPassphrase(
+    newPassphrase: string,
+    currentMaterial: KdfMaterial,
+    saveKdfMaterial: (material: KdfMaterial) => Promise<void>,
+  ): Promise<ChangePassphraseResult> {
+    if (
+      newPassphrase.length < PASSPHRASE_MIN_LENGTH ||
+      newPassphrase.length > PASSPHRASE_MAX_LENGTH
+    ) {
+      return { ok: false, reason: 'PASSPHRASE_INVALID' };
+    }
+
+    const oldKek = getActiveKek?.() ?? null;
+    if (oldKek === null || !store.isUnlocked()) {
+      return { ok: false, reason: 'NOT_UNLOCKED' };
+    }
+
+    const newSalt = await generateSalt();
+    const newMaterial: KdfMaterial = {
+      salt: newSalt,
+      params: currentMaterial.params,
+    };
+
+    const derived = await deriveKEK(newPassphrase, newMaterial.salt, newMaterial.params);
+    if (!derived.ok) {
+      return { ok: false, reason: 'DERIVATION_FAILED' };
+    }
+
+    try {
+      await store.rekey(derived.kek);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.error('[HomeEntry] vault rekey failed:', message);
+      return { ok: false, reason: 'REKEY_FAILED' };
+    }
+
+    let rewrappedBackups = 0;
+    try {
+      rewrappedBackups = await rewrapPaperBackups(oldKek, derived.kek, newMaterial);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.error('[HomeEntry] paper backup re-wrap failed:', message);
+      return { ok: false, reason: 'REWRAP_FAILED' };
+    }
+
+    await keyStore.store(derived.kek);
+    await saveKdfMaterial(newMaterial);
+
+    try {
+      await publishKdfMaterial(newMaterial);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.error('[HomeEntry] KDF publish failed after passphrase change:', message);
+      return { ok: false, reason: 'KDF_PUBLISH_FAILED' };
+    }
+
+    for (const vaultType of PHI_VAULT_TYPES) {
+      syncWorker.enqueue(vaultType);
+    }
+
+    return { ok: true, rewrappedBackups };
+  }
+
+  async function recoverWithPaperBackup(
+    mnemonic: string,
+    backupId: string,
+    saveKdfMaterial: (material: KdfMaterial) => Promise<void>,
+  ): Promise<PaperBackupRecoveryResult> {
+    if (auth.getAuth() === null) {
+      return { ok: false, reason: 'NOT_AUTHENTICATED' };
+    }
+    if (!validatePaperBackupMnemonic(mnemonic)) {
+      return { ok: false, reason: 'INVALID_MNEMONIC' };
+    }
+    if (vaultHttp === undefined) {
+      return { ok: false, reason: 'NOT_FOUND' };
+    }
+
+    const response = await vaultHttp.getPaperBackup(backupId);
+    if (response.status === 404) {
+      return { ok: false, reason: 'NOT_FOUND' };
+    }
+    if (
+      response.status < 200 ||
+      response.status >= 300 ||
+      !response.iv ||
+      !response.auth_tag ||
+      !response.ciphertext
+    ) {
+      return { ok: false, reason: 'NOT_FOUND' };
+    }
+
+    let recovered;
+    try {
+      recovered = await unwrapKekFromPaperBackup(normalizePaperBackupMnemonic(mnemonic), {
+        iv: response.iv,
+        authTag: response.auth_tag,
+        ciphertext: response.ciphertext,
+      });
+    } catch {
+      return { ok: false, reason: 'DECRYPT_FAILED' };
+    }
+
+    const material: KdfMaterial = {
+      salt: recovered.salt,
+      params: recovered.params,
+    };
+    await saveKdfMaterial(material);
+    return unlockWithKek(recovered.kek);
   }
 
   function dispose(): void {
@@ -690,9 +1072,15 @@ export function createHomeEntry(deps: HomeEntryDeps): HomeEntryController {
     probeRemoteVaultDecrypt: probeRemoteVaultDecryptForUnlock,
     hasExistingVaultData,
     hasStoredUnlockKey,
+    listPaperBackups,
+    createPaperBackup,
+    revokePaperBackup,
+    recoverWithPaperBackup,
+    changeMasterPassphrase,
     isPasskeyUnlockAvailable,
     hasPasskeyUnlock,
     enablePasskeyUnlock,
+    removePasskeyUnlock,
     dispose,
   };
 }

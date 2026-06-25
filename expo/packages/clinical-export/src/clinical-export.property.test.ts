@@ -51,12 +51,18 @@ const medicationArb: fc.Arbitrary<MedicationProfile> = fc.record({
   id: idArb,
   op_timestamp: isoTimestampArb,
   drugName: labelArb,
-  dosage: labelArb,
-  form: labelArb,
   prescribingPhysician: labelArb,
   conditionTreated: labelArb,
   active: fc.boolean(),
-  schedule: fc.constant({ kind: 'prn' } as MedicationProfile['schedule']),
+  regimens: fc.array(
+    fc.record({
+      id: idArb,
+      dosage: labelArb,
+      form: labelArb,
+      schedule: fc.constant({ kind: 'prn' as const }),
+    }),
+    { minLength: 1, maxLength: 2 },
+  ),
 });
 
 const prnLogArb: fc.Arbitrary<PrnLog> = fc.record({

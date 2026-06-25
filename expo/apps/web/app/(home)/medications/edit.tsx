@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MedicationFormScreen } from '@complex-patient/ui';
+import { MedicationFormScreen } from '@complex-patient/ui/screens';
 
 export default function MedicationEditRoute(): React.ReactElement {
   const router = useRouter();

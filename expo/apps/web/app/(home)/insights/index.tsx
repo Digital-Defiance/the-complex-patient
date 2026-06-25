@@ -13,7 +13,7 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { InsightsScreen } from '@complex-patient/ui';
+import { InsightsScreen } from '@complex-patient/ui/screens';
 
 export default function Insights(): React.ReactElement {
   const router = useRouter();

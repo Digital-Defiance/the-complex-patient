@@ -4,9 +4,10 @@
  * Priority:
  * 1. EXPO_PUBLIC_SYNC_BACKEND_URL (explicit override)
  * 2. __DEV__ + Expo dev host (physical device / LAN: 172.16.0.14:8081 → http://172.16.0.14:8881)
- * 3. __DEV__ → WordPress Studio (localhost:8881; Android emulator uses 10.0.2.2:8881)
- * 4. Web opened on localhost / LAN → WordPress Studio on the same host (even in release builds)
- * 5. Production default
+ * 3. __DEV__ + web browser on localhost/LAN → WordPress Studio on :8881 (CORS-enabled)
+ * 4. __DEV__ → WordPress Studio (localhost:8881; Android emulator uses 10.0.2.2:8881)
+ * 5. Web opened on localhost / LAN → WordPress Studio on the same host (release builds)
+ * 6. Production default
  *
  * Note: Metro serves JS on :8081; WordPress Studio serves the sync API on :8881.
  */
@@ -96,10 +97,16 @@ export function resolveSyncBackendBaseUrl(): string {
     return configured.replace(/\/+$/, '');
   }
 
+  const fromBrowser = resolveWebBrowserBackend();
+
   if (typeof __DEV__ !== 'undefined' && __DEV__) {
     const fromExpoHost = syncBackendUrlFromExpoHostUri(getExpoDevHostUri());
     if (fromExpoHost) {
       return fromExpoHost;
+    }
+
+    if (fromBrowser) {
+      return fromBrowser;
     }
 
     if (Platform.OS === 'android') {
@@ -108,7 +115,6 @@ export function resolveSyncBackendBaseUrl(): string {
     return DEFAULT_LOCAL_SYNC_BACKEND_URL;
   }
 
-  const fromBrowser = resolveWebBrowserBackend();
   if (fromBrowser) {
     return fromBrowser;
   }

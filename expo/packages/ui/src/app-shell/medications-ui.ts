@@ -3,6 +3,7 @@
  */
 
 import type {
+  DoseRegimen,
   MedAppearance,
   MedicationProfile,
   MedicationSchedule,
@@ -13,12 +14,44 @@ import type {
 import { DEFAULT_MED_APPEARANCE } from '@complex-patient/med-visuals';
 import { DEFAULT_DOSAGE_UNIT, formatDosageString, parseDosageString } from './dosage-units';
 
+export const MEDICATION_FORMS = [
+  'tablet',
+  'capsule',
+  'liquid',
+  'injection',
+  'patch',
+  'inhaler',
+  'spray',
+  'cream',
+  'drops',
+  'suppository',
+  'powder',
+  'other',
+] as const;
+
+export type MedicationFormOption = (typeof MEDICATION_FORMS)[number];
+
+export const REGIMEN_LABEL_PRESETS = [
+  { label: 'Morning', times: '08:00' },
+  { label: 'Midday', times: '12:00' },
+  { label: 'Evening', times: '18:00' },
+  { label: 'Bedtime', times: '22:00' },
+] as const;
+
 export function generateMedicationId(): string {
   const g = globalThis as { crypto?: { randomUUID?: () => string } };
   if (g.crypto?.randomUUID) {
     return g.crypto.randomUUID();
   }
   return `med-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function generateRegimenId(): string {
+  const g = globalThis as { crypto?: { randomUUID?: () => string } };
+  if (g.crypto?.randomUUID) {
+    return g.crypto.randomUUID();
+  }
+  return `reg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export const WEEKDAYS: readonly Weekday[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
@@ -75,42 +108,59 @@ export function suggestConditionsTreated(
   return suggestMedicationFieldValues(medications, (med) => med.conditionTreated, query, limit);
 }
 
-export interface MedicationDraft {
-  drugName: string;
+export interface RegimenDraft {
+  id: string;
+  label: string;
   dosageAmount: string;
   dosageUnit: string;
   form: string;
-  prescribingPhysician: string;
-  conditionTreated: string;
   scheduleKind: MedicationSchedule['kind'];
   weeklyDays: Weekday[];
   weeklyTimes: string;
   alternatingStartDate: string;
   rotatingEveryNDays: string;
   taperPhases: string;
-  /** Max total amount allowed in 24h (same unit as dosage). Used when schedule is PRN. */
   prnSafetyLimit: string;
+  prnMinIntervalHours: string;
+}
+
+export interface MedicationDraft {
+  drugName: string;
+  prescribingPhysician: string;
+  conditionTreated: string;
+  notes: string;
+  regimens: RegimenDraft[];
   appearance: MedAppearance;
   quantityOnHand: string;
   lowStockThreshold: string;
   productCode: string;
 }
 
-export function emptyMedicationDraft(): MedicationDraft {
+export function emptyRegimenDraft(preset?: { label?: string; times?: string }): RegimenDraft {
   return {
-    drugName: '',
+    id: generateRegimenId(),
+    label: preset?.label ?? '',
     dosageAmount: '',
     dosageUnit: DEFAULT_DOSAGE_UNIT,
     form: 'tablet',
-    prescribingPhysician: '',
-    conditionTreated: '',
     scheduleKind: 'weekly',
     weeklyDays: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
-    weeklyTimes: '08:00',
+    weeklyTimes: preset?.times ?? '08:00',
     alternatingStartDate: new Date().toISOString().slice(0, 10),
     rotatingEveryNDays: '1',
     taperPhases: '50mg\n25mg',
     prnSafetyLimit: '',
+    prnMinIntervalHours: '',
+  };
+}
+
+export function emptyMedicationDraft(): MedicationDraft {
+  return {
+    drugName: '',
+    prescribingPhysician: '',
+    conditionTreated: '',
+    notes: '',
+    regimens: [emptyRegimenDraft()],
     appearance: { ...DEFAULT_MED_APPEARANCE },
     quantityOnHand: '',
     lowStockThreshold: '',
@@ -118,60 +168,76 @@ export function emptyMedicationDraft(): MedicationDraft {
   };
 }
 
-export function draftFromProfile(profile: MedicationProfile): MedicationDraft {
-  const draft = emptyMedicationDraft();
-  draft.drugName = profile.drugName;
-  const parsedDosage = parseDosageString(profile.dosage);
+export function regimenDraftFromRegimen(regimen: DoseRegimen): RegimenDraft {
+  const draft = emptyRegimenDraft();
+  draft.id = regimen.id;
+  draft.label = regimen.label ?? '';
+  const parsedDosage = parseDosageString(regimen.dosage);
   draft.dosageAmount = parsedDosage.amount;
   draft.dosageUnit = parsedDosage.unit;
-  draft.form = profile.form;
-  draft.prescribingPhysician = profile.prescribingPhysician;
-  draft.conditionTreated = profile.conditionTreated;
-  draft.appearance = profile.appearance ?? { ...DEFAULT_MED_APPEARANCE };
-  draft.productCode = profile.productCode ?? '';
-  draft.quantityOnHand = profile.refill?.quantityOnHand?.toString() ?? '';
-  draft.lowStockThreshold = profile.refill?.lowStockThreshold?.toString() ?? '';
-  draft.scheduleKind = profile.schedule.kind;
+  draft.form = regimen.form;
+  draft.scheduleKind = regimen.schedule.kind;
 
-  if (profile.schedule.kind === 'weekly') {
-    draft.weeklyDays = [...profile.schedule.daysOfWeek];
-    draft.weeklyTimes = profile.schedule.times.join(', ');
-  } else if (profile.schedule.kind === 'alternating') {
-    draft.alternatingStartDate = profile.schedule.startDate.slice(0, 10);
-    draft.weeklyTimes = profile.schedule.times.join(', ');
-  } else if (profile.schedule.kind === 'rotating-interval') {
-    draft.rotatingEveryNDays = String(profile.schedule.everyNDays);
-    draft.weeklyTimes = profile.schedule.times.join(', ');
-  } else if (profile.schedule.kind === 'taper') {
-    draft.taperPhases = profile.schedule.phases.map((phase) => phase.dosage).join('\n');
-  } else if (profile.schedule.kind === 'prn' && profile.schedule.times?.length) {
-    draft.weeklyTimes = profile.schedule.times.join(', ');
+  if (regimen.schedule.kind === 'weekly') {
+    draft.weeklyDays = [...regimen.schedule.daysOfWeek];
+    draft.weeklyTimes = regimen.schedule.times.join(', ');
+  } else if (regimen.schedule.kind === 'alternating') {
+    draft.alternatingStartDate = regimen.schedule.startDate.slice(0, 10);
+    draft.weeklyTimes = regimen.schedule.times.join(', ');
+  } else if (regimen.schedule.kind === 'rotating-interval') {
+    draft.rotatingEveryNDays = String(regimen.schedule.everyNDays);
+    draft.weeklyTimes = regimen.schedule.times.join(', ');
+  } else if (regimen.schedule.kind === 'taper') {
+    draft.taperPhases = regimen.schedule.phases.map((phase) => phase.dosage).join('\n');
+  } else if (regimen.schedule.kind === 'prn' && regimen.schedule.times?.length) {
+    draft.weeklyTimes = regimen.schedule.times.join(', ');
   }
 
-  if (profile.prn) {
-    draft.prnSafetyLimit = String(profile.prn.safetyLimit24h);
+  if (regimen.prn) {
+    draft.prnSafetyLimit = String(regimen.prn.safetyLimit24h);
+    draft.prnMinIntervalHours =
+      regimen.prn.minIntervalHours !== undefined ? String(regimen.prn.minIntervalHours) : '';
   }
 
   return draft;
 }
 
-export function draftDoseAmount(draft: Pick<MedicationDraft, 'dosageAmount'>): number {
+export function draftFromProfile(profile: MedicationProfile): MedicationDraft {
+  return {
+    drugName: profile.drugName,
+    prescribingPhysician: profile.prescribingPhysician,
+    conditionTreated: profile.conditionTreated,
+    notes: profile.notes ?? '',
+    regimens: profile.regimens.map(regimenDraftFromRegimen),
+    appearance: profile.appearance ?? { ...DEFAULT_MED_APPEARANCE },
+    quantityOnHand: profile.refill?.quantityOnHand?.toString() ?? '',
+    lowStockThreshold: profile.refill?.lowStockThreshold?.toString() ?? '',
+    productCode: profile.productCode ?? '',
+  };
+}
+
+export function draftDoseAmount(draft: Pick<RegimenDraft, 'dosageAmount'>): number {
   const parsed = Number.parseFloat(draft.dosageAmount.trim());
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
-export function buildPrnConfigFromDraft(draft: MedicationDraft): PrnConfig {
+export function buildPrnConfigFromDraft(draft: RegimenDraft): PrnConfig {
   const doseAmount = draftDoseAmount(draft);
   const parsedLimit = Number.parseFloat(draft.prnSafetyLimit.trim());
   const defaultLimit = doseAmount * 4;
-  return {
+  const parsedInterval = Number.parseFloat((draft.prnMinIntervalHours ?? '').trim());
+  const config: PrnConfig = {
     doseAmount,
     doseUnit: draft.dosageUnit.trim() || DEFAULT_DOSAGE_UNIT,
     safetyLimit24h: Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : defaultLimit,
   };
+  if (Number.isFinite(parsedInterval) && parsedInterval > 0) {
+    config.minIntervalHours = parsedInterval;
+  }
+  return config;
 }
 
-export function buildScheduleFromDraft(draft: MedicationDraft): MedicationSchedule {
+export function buildScheduleFromDraft(draft: RegimenDraft): MedicationSchedule {
   const times = draft.weeklyTimes
     .split(',')
     .map((value) => value.trim())
@@ -185,7 +251,7 @@ export function buildScheduleFromDraft(draft: MedicationDraft): MedicationSchedu
     case 'rotating-interval':
       return {
         kind: 'rotating-interval',
-        everyNDays: Math.min(30, Math.max(1, Number.parseInt(draft.rotatingEveryNDays, 10) || 1)),
+        everyNDays: Math.min(365, Math.max(1, Number.parseInt(draft.rotatingEveryNDays, 10) || 1)),
         times: times.length ? times : ['08:00'],
       };
     case 'taper':
@@ -207,24 +273,40 @@ export function buildScheduleFromDraft(draft: MedicationDraft): MedicationSchedu
   }
 }
 
+export function buildRegimenFromDraft(draft: RegimenDraft): DoseRegimen {
+  const schedule = buildScheduleFromDraft(draft);
+  const regimen: DoseRegimen = {
+    id: draft.id,
+    dosage: formatDosageString(draft.dosageAmount, draft.dosageUnit).trim(),
+    form: draft.form.trim(),
+    schedule,
+  };
+  const label = draft.label.trim();
+  if (label) {
+    regimen.label = label;
+  }
+  if (draft.scheduleKind === 'prn') {
+    regimen.prn = buildPrnConfigFromDraft(draft);
+  }
+  return regimen;
+}
+
 export function buildProfileFromDraft(draft: MedicationDraft, existing?: MedicationProfile): MedicationProfile {
   const now = new Date().toISOString();
-  const schedule = buildScheduleFromDraft(draft);
   const profile: MedicationProfile = {
     id: existing?.id ?? generateMedicationId(),
     op_timestamp: existing?.op_timestamp ?? now,
     drugName: draft.drugName.trim(),
-    dosage: formatDosageString(draft.dosageAmount, draft.dosageUnit).trim(),
-    form: draft.form.trim(),
     prescribingPhysician: draft.prescribingPhysician.trim(),
     conditionTreated: draft.conditionTreated.trim(),
     active: existing?.active ?? true,
-    schedule,
+    regimens: draft.regimens.map(buildRegimenFromDraft),
     appearance: draft.appearance,
   };
 
-  if (draft.scheduleKind === 'prn') {
-    profile.prn = buildPrnConfigFromDraft(draft);
+  const notes = draft.notes.trim();
+  if (notes) {
+    profile.notes = notes;
   }
 
   if (draft.quantityOnHand.trim() || draft.lowStockThreshold.trim()) {
@@ -250,3 +332,6 @@ export function mergeMedicationRecord(current: VaultRecord[], profile: Medicatio
   }
   return current.map((record) => (record.id === profile.id ? profile : record));
 }
+
+/** @deprecated Use RegimenDraft — kept for ScheduleEditor prop typing during migration. */
+export type MedicationDraftScheduleFields = RegimenDraft;

@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { ConditionTimelineScreen } from '@complex-patient/ui';
+import { ConditionTimelineScreen } from '@complex-patient/ui/screens';
 
 export default function Timeline(): React.ReactElement {
   const { conditionId } = useLocalSearchParams<{ conditionId: string }>();

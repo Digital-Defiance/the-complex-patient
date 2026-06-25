@@ -86,6 +86,26 @@ describe('resolveSyncBackendBaseUrl', () => {
     expect(resolveSyncBackendBaseUrl()).toBe(PRODUCTION_SYNC_BACKEND_URL);
   });
 
+  it('uses local WordPress for web dev on localhost', async () => {
+    mockPlatform.OS = 'web';
+    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+    vi.stubEnv('EXPO_PUBLIC_SYNC_BACKEND_URL', '');
+    vi.stubGlobal('window', { location: { hostname: 'localhost', origin: 'http://localhost:8081' } });
+    const { resolveSyncBackendBaseUrl, DEFAULT_LOCAL_SYNC_BACKEND_URL } = await import('./sync-backend-url');
+    expect(resolveSyncBackendBaseUrl()).toBe(DEFAULT_LOCAL_SYNC_BACKEND_URL);
+  });
+
+  it('uses local WordPress for web dev on a private IP', async () => {
+    mockPlatform.OS = 'web';
+    (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+    vi.stubEnv('EXPO_PUBLIC_SYNC_BACKEND_URL', '');
+    vi.stubGlobal('window', {
+      location: { hostname: '172.16.0.14', origin: 'http://172.16.0.14:8081' },
+    });
+    const { resolveSyncBackendBaseUrl } = await import('./sync-backend-url');
+    expect(resolveSyncBackendBaseUrl()).toBe('http://172.16.0.14:8881');
+  });
+
   it('uses local WordPress when web release build is opened on localhost', async () => {
     mockPlatform.OS = 'web';
     (globalThis as { __DEV__?: boolean }).__DEV__ = false;

@@ -7,6 +7,7 @@
 import type {
   Association,
   Condition,
+  DoseRegimen,
   FlareUp,
   MedicationProfile,
   MedicationSchedule,
@@ -36,7 +37,15 @@ export type ParseFhirBundleResult =
   | { status: 'error'; message: string };
 
 type DomainExtensionPayload =
-  | { kind: 'medication'; drugName: string; dosage: string; form: string; prescribingPhysician: string; conditionTreated: string; active: boolean; schedule: MedicationSchedule; prn?: MedicationProfile['prn'] }
+  | {
+      kind: 'medication';
+      drugName: string;
+      regimens: DoseRegimen[];
+      notes?: string;
+      prescribingPhysician: string;
+      conditionTreated: string;
+      active: boolean;
+    }
   | { kind: 'prn-log'; medicationId: string; amount: number; takenAt: string; override?: boolean }
   | { kind: 'symptom'; symptomType: string; systemicLocation: string; severity: number; duration: SymptomEntry['duration']; notes: string; active: boolean }
   | { kind: 'condition'; name: string }
@@ -87,12 +96,17 @@ function parseMedicationFallback(resource: Record<string, unknown>, id: string, 
       id,
       op_timestamp,
       drugName: match[1]!,
-      form: match[2]!,
-      dosage: match[3]!,
       prescribingPhysician: prescriberMatch[1]!,
       conditionTreated: conditionMatch[1]!,
       active: resource.status === 'active',
-      schedule,
+      regimens: [
+        {
+          id: `${id}-reg-1`,
+          dosage: match[3]!,
+          form: match[2]!,
+          schedule,
+        },
+      ],
     };
   } catch {
     return null;

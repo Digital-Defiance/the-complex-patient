@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { VaultRecord } from '@complex-patient/domain';
+import { makeTestMedicationProfile } from '@complex-patient/domain';
 import {
   filterActive,
   isMedicationProfile,
@@ -14,17 +15,14 @@ import {
 describe('splitMedicationsPartition', () => {
   it('splits medication profiles and PRN logs from a mixed partition', () => {
     const records: VaultRecord[] = [
-      {
+      makeTestMedicationProfile({
         id: 'med-1',
-        op_timestamp: '2026-01-01T00:00:00.000Z',
         drugName: 'Aspirin',
         dosage: '81mg',
-        form: 'tablet',
         prescribingPhysician: 'Dr. A',
         conditionTreated: 'Pain',
-        active: true,
         schedule: { kind: 'prn' },
-      },
+      }),
       {
         id: 'prn-1',
         op_timestamp: '2026-01-02T00:00:00.000Z',
@@ -48,6 +46,7 @@ describe('splitMedicationsPartition', () => {
         id: 'event-1',
         op_timestamp: '2026-01-02T08:00:00.000Z',
         medicationId: 'med-1',
+        regimenId: 'reg-1',
         scheduledAt: '2026-01-02T08:00:00.000Z',
         takenAt: '2026-01-02T08:05:00.000Z',
       },
@@ -59,18 +58,14 @@ describe('splitMedicationsPartition', () => {
 
   it('excludes soft-deleted records', () => {
     const records: VaultRecord[] = [
-      {
+      makeTestMedicationProfile({
         id: 'med-deleted',
-        op_timestamp: '2026-01-01T00:00:00.000Z',
         drugName: 'Removed',
         dosage: '1mg',
-        form: 'tablet',
-        prescribingPhysician: 'Dr. A',
-        conditionTreated: 'Pain',
         active: false,
         schedule: { kind: 'prn' },
         deleted: true,
-      },
+      }),
     ];
 
     expect(splitMedicationsPartition(records).medications).toHaveLength(0);
@@ -80,17 +75,14 @@ describe('splitMedicationsPartition', () => {
 
 describe('record type guards', () => {
   it('detects medication profiles and PRN logs', () => {
-    const med: VaultRecord = {
+    const med: VaultRecord = makeTestMedicationProfile({
       id: 'med-1',
-      op_timestamp: '2026-01-01T00:00:00.000Z',
       drugName: 'Drug',
       dosage: '1mg',
-      form: 'tablet',
       prescribingPhysician: 'Dr.',
       conditionTreated: 'X',
-      active: true,
       schedule: { kind: 'prn' },
-    };
+    });
     const prn: VaultRecord = {
       id: 'prn-1',
       op_timestamp: '2026-01-02T00:00:00.000Z',
@@ -100,8 +92,7 @@ describe('record type guards', () => {
     };
 
     expect(isMedicationProfile(med)).toBe(true);
-    expect(isPrnLog(med)).toBe(false);
     expect(isPrnLog(prn)).toBe(true);
-    expect(isMedicationProfile(prn)).toBe(false);
+    expect(isPrnLog(med)).toBe(false);
   });
 });

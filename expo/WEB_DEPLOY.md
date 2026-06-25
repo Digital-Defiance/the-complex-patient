@@ -43,7 +43,23 @@ yarn deploy:web
 
 `sync:complex` rsyncs `dist/web/` to `complex:/home/thecompl/domains/thecomplexpatient.com/public_html/secure/`. Both sync scripts use `--checksum` (`-c`) so rsync compares file content (not just size/mtime), `--delete` removes stale assets on the destination, and only changed files are transferred. Run `yarn build:web` first if `dist/web/` does not exist.
 
+**This deploys only the browser app.** Features that call new WordPress REST routes (for example paper backups at `/vault/paper-backups`) require the PHP plugin separately — see [Deploy the WordPress plugin](#deploy-the-wordpress-plugin) below.
+
 For local WordPress Studio:
+
+```bash
+./sync-complex-local.sh
+```
+
+From `expo/`:
+
+```bash
+yarn sync:plugin-local
+```
+
+This copies the plugin into Studio **and** calls `POST /system/schema/repair` on `http://localhost:8881` to create any missing database tables (for example `paper_backup`). WordPress Studio must be running when you sync; if repair fails, open `http://localhost:8881` once and run the sync again.
+
+The web app deploy is separate:
 
 ```bash
 yarn build:web
@@ -51,6 +67,37 @@ yarn sync:complex-local
 ```
 
 This copies to `/Users/jessica/Studio/the-complex-patient/secure/`.
+
+## Deploy the WordPress plugin
+
+The sync API lives in `wp/complex-patient/` at the **repo root**, not in `expo/`. `yarn deploy:web` does **not** upload it.
+
+From the repository root:
+
+```bash
+./sync-complex.sh
+```
+
+For local WordPress Studio:
+
+```bash
+./sync-complex-local.sh
+```
+
+From `expo/` you can run the same scripts via Yarn:
+
+```bash
+yarn sync:plugin        # production (SSH rsync + schema repair via server loopback)
+yarn sync:plugin-local  # local Studio plugins directory + schema repair
+```
+
+Both commands rsync PHP files **and** repair missing database tables (for example `paper_backup`). Local repair uses the REST endpoint on `http://localhost:8881`. Production repair SSHes in and runs `wp-load.php` with a **PHP 8.1+** CLI binary (DirectAdmin hosts often use `/usr/local/php82/bin/php`; default `php` may still be 7.4). Override with `COMPLEX_PATIENT_REMOTE_PHP_BIN` if needed.
+
+The plugin runs `ensureSchema()` on load, so new tables (for example `wp_complex_patient_paper_backup`) are created without re-activating the plugin. After syncing, paper-backup routes are available at:
+
+```
+POST /wp-json/complex-patient/v1/vault/paper-backups
+```
 
 ### WordPress .htaccess (Apache)
 
@@ -85,7 +132,13 @@ const SYNC_BACKEND_BASE_URL = 'https://thecomplexpatient.com';
 
 The web app calls `https://thecomplexpatient.com/wp-json/complex-patient/v1/vault/{partition}` for sync.
 
-For local development, point this at your local WordPress URL instead.
+For local web development (`yarn expo start` on port 8081), the sync backend resolves to **the same Metro origin** (`http://localhost:8081`). Metro proxies `/wp-json/*` to WordPress Studio on port 8881 (`metro.config.js`), so the browser does not make cross-origin requests. Confirm in the console:
+
+```
+[ComplexPatient] sync backend: http://localhost:8081
+```
+
+WordPress Studio must still be running on port 8881. Restart Metro after changing `metro.config.js`.
 
 ## HTTPS required
 

@@ -135,6 +135,26 @@ final class VaultControllerTest extends TestCase
         $this->assertSame(400, $response->get_error_data()['status']);
     }
 
+    public function testGetRejectsReservedVaultSubpathsWithoutReading(): void
+    {
+        foreach (['paper-backups', 'kdf-material'] as $reserved) {
+            $response = $this->controller->handleGet($this->request(['vault_type' => $reserved]));
+
+            $this->assertInstanceOf(WP_Error::class, $response, $reserved);
+            $this->assertSame('complex_patient_unrecognized_vault_type', $response->get_error_code(), $reserved);
+            $this->assertSame(400, $response->get_error_data()['status'], $reserved);
+        }
+    }
+
+    public function testVaultRoutePatternExcludesReservedSubpaths(): void
+    {
+        $this->controller->registerRoutes();
+        $route = $GLOBALS['complex_patient_registered_routes'][0]['route'] ?? '';
+
+        $this->assertStringContainsString('paper-backups', $route);
+        $this->assertStringContainsString('kdf-material', $route);
+    }
+
     public function testGetIsScopedToAuthenticatedUser(): void
     {
         // User 7 stored a blob; the authenticated caller (42) must not see it.

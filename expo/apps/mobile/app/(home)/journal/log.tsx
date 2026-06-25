@@ -10,7 +10,7 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { SymptomJournalLogScreen } from '@complex-patient/ui';
+import { SymptomJournalLogScreen } from '@complex-patient/ui/screens';
 
 export default function JournalLog(): React.ReactElement {
   const router = useRouter();

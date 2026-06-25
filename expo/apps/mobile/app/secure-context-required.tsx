@@ -13,7 +13,7 @@
  */
 
 import React from 'react';
-import { SecureContextRequiredScreen } from '@complex-patient/ui';
+import { SecureContextRequiredScreen } from '@complex-patient/ui/screens';
 
 export default function SecureContextRequiredRoute(): React.ReactElement {
   return <SecureContextRequiredScreen />;

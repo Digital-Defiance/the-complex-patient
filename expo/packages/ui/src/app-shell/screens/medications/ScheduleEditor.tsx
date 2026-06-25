@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
-import type { MedicationDraft } from '../../medications-ui';
+import type { RegimenDraft } from '../../medications-ui';
 import { WEEKDAYS, draftDoseAmount } from '../../medications-ui';
 
 export interface ScheduleEditorProps {
-  draft: MedicationDraft;
-  onChange: (patch: Partial<MedicationDraft>) => void;
+  draft: RegimenDraft;
+  onChange: (patch: Partial<RegimenDraft>) => void;
 }
 
 const SCHEDULE_KINDS = [
@@ -84,7 +84,7 @@ export function ScheduleEditor({ draft, onChange }: ScheduleEditorProps): React.
 
       {draft.scheduleKind === 'rotating-interval' && (
         <LabeledInput
-          label="Every N days (1–30)"
+          label="Every N days (1–365)"
           value={draft.rotatingEveryNDays}
           onChangeText={(rotatingEveryNDays) => onChange({ rotatingEveryNDays })}
           testID="schedule-rotating-n"
@@ -113,14 +113,20 @@ export function ScheduleEditor({ draft, onChange }: ScheduleEditorProps): React.
       {draft.scheduleKind === 'prn' && (
         <View style={styles.section}>
           <Text style={styles.helpText}>
-            PRN only changes when you may take this med. Each quick log records your dosage above ({draft.dosageAmount || '1'}{' '}
-            {doseUnit}).
+            PRN only changes when you may take this med. Each quick log records your dosage above (
+            {draft.dosageAmount || '1'} {doseUnit}).
           </Text>
           <LabeledInput
             label={`Max ${doseUnit} in 24 hours`}
             value={draft.prnSafetyLimit}
             onChangeText={(prnSafetyLimit) => onChange({ prnSafetyLimit })}
             testID="prn-limit"
+          />
+          <LabeledInput
+            label="Minimum hours between doses (optional)"
+            value={draft.prnMinIntervalHours}
+            onChangeText={(prnMinIntervalHours) => onChange({ prnMinIntervalHours })}
+            testID="prn-min-interval"
           />
           <LabeledInput
             label="Optional reminder windows (comma-separated, 24h HH:mm)"

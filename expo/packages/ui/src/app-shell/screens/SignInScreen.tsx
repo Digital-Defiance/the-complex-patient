@@ -67,7 +67,9 @@ export function SignInScreen(): React.ReactElement {
       if (!result.ok) {
         if (result.reason === 'INVALID_CREDENTIALS') {
           setError(
-            'WordPress rejected those credentials. Use an Application Password from your WordPress user profile — not your regular login password.',
+            result.detail
+              ? result.detail
+              : 'WordPress did not accept those credentials. Use an Application Password from Users → Profile → Application Passwords — not your regular login password. Use your WordPress username (login name), not your email.',
           );
         } else {
           setError('Could not reach the sync server. Check your network and backend URL.');
@@ -98,8 +100,20 @@ export function SignInScreen(): React.ReactElement {
 
           <Text style={styles.title}>Sign In</Text>
           <Text style={styles.subtitle}>
-            Sign in with your WordPress username and an Application Password (Users → Profile → Application Passwords).
+            Sign in with your WordPress username and an Application Password from Users → Profile →
+            Application Passwords.
           </Text>
+          {Platform.OS === 'web' &&
+            typeof window !== 'undefined' &&
+            (window.location?.hostname === 'localhost' ||
+              window.location?.hostname === '127.0.0.1') && (
+              <Text style={styles.hint}>
+                Local WordPress Studio: open http://localhost:8881/wp-admin/profile.php, scroll to
+                Application Passwords, add one named “Complex Patient”, then sign in with your
+                WordPress username (the login name shown at the top of your profile — not your
+                email) and that application password.
+              </Text>
+            )}
 
           {error && (
             <Text style={styles.error} accessibilityRole="alert">
@@ -191,8 +205,15 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#555',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  hint: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 24,
     textAlign: 'center',
+    lineHeight: 20,
   },
   error: {
     color: '#c00',

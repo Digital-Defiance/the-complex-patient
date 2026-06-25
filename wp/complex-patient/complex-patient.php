@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'COMPLEX_PATIENT_VERSION', '0.0.2' );
+define( 'COMPLEX_PATIENT_VERSION', '0.0.3' );
 define( 'COMPLEX_PATIENT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'COMPLEX_PATIENT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -60,9 +60,56 @@ register_activation_hook( __FILE__, 'complex_patient_activate' );
 add_action(
     'plugins_loaded',
     static function () {
+        global $wpdb;
+
         \ComplexPatient\Activation::ensureSchema();
+
+        $installedDbVersion = get_option( 'complex_patient_db_version', '' );
+        if ( $installedDbVersion !== COMPLEX_PATIENT_VERSION ) {
+            \ComplexPatient\Activation::repairMissingTables( $wpdb );
+            update_option( 'complex_patient_db_version', COMPLEX_PATIENT_VERSION, false );
+        }
     },
     5
+);
+
+// PHP / reverse-proxy stacks (including WordPress Studio) often omit HTTP_AUTHORIZATION
+// from $_SERVER even when the client sends Authorization: Basic. WordPress core reads
+// that variable for Application Password auth on REST requests.
+add_action(
+    'plugins_loaded',
+    static function () {
+        if ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
+            return;
+        }
+        if ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+            $_SERVER['HTTP_AUTHORIZATION'] = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+            return;
+        }
+        if ( function_exists( 'apache_request_headers' ) ) {
+            $headers = apache_request_headers();
+            if ( ! empty( $headers['Authorization'] ) ) {
+                $_SERVER['HTTP_AUTHORIZATION'] = (string) $headers['Authorization'];
+            }
+        }
+    },
+    0
+);
+
+// WordPress disables Application Passwords on plain HTTP unless the site is marked
+// "local". Studio sites on http://localhost:8881 need this for app sign-in.
+add_filter(
+    'wp_is_application_passwords_available',
+    static function ( $available ) {
+        if ( $available ) {
+            return true;
+        }
+
+        $host = isset( $_SERVER['HTTP_HOST'] ) ? strtolower( (string) $_SERVER['HTTP_HOST'] ) : '';
+        $host = explode( ':', $host )[0];
+
+        return in_array( $host, array( 'localhost', '127.0.0.1' ), true );
+    }
 );
 
 // Register the blind-sync REST endpoints on rest_api_init (Requirement 6.5).
@@ -90,11 +137,20 @@ add_action(
         );
         $deviceController->registerRoutes();
 
+        $paperBackupController = new \ComplexPatient\Rest\PaperBackupController(
+            new \ComplexPatient\PaperBackupRepository( $wpdb ),
+            $auth
+        );
+        $paperBackupController->registerRoutes();
+
         $vaultController = new \ComplexPatient\Rest\VaultController(
             new \ComplexPatient\VaultRepository( $wpdb ),
             $auth,
             $vaultNotifier
         );
         $vaultController->registerRoutes();
+
+        $schemaController = new \ComplexPatient\Rest\SchemaController();
+        $schemaController->registerRoutes();
     }
 );

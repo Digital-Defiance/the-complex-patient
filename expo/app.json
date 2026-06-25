@@ -37,6 +37,13 @@
           "locationWhenInUsePermission": "Allow The Complex Patient to attach approximate location when you log health events (optional).",
           "locationAlwaysAndWhenInUsePermission": "Allow background location trail samples so weather overlays can reflect where you were (optional)."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow The Complex Patient to scan paper backup QR codes for account recovery.",
+          "recordAudioAndroid": false
+        }
       ]
     ],
     "web": {

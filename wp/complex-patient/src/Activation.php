@@ -34,6 +34,11 @@ final class Activation
     public const DEVICE_TABLE_BASENAME = 'complex_patient_device';
 
     /**
+     * Unprefixed base name of the paper backup envelope table.
+     */
+    public const PAPER_BACKUP_TABLE_BASENAME = 'complex_patient_paper_backup';
+
+    /**
      * Build the CREATE TABLE statement for the vault table.
      *
      * This is a pure function (no WordPress dependencies) so the schema can be
@@ -128,11 +133,45 @@ final class Activation
     }
 
     /**
+     * Build the CREATE TABLE statement for the paper backup table.
+     *
+     * Stores only opaque AES-GCM envelopes wrapping the vault KEK. The mnemonic
+     * never crosses this boundary and no system recovery key exists server-side.
+     *
+     * @param string $tableName      Fully prefixed table name.
+     * @param string $charsetCollate Result of wpdb::get_charset_collate(), may be empty.
+     */
+    public static function buildPaperBackupSchemaSql(string $tableName, string $charsetCollate = ''): string
+    {
+        $suffix = '' === $charsetCollate ? '' : ' ' . $charsetCollate;
+
+        return "CREATE TABLE {$tableName} (
+  backup_id varchar(36) NOT NULL,
+  wp_user_id bigint(20) unsigned NOT NULL,
+  label varchar(128) DEFAULT NULL,
+  iv varchar(32) NOT NULL,
+  auth_tag varchar(32) NOT NULL,
+  ciphertext longblob NOT NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY  (backup_id),
+  KEY idx_user (wp_user_id)
+){$suffix};";
+    }
+
+    /**
      * Resolve the fully prefixed device registration table name.
      */
     public static function deviceTableName(\wpdb $wpdb): string
     {
         return $wpdb->prefix . self::DEVICE_TABLE_BASENAME;
+    }
+
+    /**
+     * Resolve the fully prefixed paper backup table name.
+     */
+    public static function paperBackupTableName(\wpdb $wpdb): string
+    {
+        return $wpdb->prefix . self::PAPER_BACKUP_TABLE_BASENAME;
     }
 
     /**
@@ -176,9 +215,10 @@ final class Activation
 
         $charsetCollate = $wpdb->get_charset_collate();
         $tables         = [
-            self::tableName($wpdb)       => self::buildSchemaSql(self::tableName($wpdb), $charsetCollate),
-            self::kdfTableName($wpdb)    => self::buildKdfSchemaSql(self::kdfTableName($wpdb), $charsetCollate),
-            self::deviceTableName($wpdb) => self::buildDeviceSchemaSql(self::deviceTableName($wpdb), $charsetCollate),
+            self::tableName($wpdb)             => self::buildSchemaSql(self::tableName($wpdb), $charsetCollate),
+            self::kdfTableName($wpdb)          => self::buildKdfSchemaSql(self::kdfTableName($wpdb), $charsetCollate),
+            self::deviceTableName($wpdb)       => self::buildDeviceSchemaSql(self::deviceTableName($wpdb), $charsetCollate),
+            self::paperBackupTableName($wpdb)  => self::buildPaperBackupSchemaSql(self::paperBackupTableName($wpdb), $charsetCollate),
         ];
 
         foreach ($tables as $tableName => $sql) {
@@ -237,6 +277,76 @@ final class Activation
         }
 
         throw new \RuntimeException($message);
+    }
+
+    /**
+     * Determine whether the given table currently exists.
+     */
+    public static function hasTable(\wpdb $wpdb, string $tableName): bool
+    {
+        return self::tableExists($wpdb, $tableName);
+    }
+
+    /**
+     * Report which plugin tables are present in the database.
+     *
+     * @return array<string, bool>
+     */
+    public static function getSchemaStatus(\wpdb $wpdb): array
+    {
+        return [
+            'vault'        => self::tableExists($wpdb, self::tableName($wpdb)),
+            'kdf'          => self::tableExists($wpdb, self::kdfTableName($wpdb)),
+            'device'       => self::tableExists($wpdb, self::deviceTableName($wpdb)),
+            'paper_backup' => self::tableExists($wpdb, self::paperBackupTableName($wpdb)),
+        ];
+    }
+
+    /**
+     * Create any missing plugin tables. Safe to call after rsync deploys new PHP
+     * without re-activating the plugin in wp-admin.
+     *
+     * @return array<string, string> short table key → present|created|failed|error
+     */
+    public static function repairMissingTables(\wpdb $wpdb): array
+    {
+        if (! function_exists('dbDelta')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
+
+        $charsetCollate = $wpdb->get_charset_collate();
+        $tables         = [
+            'vault'        => [self::tableName($wpdb), self::buildSchemaSql(self::tableName($wpdb), $charsetCollate)],
+            'kdf'          => [self::kdfTableName($wpdb), self::buildKdfSchemaSql(self::kdfTableName($wpdb), $charsetCollate)],
+            'device'       => [self::deviceTableName($wpdb), self::buildDeviceSchemaSql(self::deviceTableName($wpdb), $charsetCollate)],
+            'paper_backup' => [self::paperBackupTableName($wpdb), self::buildPaperBackupSchemaSql(self::paperBackupTableName($wpdb), $charsetCollate)],
+        ];
+
+        $report = [];
+
+        foreach ($tables as $key => [$tableName, $sql]) {
+            if (self::tableExists($wpdb, $tableName)) {
+                $report[$key] = 'present';
+                continue;
+            }
+
+            try {
+                self::ensureTable($wpdb, $tableName, $sql, false);
+                $report[$key] = self::tableExists($wpdb, $tableName) ? 'created' : 'failed';
+            } catch (\Throwable $exception) {
+                if (function_exists('error_log')) {
+                    error_log(
+                        '[Complex Patient] repairMissingTables failed for '
+                        . $tableName
+                        . ': '
+                        . $exception->getMessage()
+                    );
+                }
+                $report[$key] = 'error';
+            }
+        }
+
+        return $report;
     }
 
     /**

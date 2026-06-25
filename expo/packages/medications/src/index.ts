@@ -64,7 +64,7 @@ export {
 export type { ScheduledDoseSlot } from './schedule';
 export { expandDosesForDay, scheduledDoseKey, doseInstanceKey } from './schedule';
 
-export type { TodayDoseStatus, TodayScheduledDose, TodayPrnMedication, TodayQueue } from './today';
+export type { TodayDoseStatus, TodayScheduledDose, TodayPrnRegimen, TodayQueue } from './today';
 export { buildTodayQueue } from './today';
 
 export type { MedEventMutationResult, AdherenceDaySummary } from './adherence';
@@ -80,3 +80,5 @@ export {
   buildMedicationNotificationTriggers,
   notificationTriggerId,
 } from './notification-schedule';
+
+export { makeMedicationProfile } from './test-fixtures';

@@ -12,6 +12,7 @@ import type {
   PrnLog,
   SymptomEntry,
 } from '@complex-patient/domain';
+import { summarizeMedicationDosage, summarizeMedicationForm } from '@complex-patient/domain';
 import type { ClinicalExportSource, FhirBundle, FhirBundleEntry } from './types';
 import { filterActive } from './partition';
 import {
@@ -59,7 +60,13 @@ function buildPatient(): Record<string, unknown> {
 }
 
 function buildMedicationStatement(med: MedicationProfile): Record<string, unknown> {
-  const noteParts = [`Schedule: ${JSON.stringify(med.schedule)}`];
+  const noteParts = med.regimens.map(
+    (regimen) =>
+      `${regimen.label ? `${regimen.label}: ` : ''}${regimen.dosage} ${regimen.form} — ${JSON.stringify(regimen.schedule)}`,
+  );
+  if (med.notes?.trim()) {
+    noteParts.unshift(`Notes: ${med.notes.trim()}`);
+  }
   if (med.prescribingPhysician.trim()) {
     noteParts.unshift(`Prescriber: ${med.prescribingPhysician.trim()}`);
   }
@@ -75,13 +82,11 @@ function buildMedicationStatement(med: MedicationProfile): Record<string, unknow
       status: med.active ? 'active' : 'completed',
       subject: patientReference(),
       medicationCodeableConcept: {
-        text: `${med.drugName} (${med.form}, ${med.dosage})`,
+        text: `${med.drugName} (${summarizeMedicationForm(med)}, ${summarizeMedicationDosage(med)})`,
       },
-      dosage: [
-        {
-          text: med.dosage,
-        },
-      ],
+      dosage: med.regimens.map((regimen) => ({
+        text: regimen.label ? `${regimen.label}: ${regimen.dosage}` : regimen.dosage,
+      })),
       note: [
         {
           text: noteParts.join('. '),
@@ -91,13 +96,11 @@ function buildMedicationStatement(med: MedicationProfile): Record<string, unknow
     {
       kind: 'medication',
       drugName: med.drugName,
-      dosage: med.dosage,
-      form: med.form,
+      regimens: med.regimens,
+      notes: med.notes,
       prescribingPhysician: med.prescribingPhysician,
       conditionTreated: med.conditionTreated,
       active: med.active,
-      schedule: med.schedule,
-      prn: med.prn,
     },
   );
 }

@@ -12,7 +12,7 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { PrnQuickLogScreen } from '@complex-patient/ui';
+import { PrnQuickLogScreen } from '@complex-patient/ui/screens';
 
 export default function PrnQuickLog(): React.ReactElement {
   const router = useRouter();

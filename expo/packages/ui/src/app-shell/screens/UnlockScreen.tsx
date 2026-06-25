@@ -46,7 +46,16 @@ import {
   keyboardDoneAccessoryProps,
 } from '../ios-keyboard-done-accessory';
 import { deriveKEK, type KdfParams, type CryptoKeyRef } from '@complex-patient/crypto-engine';
-import { resolveKdfMaterialForUnlock, bytesFromBase64, base64FromBytes, KdfMaterialMissingError, normalizeKdfParams } from '../../app/kdf-material-sync';
+import { resolveKdfMaterialForUnlock, KdfMaterialMissingError } from '../../app/kdf-material-sync';
+import { PaperBackupRecoveryPanel } from './PaperBackupRecoveryPanel';
+import {
+  createKdfMaterialStorage,
+  type KdfMaterialStorage,
+  type StoredKdfMaterial,
+} from './kdf-material-storage';
+
+export type { KdfMaterialStorage, StoredKdfMaterial };
+export { createKdfMaterialStorage };
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -56,30 +65,6 @@ import { resolveKdfMaterialForUnlock, bytesFromBase64, base64FromBytes, KdfMater
 const PASSPHRASE_MIN = 12;
 /** Maximum passphrase length for UI validation (Requirement 7.8). */
 const PASSPHRASE_MAX = 128;
-
-/** Storage key for persisted KDF material (non-secret). */
-const KDF_MATERIAL_KEY = 'complex-patient.kdf-material';
-
-// ---------------------------------------------------------------------------
-// KDF Material Storage interface
-// ---------------------------------------------------------------------------
-
-/**
- * Interface for persisting KDF material (salt + params) outside the vault.
- * Both native (expo-secure-store / AsyncStorage) and web (localStorage) satisfy
- * this shape. The stored data is NOT secret — it contains only the salt and the
- * algorithm parameters needed to re-derive the same KEK on subsequent unlocks.
- */
-export interface KdfMaterialStorage {
-  getItem(key: string): Promise<string | null> | string | null;
-  setItem(key: string, value: string): Promise<void> | void;
-}
-
-/** Persisted KDF material structure (non-secret). */
-export interface StoredKdfMaterial {
-  saltBase64: string;
-  params: KdfParams;
-}
 
 // ---------------------------------------------------------------------------
 // Submit result type
@@ -220,48 +205,17 @@ export async function submitBiometric(
 ): Promise<BiometricSubmitResult> {
   const res = await home.unlock();
   if (res.ok) return { ok: true };
-  // No stored KEK yet, biometric failure, or session lockout → passphrase path (7.5).
+  // No stored KEK yet, biometric failure, session lockout, or broken passkey → passphrase path (7.5).
   if (
     res.reason === 'NO_KEY_STORED' ||
     res.reason === 'BIOMETRIC_FAILED' ||
-    res.reason === 'BIOMETRIC_LOCKED_OUT'
+    res.reason === 'BIOMETRIC_LOCKED_OUT' ||
+    res.reason === 'PASSPHRASE_REQUIRED'
   ) {
     return 'FALLBACK';
   }
   // Other non-ready → preserve locked state, stay on unlock screen (7.9).
   return { ok: false, reason: 'STILL_LOCKED' };
-}
-
-// ---------------------------------------------------------------------------
-// KDF material helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Create load/save functions for KDF material backed by a key-value storage.
- * The storage is outside the vault (non-secret location), suitable for
- * expo-secure-store or localStorage.
- */
-export function createKdfMaterialStorage(storage: KdfMaterialStorage) {
-  return {
-    async loadKdfMaterial(): Promise<{ salt: Uint8Array; params: KdfParams } | null> {
-      const raw = await storage.getItem(KDF_MATERIAL_KEY);
-      if (!raw) return null;
-      try {
-        const parsed: StoredKdfMaterial = JSON.parse(raw);
-        const salt = bytesFromBase64(parsed.saltBase64);
-        return { salt, params: normalizeKdfParams(parsed.params) };
-      } catch {
-        return null;
-      }
-    },
-    async saveKdfMaterial(m: { salt: Uint8Array; params: KdfParams }): Promise<void> {
-      const stored: StoredKdfMaterial = {
-        saltBase64: base64FromBytes(m.salt),
-        params: m.params,
-      };
-      await storage.setItem(KDF_MATERIAL_KEY, JSON.stringify(stored));
-    },
-  };
 }
 
 /** Shown when the device supports biometrics — sets expectation after a slow passphrase unlock. */
@@ -467,7 +421,7 @@ export function UnlockScreen({
           break;
         case 'KDF_MISSING':
           setError(
-            'Vault data is on this device but key-derivation settings are missing. Restore from backup or contact support — entering your passphrase cannot recover the vault in this state.',
+            'Vault data is on this device but key-derivation settings are missing. Use Recover with paper backup below, or restore from another device.',
           );
           break;
         case 'NOT_AUTHENTICATED':
@@ -548,7 +502,14 @@ export function UnlockScreen({
 
       if (result === 'FALLBACK') {
         setShowPassphraseInput(true);
-        setError('Please enter your master passphrase to unlock.');
+        if (passkeyAvailable) {
+          setHasPasskey(home.hasPasskeyUnlock?.() ?? false);
+          setError(
+            'Passkey unlock failed. Enter your master passphrase, or reset your passkey if it no longer works.',
+          );
+        } else {
+          setError('Please enter your master passphrase to unlock.');
+        }
         return;
       }
 
@@ -562,7 +523,17 @@ export function UnlockScreen({
       setLoading(false);
       setLoadingMessage(null);
     }
-  }, [home, refreshHomeStatus]);
+  }, [home, passkeyAvailable, refreshHomeStatus]);
+
+  const handleResetPasskey = useCallback(() => {
+    home?.removePasskeyUnlock?.();
+    setHasPasskey(false);
+    setPreferPassphrase(true);
+    setShowPassphraseInput(true);
+    setError(
+      'Saved passkey removed from this browser. Unlock with your master passphrase, then set up a new passkey in Settings.',
+    );
+  }, [home]);
 
   return (
     <KeyboardAvoidingView
@@ -737,6 +708,27 @@ export function UnlockScreen({
         >
           <Text style={styles.linkText}>Use passphrase instead</Text>
         </Pressable>
+      )}
+
+      {passkeySupported && (passkeyAvailable || hasPasskey) && (
+        <Pressable
+          style={styles.linkButton}
+          onPress={handleResetPasskey}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel="Reset passkey on this browser"
+          testID="unlock-reset-passkey"
+        >
+          <Text style={styles.linkText}>Reset passkey on this browser</Text>
+        </Pressable>
+      )}
+
+      {home && (
+        <PaperBackupRecoveryPanel
+          home={home}
+          kdfStorage={kdfStorage}
+          onRecovered={refreshHomeStatus}
+        />
       )}
         </View>
       </ScrollView>

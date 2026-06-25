@@ -8,7 +8,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { UnlockScreen } from '@complex-patient/ui';
+import { UnlockScreen } from '@complex-patient/ui/screens';
 import { nativeKdfStorage } from '../../src/adapters';
 import { createExpoBiometricAdapter } from '../../src/adapters/native-key-store-adapters';
 

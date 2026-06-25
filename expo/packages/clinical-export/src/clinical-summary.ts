@@ -11,6 +11,7 @@ import type {
   PrnLog,
   SymptomEntry,
 } from '@complex-patient/domain';
+import { summarizeMedicationDosage, summarizeMedicationForm } from '@complex-patient/domain';
 import type { ClinicalExportSource } from './types';
 import { filterActive } from './partition';
 import { EXPORT_JSON_FILENAME } from './types';
@@ -52,8 +53,11 @@ function formatDuration(symptom: SymptomEntry): string {
 }
 
 function medicationLine(med: MedicationProfile): string {
-  const base = `**${mdCell(med.drugName)}** — ${mdCell(med.dosage)}, ${mdCell(med.form)}`;
+  const base = `**${mdCell(med.drugName)}** — ${mdCell(summarizeMedicationDosage(med))}, ${mdCell(summarizeMedicationForm(med))}`;
   const extras: string[] = [];
+  if (med.notes?.trim()) {
+    extras.push(mdCell(med.notes.trim()));
+  }
   if (med.conditionTreated.trim()) {
     extras.push(`for ${mdCell(med.conditionTreated)}`);
   }

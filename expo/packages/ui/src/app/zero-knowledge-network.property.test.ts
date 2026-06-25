@@ -250,12 +250,18 @@ const medicationArb: fc.Arbitrary<MedicationProfile> = fc.record({
   id: phiString('MEDID'),
   op_timestamp: recentIso,
   drugName: phiString('DRUG'),
-  dosage: phiString('DOSE'),
-  form: phiString('FORM'),
   prescribingPhysician: phiString('DOC'),
   conditionTreated: phiString('COND'),
   active: fc.boolean(),
-  schedule: fc.constant({ kind: 'prn' as const }),
+  regimens: fc.array(
+    fc.record({
+      id: phiString('REGID'),
+      dosage: phiString('DOSE'),
+      form: phiString('FORM'),
+      schedule: fc.constant({ kind: 'prn' as const }),
+    }),
+    { minLength: 1, maxLength: 2 },
+  ),
 });
 
 const symptomArb: fc.Arbitrary<SymptomEntry> = fc.record({
@@ -384,7 +390,7 @@ function collectSensitiveTokens(scenario: GeneratedScenario): Set<string> {
 
   // PHI tokens
   for (const m of scenario.medications) {
-    add(m.id, m.drugName, m.dosage, m.form, m.prescribingPhysician, m.conditionTreated);
+    add(m.id, m.drugName, m.regimens[0]?.dosage ?? '', m.regimens[0]?.form ?? '', m.prescribingPhysician, m.conditionTreated);
   }
   for (const s of scenario.symptoms) {
     add(s.id, s.symptomType, s.systemicLocation, s.notes);

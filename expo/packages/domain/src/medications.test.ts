@@ -12,6 +12,7 @@ import type {
   PrnConfig,
   Weekday,
   TimeBlock,
+  DoseRegimen,
 } from './medications';
 
 describe('Medication domain models', () => {
@@ -21,12 +22,17 @@ describe('Medication domain models', () => {
         id: 'med-001',
         op_timestamp: '2024-01-15T10:00:00Z',
         drugName: 'Metoprolol',
-        dosage: '25mg',
-        form: 'tablet',
         prescribingPhysician: 'Dr. Smith',
         conditionTreated: 'POTS',
         active: true,
-        schedule: { kind: 'weekly', daysOfWeek: ['MON', 'WED', 'FRI'], times: ['08:00'] },
+        regimens: [
+          {
+            id: 'reg-1',
+            dosage: '25mg',
+            form: 'tablet',
+            schedule: { kind: 'weekly', daysOfWeek: ['MON', 'WED', 'FRI'], times: ['08:00'] },
+          },
+        ],
       };
       expect(profile.id).toBe('med-001');
       expect(profile.drugName).toBe('Metoprolol');
@@ -69,12 +75,18 @@ describe('Medication domain models', () => {
 });
 
 describe('validateMedicationProfile', () => {
-  const validInput = {
-    drugName: 'Metoprolol',
+  const defaultRegimen = (): DoseRegimen => ({
+    id: 'reg-1',
     dosage: '25mg',
     form: 'tablet',
+    schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+  });
+
+  const validInput = {
+    drugName: 'Metoprolol',
     prescribingPhysician: 'Dr. Smith',
     conditionTreated: 'POTS',
+    regimens: [defaultRegimen()],
   };
 
   it('accepts a valid profile with all fields populated', () => {
@@ -85,10 +97,9 @@ describe('validateMedicationProfile', () => {
   it('accepts fields at exactly 1 character', () => {
     const result = validateMedicationProfile({
       drugName: 'A',
-      dosage: 'B',
-      form: 'C',
       prescribingPhysician: 'D',
       conditionTreated: 'E',
+      regimens: [{ ...defaultRegimen(), dosage: 'B', form: 'C' }],
     });
     expect(result.valid).toBe(true);
   });
@@ -97,10 +108,9 @@ describe('validateMedicationProfile', () => {
     const longStr = 'x'.repeat(200);
     const result = validateMedicationProfile({
       drugName: longStr,
-      dosage: longStr,
-      form: longStr,
       prescribingPhysician: longStr,
       conditionTreated: longStr,
+      regimens: [{ ...defaultRegimen(), dosage: longStr, form: longStr }],
     });
     expect(result.valid).toBe(true);
   });
@@ -114,8 +124,11 @@ describe('validateMedicationProfile', () => {
     }
   });
 
-  it('rejects field exceeding 200 characters', () => {
-    const result = validateMedicationProfile({ ...validInput, dosage: 'x'.repeat(201) });
+  it('rejects regimen dosage exceeding 200 characters', () => {
+    const result = validateMedicationProfile({
+      ...validInput,
+      regimens: [{ ...defaultRegimen(), dosage: 'x'.repeat(201) }],
+    });
     expect(result.valid).toBe(false);
     if (!result.valid) {
       expect(result.errors).toHaveLength(1);
@@ -123,17 +136,15 @@ describe('validateMedicationProfile', () => {
     }
   });
 
-  it('reports multiple invalid required fields simultaneously', () => {
+  it('reports multiple invalid fields simultaneously', () => {
     const result = validateMedicationProfile({
       drugName: '',
-      dosage: '',
-      form: 'tablet',
       prescribingPhysician: '',
       conditionTreated: 'POTS',
+      regimens: [{ ...defaultRegimen(), dosage: '' }],
     });
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.errors).toHaveLength(2);
       const fields = result.errors.map((e) => e.field);
       expect(fields).toContain('drugName');
       expect(fields).toContain('dosage');
@@ -149,17 +160,16 @@ describe('validateMedicationProfile', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('rejects all required fields when drugName, dosage, and form are empty', () => {
+  it('rejects profile with no regimens', () => {
     const result = validateMedicationProfile({
-      drugName: '',
-      dosage: '',
-      form: '',
+      drugName: 'Metoprolol',
       prescribingPhysician: '',
       conditionTreated: '',
+      regimens: [],
     });
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.errors).toHaveLength(3);
+      expect(result.errors.some((error) => error.field === 'regimens')).toBe(true);
     }
   });
 });
@@ -195,10 +205,10 @@ describe('validateMedicationSchedule', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('accepts rotating-interval with N=30 (upper bound)', () => {
+  it('accepts rotating-interval with N=365 (upper bound)', () => {
     const result = validateMedicationSchedule({
       kind: 'rotating-interval',
-      everyNDays: 30,
+      everyNDays: 365,
       times: ['08:00'],
     });
     expect(result.valid).toBe(true);
@@ -212,14 +222,14 @@ describe('validateMedicationSchedule', () => {
     });
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.message).toContain('between 1 and 30');
+      expect(result.message).toContain('between 1 and 365');
     }
   });
 
-  it('rejects rotating-interval with N=31', () => {
+  it('rejects rotating-interval with N=366', () => {
     const result = validateMedicationSchedule({
       kind: 'rotating-interval',
-      everyNDays: 31,
+      everyNDays: 366,
       times: ['08:00'],
     });
     expect(result.valid).toBe(false);

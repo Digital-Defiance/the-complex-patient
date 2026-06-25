@@ -8,5 +8,9 @@
   "scripts": {
     "test": "vitest run",
     "build": "tsc"
+  },
+  "dependencies": {
+    "@scure/bip39": "^2.2.0",
+    "toqr": "^0.1.1"
   }
 }

@@ -26,5 +26,10 @@ export { ActivityResponder } from './activity-wiring';
 export { suspendBackgroundLock, isBackgroundLockSuspended } from './background-lock-session';
 export { useDeferredHomeServicesReady } from './deferred-home-services';
 
-export { SecureContextRequiredScreen, CompositionFailedScreen, LoadingScreen, AgeGateScreen, SignInScreen, IneligibleScreen, IneligibleScreenContent, IneligibleErrorBoundary, UnlockScreen, submitPassphrase, submitBiometric, createKdfMaterialStorage, HomeScreen, ConditionTimelineScreen, MedicationsScreen, MedicationsHubScreen, MedicationsTodayScreen, MedicationFormScreen, MedicationAdherenceHistoryScreen, PrnQuickLogScreen, SymptomJournalLogScreen, SymptomJournalHubScreen, SymptomJournalHistoryScreen, FlareScreen, InsightsScreen, PhysicianReportScreen, ExportScreen, ImportScreen, WeatherSettingsSection, SyncStatusIndicator, useConnectivityWatcher, aggregateSyncStatus, STATUS_VISUALS } from './screens';
-export type { KdfMaterialStorage, StoredKdfMaterial, PassphraseSubmitResult, BiometricSubmitResult, PassphraseScreenDeps, UnlockScreenProps, HomeScreenProps, ConditionTimelineScreenProps, MedicationsScreenProps, MedicationsHubScreenProps, MedicationsTodayScreenProps, MedicationFormScreenProps, MedicationAdherenceHistoryScreenProps, PrnQuickLogScreenProps, SymptomJournalLogScreenProps, SymptomJournalHubScreenProps, SymptomJournalHistoryScreenProps, FlareScreenProps, InsightsScreenProps, PhysicianReportScreenProps, ExportScreenProps, ImportScreenProps, WeatherSettingsSectionProps, SyncStatusIndicatorProps } from './screens';
+export {
+  SyncStatusIndicator,
+  useConnectivityWatcher,
+  aggregateSyncStatus,
+  STATUS_VISUALS,
+  type SyncStatusIndicatorProps,
+} from './screens/SyncStatusIndicator';

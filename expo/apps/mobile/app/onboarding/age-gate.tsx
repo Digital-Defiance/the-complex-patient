@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { AgeGateScreen } from '@complex-patient/ui';
+import { AgeGateScreen } from '@complex-patient/ui/screens';
 
 export default function AgeGate(): React.ReactElement {
   return <AgeGateScreen />;

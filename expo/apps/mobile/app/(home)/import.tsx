@@ -4,7 +4,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ImportScreen } from '@complex-patient/ui';
+import { ImportScreen } from '@complex-patient/ui/screens';
 import { pickClinicalExportZip } from '../../src/adapters/clinical-export-adapters';
 
 export default function ImportRoute(): React.ReactElement {

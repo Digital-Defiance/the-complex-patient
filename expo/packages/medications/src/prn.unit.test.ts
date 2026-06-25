@@ -45,13 +45,18 @@ function sequentialIds(prefix: string): () => string {
 function prnInput(prn: PrnConfig): MedicationProfileInput {
   return {
     drugName: 'Hydromorphone',
-    dosage: '2mg',
-    form: 'tablet',
     prescribingPhysician: 'Dr. Lee',
     conditionTreated: 'Breakthrough pain',
     active: true,
-    schedule: { kind: 'prn' },
-    prn,
+    regimens: [
+      {
+        id: 'reg-1',
+        dosage: '2mg',
+        form: 'tablet',
+        schedule: { kind: 'prn' },
+        prn,
+      },
+    ],
   };
 }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { MedicationProfile, SymptomEntry, PrnLog } from '@complex-patient/domain';
+import { makeTestMedicationProfile } from '@complex-patient/domain';
 import {
   detectCorrelations,
   MAX_INSIGHT_CARDS,
@@ -71,15 +72,13 @@ function prnLog(overrides: Partial<PrnLog> & { id: string; takenAt: string }): P
 function medication(
   overrides: Partial<MedicationProfile> & { id: string; drugName: string; active: boolean },
 ): MedicationProfile {
-  return {
+  return makeTestMedicationProfile({
     op_timestamp: NOW.toISOString(),
-    dosage: '10mg',
-    form: 'tablet',
     prescribingPhysician: 'Dr. Smith',
     conditionTreated: 'POTS',
     schedule: { kind: 'prn' },
     ...overrides,
-  };
+  });
 }
 
 /**

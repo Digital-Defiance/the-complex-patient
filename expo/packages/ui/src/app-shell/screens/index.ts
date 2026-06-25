@@ -16,9 +16,6 @@ export {
   UnlockScreen,
   submitPassphrase,
   submitBiometric,
-  createKdfMaterialStorage,
-  type KdfMaterialStorage,
-  type StoredKdfMaterial,
   type PassphraseSubmitResult,
   type BiometricSubmitResult,
   type PassphraseScreenDeps,
@@ -26,6 +23,11 @@ export {
   BIOMETRIC_FUTURE_UNLOCK_HINT,
   BIOMETRIC_FAST_PATH_HINT,
 } from './UnlockScreen';
+export {
+  createKdfMaterialStorage,
+  type KdfMaterialStorage,
+  type StoredKdfMaterial,
+} from './kdf-material-storage';
 export { HomeScreen, type HomeScreenProps } from './HomeScreen';
 export { ConditionTimelineScreen, type ConditionTimelineScreenProps } from './ConditionTimelineScreen';
 export {
@@ -46,6 +48,14 @@ export { FlareScreen, type FlareScreenProps } from './FlareScreen';
 export { MedicationsScreen, type MedicationsScreenProps } from './MedicationsScreen';
 export { PrnQuickLogScreen, type PrnQuickLogScreenProps } from './PrnQuickLogScreen';
 export { WeatherSettingsSection, type WeatherSettingsSectionProps } from './WeatherSettingsSection';
+export { PaperBackupSection, type PaperBackupSectionProps } from './PaperBackupSection';
+export { PaperBackupRecoveryPanel, type PaperBackupRecoveryPanelProps } from './PaperBackupRecoveryPanel';
+export { PaperBackupTemplateView, type PaperBackupTemplateViewProps } from './PaperBackupTemplateView';
+export { PaperBackupVerificationStep, type PaperBackupVerificationStepProps } from './PaperBackupVerificationStep';
+export { PaperBackupQrScanner, type PaperBackupQrScannerProps } from './PaperBackupQrScanner';
+export { VaultSettingsScreen, type VaultSettingsScreenProps } from './VaultSettingsScreen';
+export { ChangePassphraseSection, type ChangePassphraseSectionProps } from './ChangePassphraseSection';
+export { PasskeyUnlockSection } from './PasskeyUnlockSection';
 export { MedicationsHubScreen, type MedicationsHubScreenProps } from './medications/MedicationsHubScreen';
 export { MedicationsTodayScreen, type MedicationsTodayScreenProps } from './medications/MedicationsTodayScreen';
 export { MedicationFormScreen, type MedicationFormScreenProps } from './medications/MedicationFormScreen';

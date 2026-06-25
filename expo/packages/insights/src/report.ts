@@ -31,6 +31,7 @@
  */
 
 import type { MedicationProfile, SymptomEntry, PrnLog } from '@complex-patient/domain';
+import { summarizeMedicationDosage, summarizeMedicationForm } from '@complex-patient/domain';
 import { systemClock } from './pipeline';
 import { detectCorrelations, type AIInsightCard } from './correlation';
 import type { Clock, MedEvent, VaultDataSource } from './types';
@@ -205,7 +206,7 @@ function compareMedications(a: MedicationProfile, b: MedicationProfile): number 
 
 /** Render a single medication into a human-readable line. */
 function medicationLine(med: MedicationProfile): string {
-  const base = `${med.drugName} — ${med.dosage}, ${med.form}`;
+  const base = `${med.drugName} — ${summarizeMedicationDosage(med)}, ${summarizeMedicationForm(med)}`;
   const extras: string[] = [];
   if (med.conditionTreated.trim()) {
     extras.push(med.conditionTreated.trim());

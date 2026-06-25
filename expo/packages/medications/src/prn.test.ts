@@ -38,17 +38,25 @@ function sequentialIds(prefix: string): () => string {
 
 const prnConfig: PrnConfig = { doseAmount: 1, doseUnit: 'tablet', safetyLimit24h: 4 };
 
-function prnInput(overrides: Partial<MedicationProfileInput> = {}): MedicationProfileInput {
+function prnInput(overrides: Partial<MedicationProfileInput> & { dosage?: string; form?: string; prn?: PrnConfig } = {}): MedicationProfileInput {
+  const { dosage = '5mg', form = 'tablet', prn = prnConfig, regimens, ...rest } = overrides;
   return {
     drugName: 'Oxycodone',
-    dosage: '5mg',
-    form: 'tablet',
     prescribingPhysician: 'Dr. Smith',
     conditionTreated: 'Pain',
     active: true,
-    schedule: { kind: 'prn' },
-    prn: prnConfig,
-    ...overrides,
+    regimens:
+      regimens ??
+      [
+        {
+          id: 'reg-1',
+          dosage,
+          form,
+          schedule: { kind: 'prn' },
+          prn,
+        },
+      ],
+    ...rest,
   };
 }
 
@@ -68,7 +76,7 @@ async function seedPrnMedication(prn: PrnConfig = prnConfig): Promise<string> {
     kek: KEY,
     newId: sequentialIds('med'),
   });
-  const created = await profileEngine.create(prnInput({ prn, schedule: { kind: 'prn' } }));
+  const created = await profileEngine.create(prnInput({ prn }));
   if (!created.ok) throw new Error('failed to seed PRN medication');
   return created.profile.id;
 }
@@ -161,9 +169,18 @@ describe('PrnQuickLogEngine.quickLog — one-tap recording (13.1, 13.5)', () => 
   it('rejects Quick Log for a non-PRN medication', async () => {
     const profileEngine = new MedicationProfileEngine({ store: vault, crypto, kek: KEY, newId: sequentialIds('med') });
     const created = await profileEngine.create({
-      drugName: 'Lisinopril', dosage: '10mg', form: 'tablet',
-      prescribingPhysician: 'Dr. Who', conditionTreated: 'BP', active: true,
-      schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+      drugName: 'Lisinopril',
+      prescribingPhysician: 'Dr. Who',
+      conditionTreated: 'BP',
+      active: true,
+      regimens: [
+        {
+          id: 'reg-1',
+          dosage: '10mg',
+          form: 'tablet',
+          schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+        },
+      ],
     });
     if (!created.ok) throw new Error('seed failed');
     const engine = makeQuickLogEngine(() => '2026-01-01T08:00:00.000Z');

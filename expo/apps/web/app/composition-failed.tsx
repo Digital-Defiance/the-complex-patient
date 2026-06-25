@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { CompositionFailedScreen } from '@complex-patient/ui';
+import { CompositionFailedScreen } from '@complex-patient/ui/screens';
 
 export default function CompositionFailedRoute(): React.ReactElement {
   return <CompositionFailedScreen />;

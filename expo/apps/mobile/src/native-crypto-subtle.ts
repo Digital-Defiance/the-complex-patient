@@ -6,8 +6,11 @@
  */
 
 import { gcm } from '@noble/ciphers/aes.js';
+import { hkdf } from '@noble/hashes/hkdf.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 
-type RawAesGcmKey = CryptoKey & { __rawKey: Uint8Array };
+type RawAesGcmKey = CryptoKey & { __rawKey: Uint8Array; __kind: 'aes-gcm' };
+type RawHkdfKey = CryptoKey & { __rawKey: Uint8Array; __kind: 'hkdf' };
 
 function toBytes(data: ArrayBuffer | Uint8Array): Uint8Array {
   return data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -17,29 +20,69 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
+function algorithmName(algorithm: string | Algorithm): string {
+  return typeof algorithm === 'string' ? algorithm : algorithm.name;
+}
+
 export function installNativeSubtlePolyfill(): void {
-  const subtle: Pick<SubtleCrypto, 'importKey' | 'encrypt' | 'decrypt'> = {
+  const subtle: Pick<SubtleCrypto, 'importKey' | 'encrypt' | 'decrypt' | 'deriveBits'> = {
     async importKey(
       format: 'raw',
       keyData: ArrayBuffer | Uint8Array,
-      algorithm: { name: string },
+      algorithm: string | Algorithm,
       _extractable: boolean,
       keyUsages: KeyUsage[],
     ): Promise<CryptoKey> {
-      if (format !== 'raw' || algorithm.name !== 'AES-GCM') {
+      if (format !== 'raw') {
         throw new DOMException('Unsupported importKey parameters', 'NotSupportedError');
       }
+
+      const name = algorithmName(algorithm);
       const bytes = toBytes(keyData);
-      if (bytes.length !== 32) {
-        throw new DOMException('Invalid AES-GCM key length', 'DataError');
+
+      if (name === 'HKDF') {
+        return {
+          __rawKey: bytes,
+          __kind: 'hkdf',
+          algorithm: { name: 'HKDF' },
+          type: 'secret',
+          extractable: false,
+          usages: keyUsages,
+        } as RawHkdfKey;
       }
-      return {
-        __rawKey: bytes,
-        algorithm,
-        type: 'secret',
-        extractable: false,
-        usages: keyUsages,
-      } as RawAesGcmKey;
+
+      if (name === 'AES-GCM') {
+        if (bytes.length !== 32) {
+          throw new DOMException('Invalid AES-GCM key length', 'DataError');
+        }
+        return {
+          __rawKey: bytes,
+          __kind: 'aes-gcm',
+          algorithm: { name: 'AES-GCM' },
+          type: 'secret',
+          extractable: false,
+          usages: keyUsages,
+        } as RawAesGcmKey;
+      }
+
+      throw new DOMException('Unsupported importKey parameters', 'NotSupportedError');
+    },
+
+    async deriveBits(
+      algorithm: AlgorithmIdentifier,
+      baseKey: CryptoKey,
+      length: number,
+    ): Promise<ArrayBuffer> {
+      const params = algorithm as HkdfParams;
+      if (params.name !== 'HKDF') {
+        throw new DOMException('Unsupported deriveBits algorithm', 'NotSupportedError');
+      }
+
+      const rawKey = (baseKey as RawHkdfKey).__rawKey;
+      const salt = params.salt ? toBytes(params.salt) : new Uint8Array();
+      const info = params.info ? toBytes(params.info) : new Uint8Array();
+      const derived = hkdf(sha256, rawKey, salt, info, length / 8);
+      return toArrayBuffer(derived);
     },
 
     async encrypt(

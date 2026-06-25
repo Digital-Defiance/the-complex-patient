@@ -5,7 +5,7 @@
 import React, { useCallback } from 'react';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ExportScreen } from '@complex-patient/ui';
+import { ExportScreen } from '@complex-patient/ui/screens';
 import { saveAndShareClinicalExport } from '../../src/adapters/clinical-export-adapters';
 
 export default function ExportRoute(): React.ReactElement {

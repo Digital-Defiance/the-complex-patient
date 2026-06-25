@@ -63,32 +63,36 @@ function MedicationsTodayInner({
   );
 
   const handleTake = useCallback(
-    async (medicationId: string, scheduledAt: string) => {
-      const key = `${medicationId}:${scheduledAt}`;
+    async (medicationId: string, regimenId: string, scheduledAt: string) => {
+      const key = `${medicationId}:${regimenId}:${scheduledAt}`;
       setBusyKey(key);
-      await mutate((current) => recordDoseTaken({ current, medicationId, scheduledAt }).records);
+      await mutate((current) =>
+        recordDoseTaken({ current, medicationId, regimenId, scheduledAt }).records,
+      );
       setBusyKey(null);
     },
     [mutate],
   );
 
   const handleSkip = useCallback(
-    async (medicationId: string, scheduledAt: string) => {
-      const key = `${medicationId}:${scheduledAt}`;
+    async (medicationId: string, regimenId: string, scheduledAt: string) => {
+      const key = `${medicationId}:${regimenId}:${scheduledAt}`;
       setBusyKey(key);
-      await mutate((current) => recordDoseSkipped({ current, medicationId, scheduledAt }).records);
+      await mutate((current) =>
+        recordDoseSkipped({ current, medicationId, regimenId, scheduledAt }).records,
+      );
       setBusyKey(null);
     },
     [mutate],
   );
 
   const handleSnooze = useCallback(
-    async (medicationId: string, scheduledAt: string) => {
-      const key = `${medicationId}:${scheduledAt}`;
+    async (medicationId: string, regimenId: string, scheduledAt: string) => {
+      const key = `${medicationId}:${regimenId}:${scheduledAt}`;
       setBusyKey(key);
       const snoozedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
       await mutate((current) =>
-        recordDoseSnoozed({ current, medicationId, scheduledAt, snoozedUntil }).records,
+        recordDoseSnoozed({ current, medicationId, regimenId, scheduledAt, snoozedUntil }).records,
       );
       setBusyKey(null);
     },
@@ -119,19 +123,23 @@ function MedicationsTodayInner({
       ) : (
         queue.scheduled.map((dose) => {
           const med = medications.find((entry) => entry.id === dose.medicationId);
-          const key = `${dose.medicationId}:${dose.scheduledAt}`;
+          const regimen = med?.regimens.find((entry) => entry.id === dose.regimenId);
+          const key = `${dose.medicationId}:${dose.regimenId}:${dose.scheduledAt}`;
           const busy = busyKey === key;
           return (
             <View key={key} style={styles.doseCard} testID={`today-dose-${dose.medicationId}`}>
               <View style={styles.doseHeader}>
                 <MedProductIcon
                   appearance={med?.appearance}
-                  form={med?.form ?? ''}
-                  dosageUnit={med ? parseDosageString(med.dosage).unit : ''}
+                  form={regimen?.form ?? ''}
+                  dosageUnit={regimen ? parseDosageString(regimen.dosage).unit : ''}
                   size={28}
                 />
                 <View style={styles.doseText}>
-                  <Text style={styles.doseName}>{dose.drugName}</Text>
+                  <Text style={styles.doseName}>
+                    {dose.drugName}
+                    {dose.regimenLabel ? ` (${dose.regimenLabel})` : ''}
+                  </Text>
                   <Text style={styles.doseMeta}>
                     {dose.timeLabel} · {dose.dosageLabel} · {dose.status}
                   </Text>
@@ -142,7 +150,7 @@ function MedicationsTodayInner({
                   <Pressable
                     style={styles.takeBtn}
                     disabled={busy}
-                    onPress={() => void handleTake(dose.medicationId, dose.scheduledAt)}
+                    onPress={() => void handleTake(dose.medicationId, dose.regimenId, dose.scheduledAt)}
                     testID={`today-take-${dose.medicationId}`}
                   >
                     <Text style={styles.takeText}>{busy ? '…' : 'Take'}</Text>
@@ -150,7 +158,7 @@ function MedicationsTodayInner({
                   <Pressable
                     style={styles.secondaryBtn}
                     disabled={busy}
-                    onPress={() => void handleSkip(dose.medicationId, dose.scheduledAt)}
+                    onPress={() => void handleSkip(dose.medicationId, dose.regimenId, dose.scheduledAt)}
                     testID={`today-skip-${dose.medicationId}`}
                   >
                     <Text style={styles.secondaryText}>Skip</Text>
@@ -158,7 +166,7 @@ function MedicationsTodayInner({
                   <Pressable
                     style={styles.secondaryBtn}
                     disabled={busy}
-                    onPress={() => void handleSnooze(dose.medicationId, dose.scheduledAt)}
+                    onPress={() => void handleSnooze(dose.medicationId, dose.regimenId, dose.scheduledAt)}
                     testID={`today-snooze-${dose.medicationId}`}
                   >
                     <Text style={styles.secondaryText}>Snooze 15m</Text>

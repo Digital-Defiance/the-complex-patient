@@ -13,7 +13,7 @@
  */
 
 import React from 'react';
-import { IneligibleScreen } from '@complex-patient/ui';
+import { IneligibleScreen } from '@complex-patient/ui/screens';
 
 export default function IneligibleRoute(): React.ReactElement {
   return <IneligibleScreen />;

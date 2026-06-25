@@ -14,6 +14,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, StyleSheet } from 'react-native';
 import { buildMedicationsView, type PolyView, type PolyViewBlock } from '@complex-patient/medications';
 import type { MedicationProfile, VaultRecord } from '@complex-patient/domain';
+import { summarizeMedicationDosage, summarizeMedicationForm } from '@complex-patient/domain';
 import { splitMedicationsPartition } from '@complex-patient/clinical-export';
 import { MedProductIcon } from '@complex-patient/med-visuals';
 import { parseDosageString } from '../dosage-units';
@@ -40,8 +41,6 @@ export interface MedicationsScreenProps {
 interface EditState {
   medicationId: string;
   drugName: string;
-  dosage: string;
-  form: string;
   prescribingPhysician: string;
   conditionTreated: string;
 }
@@ -105,8 +104,6 @@ function MedicationsScreenInner({ home, onNavigatePrn, onAdd, onEditMedication, 
     setEditing({
       medicationId: med.id,
       drugName: med.drugName,
-      dosage: med.dosage,
-      form: med.form,
       prescribingPhysician: med.prescribingPhysician,
       conditionTreated: med.conditionTreated,
     });
@@ -129,8 +126,6 @@ function MedicationsScreenInner({ home, onNavigatePrn, onAdd, onEditMedication, 
           ? {
               ...med,
               drugName: editing.drugName,
-              dosage: editing.dosage,
-              form: editing.form,
               prescribingPhysician: editing.prescribingPhysician,
               conditionTreated: editing.conditionTreated,
               op_timestamp: new Date().toISOString(),
@@ -362,22 +357,6 @@ function MedicationRow({ medication, editing, onEdit, onEditMedication, onSave, 
         />
         <TextInput
           style={styles.editInput}
-          value={editing.dosage}
-          onChangeText={(v: string) => onUpdateField('dosage', v)}
-          placeholder="Dosage"
-          accessibilityLabel="Dosage"
-          testID={`edit-dosage-${medication.id}`}
-        />
-        <TextInput
-          style={styles.editInput}
-          value={editing.form}
-          onChangeText={(v: string) => onUpdateField('form', v)}
-          placeholder="Form"
-          accessibilityLabel="Form"
-          testID={`edit-form-${medication.id}`}
-        />
-        <TextInput
-          style={styles.editInput}
           value={editing.prescribingPhysician}
           onChangeText={(v: string) => onUpdateField('prescribingPhysician', v)}
           placeholder="Prescribing physician"
@@ -404,12 +383,14 @@ function MedicationRow({ medication, editing, onEdit, onEditMedication, onSave, 
     );
   }
 
+  const primaryRegimen = medication.regimens[0];
+
   return (
     <View style={styles.medicationRow} testID={`medication-row-${medication.id}`}>
       <MedProductIcon
         appearance={medication.appearance}
-        form={medication.form}
-        dosageUnit={parseDosageString(medication.dosage).unit}
+        form={primaryRegimen?.form ?? ''}
+        dosageUnit={primaryRegimen ? parseDosageString(primaryRegimen.dosage).unit : ''}
         size={28}
       />
       <View style={styles.medInfo}>
@@ -417,7 +398,7 @@ function MedicationRow({ medication, editing, onEdit, onEditMedication, onSave, 
           {medication.drugName}
         </Text>
         <Text style={styles.dosageText}>
-          {medication.dosage} — {medication.form}
+          {summarizeMedicationDosage(medication)} — {summarizeMedicationForm(medication)}
         </Text>
         <Text style={styles.detailText}>
           {medication.prescribingPhysician} • {medication.conditionTreated}

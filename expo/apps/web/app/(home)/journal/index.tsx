@@ -4,7 +4,7 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { SymptomJournalHubScreen } from '@complex-patient/ui';
+import { SymptomJournalHubScreen } from '@complex-patient/ui/screens';
 
 export default function JournalHub(): React.ReactElement {
   const router = useRouter();

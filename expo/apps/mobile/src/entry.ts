@@ -146,6 +146,7 @@ export async function createMobileHome(
     vaultHttp: http,
     getActiveKek: () => keyStore.getKek(),
     deviceIdStorage,
+    paperBackupRegistryStorage: options.ineligibilityStorage ?? nativeFlagStorage,
   });
 
   return controller;

@@ -254,6 +254,14 @@ describe('submitBiometric', () => {
 
       expect(result).toBe('FALLBACK');
     });
+
+    it('returns FALLBACK on PASSPHRASE_REQUIRED (broken passkey on web)', async () => {
+      const home = { unlock: vi.fn(async () => ({ ok: false, reason: 'PASSPHRASE_REQUIRED' })) };
+
+      const result = await submitBiometric(home);
+
+      expect(result).toBe('FALLBACK');
+    });
   });
 
   describe('Requirement 7.9: Non-ready results preserve the locked state', () => {

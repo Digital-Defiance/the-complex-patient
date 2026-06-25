@@ -92,7 +92,9 @@ export function buildAuthorizationHeader(auth: WordPressAuth): string {
   if (auth.username.length === 0 || auth.applicationPassword.length === 0) {
     throw new Error('Application Password credential requires username and password');
   }
-  return `Basic ${encodeBase64Utf8(`${auth.username}:${auth.applicationPassword}`)}`;
+  // WordPress shows application passwords in groups of four characters; spaces are not part of the secret.
+  const password = auth.applicationPassword.replace(/\s+/g, '');
+  return `Basic ${encodeBase64Utf8(`${auth.username}:${password}`)}`;
 }
 
 /**

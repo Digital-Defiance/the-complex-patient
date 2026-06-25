@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { makeTestMedicationProfile } from '@complex-patient/domain';
 import { buildFhirBundle } from './fhir';
 import { parseFhirBundleToSource } from './import-parse';
 import { applyClinicalImportMerge, mergeRecordsById, prepareClinicalImportMerge } from './import-merge';
@@ -35,17 +36,15 @@ describe('prepareClinicalImportMerge', () => {
   it('prepares merged partitions from parsed import and current vault', () => {
     const exportSource: ClinicalExportSource = {
       medications: [
-        {
+        makeTestMedicationProfile({
           id: 'med-1',
           op_timestamp: '2026-06-04T00:00:00.000Z',
           drugName: 'Imported',
           dosage: '5mg',
-          form: 'tablet',
           prescribingPhysician: 'Dr. B',
           conditionTreated: 'Pain',
-          active: true,
           schedule: { kind: 'prn' },
-        },
+        }),
       ],
       prnLogs: [],
       symptoms: [],
@@ -56,17 +55,15 @@ describe('prepareClinicalImportMerge', () => {
 
     const current: ClinicalExportSource = {
       medications: [
-        {
+        makeTestMedicationProfile({
           id: 'med-local',
           op_timestamp: '2026-06-01T00:00:00.000Z',
           drugName: 'Local',
           dosage: '1mg',
-          form: 'tablet',
           prescribingPhysician: 'Dr. A',
           conditionTreated: 'Pain',
-          active: true,
           schedule: { kind: 'prn' },
-        },
+        }),
       ],
       prnLogs: [],
       symptoms: [],
@@ -93,17 +90,15 @@ describe('applyClinicalImportMerge', () => {
   it('commits merged partitions in vault order', async () => {
     const exportSource: ClinicalExportSource = {
       medications: [
-        {
+        makeTestMedicationProfile({
           id: 'med-import',
           op_timestamp: '2026-06-04T00:00:00.000Z',
           drugName: 'Imported',
           dosage: '5mg',
-          form: 'tablet',
           prescribingPhysician: 'Dr. B',
           conditionTreated: 'Pain',
-          active: true,
           schedule: { kind: 'prn' },
-        },
+        }),
       ],
       prnLogs: [],
       symptoms: [],
@@ -147,17 +142,15 @@ describe('applyClinicalImportMerge', () => {
     const bundle = buildFhirBundle(
       {
         medications: [
-          {
+          makeTestMedicationProfile({
             id: 'med-import',
             op_timestamp: '2026-06-04T00:00:00.000Z',
             drugName: 'Imported',
             dosage: '5mg',
-            form: 'tablet',
             prescribingPhysician: 'Dr. B',
             conditionTreated: 'Pain',
-            active: true,
             schedule: { kind: 'prn' },
-          },
+          }),
         ],
         prnLogs: [],
         symptoms: [],

@@ -12,6 +12,7 @@ export type {
   TaperPhase,
   PrnConfig,
   MedicationSchedule,
+  DoseRegimen,
   MedicationProfile,
   MedPillShape,
   MedAppearance,
@@ -20,6 +21,13 @@ export type {
   MedEvent,
   LogLocation,
   PrnLog,
+} from './medications';
+
+export {
+  summarizeMedicationDosage,
+  summarizeMedicationForm,
+  scheduledTimesForMedication,
+  medicationHasPrn,
 } from './medications';
 
 export type {
@@ -42,8 +50,10 @@ export type {
 
 export {
   validateMedicationProfile,
+  validateDoseRegimen,
   validateMedicationSchedule,
   validatePrnSafetyLimit,
+  validatePrnConfig,
 } from './validation/medications';
 
 export type {
@@ -62,3 +72,5 @@ export {
 export type { AgeGateInput, AgeGateResult } from './age-gate';
 
 export { evaluateAgeGate, MINIMUM_AGE_YEARS } from './age-gate';
+
+export { makeTestMedicationProfile } from './test-fixtures';

@@ -136,7 +136,9 @@ export class WebSessionKeyStore implements SessionKeyStore {
     return this.passkeyUnlock ? hasStoredPasskeyUnlock(this.passkeyUnlock.storage) : false;
   }
 
-  async enablePasskeyUnlock(): Promise<{ ok: true } | { ok: false; message: string }> {
+  async enablePasskeyUnlock(
+    options?: { replace?: boolean },
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
     if (!this.passkeyUnlock) {
       return { ok: false, message: 'Passkey unlock is not configured.' };
     }
@@ -148,7 +150,10 @@ export class WebSessionKeyStore implements SessionKeyStore {
     }
 
     try {
-      if (this.hasPasskeyUnlock()) {
+      if (options?.replace) {
+        clearPasskeyUnlock(this.passkeyUnlock.storage);
+        await registerPasskeyUnlock(this.kek, this.passkeyUnlock);
+      } else if (this.hasPasskeyUnlock()) {
         await refreshPasskeyUnlockWrap(this.kek, this.passkeyUnlock);
       } else {
         await registerPasskeyUnlock(this.kek, this.passkeyUnlock);
@@ -160,7 +165,7 @@ export class WebSessionKeyStore implements SessionKeyStore {
     }
   }
 
-  clearPasskeyUnlock(): void {
+  removePasskeyUnlock(): void {
     if (this.passkeyUnlock) {
       clearPasskeyUnlock(this.passkeyUnlock.storage);
     }

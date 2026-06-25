@@ -51,6 +51,8 @@ export interface PrnConfig {
   doseAmount: number;
   doseUnit: string;
   safetyLimit24h: number;
+  /** Optional minimum hours between PRN doses (e.g. 4 for q4h PRN). */
+  minIntervalHours?: number;
 }
 
 /**
@@ -59,7 +61,7 @@ export interface PrnConfig {
  * - prn: as-needed, excluded from fixed-time scheduling (11.3, 13.2)
  * - weekly: specific days of the week (11.1)
  * - alternating: alternating days from a start date (11.1)
- * - rotating-interval: every N days where N ∈ [1, 30] (11.1, 11.4)
+ * - rotating-interval: every N days where N ∈ [1, 365] (11.1, 11.4)
  * - taper: multi-week tapering up to 52 weeks (11.2, 11.4)
  */
 export type MedicationSchedule =
@@ -70,26 +72,79 @@ export type MedicationSchedule =
   | { kind: 'taper'; phases: TaperPhase[] };
 
 /**
+ * One dose regimen for a medication — dosage, form, and schedule.
+ * A single drug (e.g. Prazosin) may have multiple regimens (morning + bedtime).
+ */
+export interface DoseRegimen {
+  id: string;
+  /** Short label for reminders and the cabinet (e.g. "Morning", "Bedtime"). */
+  label?: string;
+  dosage: string;
+  form: string;
+  schedule: MedicationSchedule;
+  prn?: PrnConfig;
+}
+
+/**
  * A full medication profile record stored in the medications vault partition.
  *
- * drugName, dosage, and form are required (non-empty, ≤200 characters).
+ * drugName is required (non-empty, ≤200 characters).
+ * At least one regimen is required; each regimen's dosage and form are required.
  * prescribingPhysician and conditionTreated are optional (≤200 characters when provided).
  */
 export interface MedicationProfile extends VaultRecord {
   drugName: string;
-  dosage: string;
-  form: string;
   /** Optional — may be empty when unknown or self-managed. */
   prescribingPhysician: string;
   /** Optional — may be empty when unknown or self-managed. */
   conditionTreated: string;
+  /** Optional dosing instructions (PRN rules, substitutions, OTC, etc.). */
+  notes?: string;
   active: boolean;
-  schedule: MedicationSchedule;
-  prn?: PrnConfig;
+  regimens: DoseRegimen[];
   appearance?: MedAppearance;
   refill?: MedRefillTracking;
   /** Optional NDC or barcode string (manual entry; scan can populate later). */
   productCode?: string;
+}
+
+/** Human-readable dosage summary across all regimens (e.g. "1mg · 2mg bedtime"). */
+export function summarizeMedicationDosage(med: MedicationProfile): string {
+  return med.regimens
+    .map((regimen) => {
+      const prefix = regimen.label?.trim();
+      return prefix ? `${regimen.dosage} (${prefix})` : regimen.dosage;
+    })
+    .join(' · ');
+}
+
+/** Distinct forms across regimens, joined for display. */
+export function summarizeMedicationForm(med: MedicationProfile): string {
+  return [...new Set(med.regimens.map((regimen) => regimen.form))].join(', ');
+}
+
+/** Collect scheduled administration times from all non-PRN regimens. */
+export function scheduledTimesForMedication(med: MedicationProfile): string[] {
+  const times: string[] = [];
+  for (const regimen of med.regimens) {
+    switch (regimen.schedule.kind) {
+      case 'weekly':
+      case 'alternating':
+      case 'rotating-interval':
+        times.push(...regimen.schedule.times);
+        break;
+      default:
+        break;
+    }
+  }
+  return times;
+}
+
+/** True when any regimen is PRN or carries a PRN config. */
+export function medicationHasPrn(med: MedicationProfile): boolean {
+  return med.regimens.some(
+    (regimen) => regimen.schedule.kind === 'prn' || regimen.prn !== undefined,
+  );
 }
 
 export type MedEventStatus = 'pending' | 'taken' | 'skipped' | 'snoozed';
@@ -99,6 +154,7 @@ export type MedEventStatus = 'pending' | 'taken' | 'skipped' | 'snoozed';
  */
 export interface MedEvent extends VaultRecord {
   medicationId: string;
+  regimenId: string;
   scheduledAt: string;
   takenAt: string | null;
   status?: MedEventStatus;
@@ -122,6 +178,8 @@ export interface LogLocation {
  */
 export interface PrnLog extends VaultRecord {
   medicationId: string;
+  /** Which PRN regimen was logged; omitted on legacy logs defaults to first PRN regimen. */
+  regimenId?: string;
   amount: number;
   takenAt: string;
   override?: boolean;

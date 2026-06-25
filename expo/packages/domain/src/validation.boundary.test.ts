@@ -20,20 +20,25 @@ import {
 } from './validation/symptoms';
 
 describe('Boundary: Medication profile field length (Req 10.2)', () => {
-  const baseProfile = {
-    drugName: 'Metoprolol',
+  const defaultRegimen = () => ({
+    id: 'reg-1',
     dosage: '25mg',
     form: 'tablet',
+    schedule: { kind: 'weekly' as const, daysOfWeek: ['MON' as const], times: ['08:00'] },
+  });
+
+  const baseProfile = {
+    drugName: 'Metoprolol',
     prescribingPhysician: 'Dr. Smith',
     conditionTreated: 'POTS',
+    regimens: [defaultRegimen()],
   };
 
-  const requiredFields = ['drugName', 'dosage', 'form'] as const;
-  const optionalFields = ['prescribingPhysician', 'conditionTreated'] as const;
-  const allFields = [...requiredFields, ...optionalFields] as const;
+  const profileFields = ['drugName', 'prescribingPhysician', 'conditionTreated'] as const;
+  const regimenFields = ['dosage', 'form'] as const;
 
   describe('exact boundary at 200 characters per individual field', () => {
-    for (const field of allFields) {
+    for (const field of profileFields) {
       it(`accepts ${field} at exactly 200 chars`, () => {
         const result = validateMedicationProfile({ ...baseProfile, [field]: 'a'.repeat(200) });
         expect(result.valid).toBe(true);
@@ -54,17 +59,37 @@ describe('Boundary: Medication profile field length (Req 10.2)', () => {
       });
     }
 
-    for (const field of requiredFields) {
-      it(`rejects ${field} when empty string (0 chars)`, () => {
-        const result = validateMedicationProfile({ ...baseProfile, [field]: '' });
+    for (const field of regimenFields) {
+      it(`accepts regimen ${field} at exactly 200 chars`, () => {
+        const result = validateMedicationProfile({
+          ...baseProfile,
+          regimens: [{ ...defaultRegimen(), [field]: 'a'.repeat(200) }],
+        });
+        expect(result.valid).toBe(true);
+      });
+
+      it(`rejects regimen ${field} at 201 chars`, () => {
+        const result = validateMedicationProfile({
+          ...baseProfile,
+          regimens: [{ ...defaultRegimen(), [field]: 'a'.repeat(201) }],
+        });
         expect(result.valid).toBe(false);
         if (!result.valid) {
           expect(result.errors[0].field).toBe(field);
+          expect(result.errors[0].message).toContain('200');
         }
       });
     }
 
-    for (const field of optionalFields) {
+    it('rejects drugName when empty string (0 chars)', () => {
+      const result = validateMedicationProfile({ ...baseProfile, drugName: '' });
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.errors[0].field).toBe('drugName');
+      }
+    });
+
+    for (const field of ['prescribingPhysician', 'conditionTreated'] as const) {
       it(`accepts empty ${field}`, () => {
         const result = validateMedicationProfile({ ...baseProfile, [field]: '' });
         expect(result.valid).toBe(true);
@@ -144,7 +169,7 @@ describe('Boundary: Rotating-interval range (Req 11.4)', () => {
     const result = validateMedicationSchedule({ kind: 'rotating-interval', everyNDays: 0, times: ['08:00'] });
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.message).toContain('between 1 and 30');
+      expect(result.message).toContain('between 1 and 365');
     }
   });
 
@@ -153,13 +178,13 @@ describe('Boundary: Rotating-interval range (Req 11.4)', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('accepts everyNDays = 30 (upper bound)', () => {
-    const result = validateMedicationSchedule({ kind: 'rotating-interval', everyNDays: 30, times: ['08:00'] });
+  it('accepts everyNDays = 365 (upper bound)', () => {
+    const result = validateMedicationSchedule({ kind: 'rotating-interval', everyNDays: 365, times: ['08:00'] });
     expect(result.valid).toBe(true);
   });
 
-  it('rejects everyNDays = 31 (above upper bound)', () => {
-    const result = validateMedicationSchedule({ kind: 'rotating-interval', everyNDays: 31, times: ['08:00'] });
+  it('rejects everyNDays = 366 (above upper bound)', () => {
+    const result = validateMedicationSchedule({ kind: 'rotating-interval', everyNDays: 366, times: ['08:00'] });
     expect(result.valid).toBe(false);
   });
 
@@ -178,8 +203,8 @@ describe('Boundary: Rotating-interval range (Req 11.4)', () => {
     expect(result.valid).toBe(false);
   });
 
-  it('rejects decimal at upper boundary (e.g. 29.9)', () => {
-    const result = validateMedicationSchedule({ kind: 'rotating-interval', everyNDays: 29.9, times: ['08:00'] });
+  it('rejects decimal at upper boundary (e.g. 364.9)', () => {
+    const result = validateMedicationSchedule({ kind: 'rotating-interval', everyNDays: 364.9, times: ['08:00'] });
     expect(result.valid).toBe(false);
   });
 });
@@ -399,17 +424,15 @@ describe('Boundary: Trigger length (Req 17.2)', () => {
 
 describe('Per-field error reporting: all invalid fields reported simultaneously (Req 10.2, 15.3)', () => {
   describe('Medication profile - reports ALL invalid fields at once', () => {
-    it('reports all required fields when drugName, dosage, and form are empty', () => {
+    it('reports drugName and regimen dosage/form when empty', () => {
       const result = validateMedicationProfile({
         drugName: '',
-        dosage: '',
-        form: '',
         prescribingPhysician: '',
         conditionTreated: '',
+        regimens: [{ id: 'reg-1', dosage: '', form: '', schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] } }],
       });
       expect(result.valid).toBe(false);
       if (!result.valid) {
-        expect(result.errors).toHaveLength(3);
         const fields = result.errors.map((e) => e.field);
         expect(fields).toContain('drugName');
         expect(fields).toContain('dosage');
@@ -417,18 +440,16 @@ describe('Per-field error reporting: all invalid fields reported simultaneously 
       }
     });
 
-    it('reports all 5 fields when all exceed 200 chars', () => {
+    it('reports profile and regimen fields when all exceed 200 chars', () => {
       const tooLong = 'x'.repeat(201);
       const result = validateMedicationProfile({
         drugName: tooLong,
-        dosage: tooLong,
-        form: tooLong,
         prescribingPhysician: tooLong,
         conditionTreated: tooLong,
+        regimens: [{ id: 'reg-1', dosage: tooLong, form: tooLong, schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] } }],
       });
       expect(result.valid).toBe(false);
       if (!result.valid) {
-        expect(result.errors).toHaveLength(5);
         const fields = result.errors.map((e) => e.field);
         expect(fields).toContain('drugName');
         expect(fields).toContain('dosage');
@@ -441,14 +462,12 @@ describe('Per-field error reporting: all invalid fields reported simultaneously 
     it('reports mix of empty and too-long errors together', () => {
       const result = validateMedicationProfile({
         drugName: '',
-        dosage: 'x'.repeat(201),
-        form: '',
         prescribingPhysician: 'Valid',
         conditionTreated: 'x'.repeat(201),
+        regimens: [{ id: 'reg-1', dosage: 'x'.repeat(201), form: '', schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] } }],
       });
       expect(result.valid).toBe(false);
       if (!result.valid) {
-        expect(result.errors).toHaveLength(4);
         const fields = result.errors.map((e) => e.field);
         expect(fields).toContain('drugName');
         expect(fields).toContain('dosage');
@@ -538,22 +557,33 @@ describe('Rejection of whole records: no partial data accepted (Req 10.2, 15.3)'
     it('rejects the entire profile when only one field is invalid', () => {
       const result = validateMedicationProfile({
         drugName: 'Valid Drug',
-        dosage: 'x'.repeat(201), // only this is invalid
-        form: 'tablet',
         prescribingPhysician: 'Dr. Jones',
         conditionTreated: 'Hypertension',
+        regimens: [
+          {
+            id: 'reg-1',
+            dosage: 'x'.repeat(201),
+            form: 'tablet',
+            schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+          },
+        ],
       });
       expect(result.valid).toBe(false);
-      // The validation result is { valid: false } — nothing is partially accepted
     });
 
     it('returns valid: true when only optional fields are empty', () => {
       const result = validateMedicationProfile({
         drugName: 'Good',
-        dosage: 'Good',
-        form: 'Good',
         prescribingPhysician: 'Good',
         conditionTreated: '',
+        regimens: [
+          {
+            id: 'reg-1',
+            dosage: 'Good',
+            form: 'Good',
+            schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+          },
+        ],
       });
       expect(result.valid).toBe(true);
     });

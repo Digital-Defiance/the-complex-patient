@@ -5,6 +5,10 @@
   "description": "Shared components/hooks consumed by mobile + web, incl. the Zustand-style vault store mirroring decrypted Local_Vault partitions",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./screens": "./src/screens.ts"
+  },
   "scripts": {
     "test": "vitest run",
     "build": "tsc"
@@ -22,11 +26,26 @@
     "@complex-patient/weather": "workspace:*"
   },
   "peerDependencies": {
+    "expo-camera": ">=56.0.0",
+    "expo-print": ">=56.0.0",
+    "expo-sharing": ">=56.0.0",
     "react": ">=18.0.0",
     "react-native-safe-area-context": ">=5.0.0"
   },
+  "peerDependenciesMeta": {
+    "expo-camera": {
+      "optional": true
+    },
+    "expo-print": {
+      "optional": true
+    },
+    "expo-sharing": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@complex-patient/insights": "workspace:*",
-    "@types/react": "~19.2.14"
+    "@types/react": "~19.2.14",
+    "expo-camera": "56.0.4"
   }
 }

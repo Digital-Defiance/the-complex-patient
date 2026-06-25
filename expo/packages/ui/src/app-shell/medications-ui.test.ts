@@ -1,20 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { MedicationProfile } from '@complex-patient/domain';
-import { suggestConditionsTreated, suggestPrescribingPhysicians, buildPrnConfigFromDraft, emptyMedicationDraft } from './medications-ui';
+import { makeMedicationProfile } from '@complex-patient/medications';
+import {
+  suggestConditionsTreated,
+  suggestPrescribingPhysicians,
+  buildPrnConfigFromDraft,
+  emptyRegimenDraft,
+} from './medications-ui';
 
 function med(overrides: Partial<MedicationProfile> & Pick<MedicationProfile, 'prescribingPhysician' | 'conditionTreated'>): MedicationProfile {
-  return {
+  return makeMedicationProfile({
     id: overrides.id ?? 'med-1',
-    op_timestamp: '2024-01-01T00:00:00.000Z',
     drugName: 'Drug',
-    dosage: '1 mg',
-    form: 'tablet',
     prescribingPhysician: overrides.prescribingPhysician,
     conditionTreated: overrides.conditionTreated,
-    active: true,
-    schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
     ...overrides,
-  };
+  });
 }
 
 describe('suggestPrescribingPhysicians', () => {
@@ -43,8 +44,8 @@ describe('suggestPrescribingPhysicians', () => {
 });
 
 describe('buildPrnConfigFromDraft', () => {
-  it('derives PRN dose from the main dosage fields', () => {
-    const draft = emptyMedicationDraft();
+  it('derives PRN dose from the regimen dosage fields', () => {
+    const draft = emptyRegimenDraft();
     draft.dosageAmount = '2';
     draft.dosageUnit = 'spray';
     draft.prnSafetyLimit = '6';

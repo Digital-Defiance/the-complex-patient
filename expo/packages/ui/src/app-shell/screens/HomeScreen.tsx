@@ -263,11 +263,13 @@ export function HomeScreen({ onNavigate, onSignedOut }: HomeScreenProps): React.
           style={styles.navButton}
           onPress={() => onNavigate('settings')}
           accessibilityRole="button"
-          accessibilityLabel="Weather and location settings"
+          accessibilityLabel="Settings: passphrase, paper backups, weather and location"
           testID="home-nav-settings"
         >
-          <Text style={styles.navButtonText}>Weather &amp; Location</Text>
-          <Text style={styles.navButtonSubtext}>Optional location on med logs and chart overlays</Text>
+          <Text style={styles.navButtonText}>Settings</Text>
+          <Text style={styles.navButtonSubtext}>
+            Passphrase, paper backups, weather &amp; location
+          </Text>
         </Pressable>
       </View>
 

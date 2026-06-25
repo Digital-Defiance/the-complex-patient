@@ -46,6 +46,7 @@ import {
 import { createLocalStorageFlagStorage } from '../../device-flag-storage';
 import { inferAgeEligibleFromWebVault } from './infer-age-eligible';
 import { loadAuthFromSession, saveAuthToSession } from './auth-session-storage';
+import { webFlagStorage } from './adapters';
 
 /** Raised when the web app is loaded outside a secure (HTTPS) context (1.8). */
 export class SecureContextRequiredError extends Error {
@@ -152,6 +153,7 @@ export async function createWebHome(options: WebEntryOptions): Promise<HomeEntry
     vaultHttp: http,
     getActiveKek: () => keyStore.getKek(),
     deviceIdStorage,
+    paperBackupRegistryStorage: options.ineligibilityStorage ?? webFlagStorage,
   });
 
   return controller;

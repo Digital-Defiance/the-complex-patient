@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { MedicationProfile, SymptomEntry } from '@complex-patient/domain';
+import { makeTestMedicationProfile } from '@complex-patient/domain';
 import {
   buildPhysicianReport,
   generatePhysicianReport,
@@ -27,15 +28,13 @@ function daysAgo(days: number): string {
 function medication(
   overrides: Partial<MedicationProfile> & { id: string; drugName: string; active: boolean },
 ): MedicationProfile {
-  return {
+  return makeTestMedicationProfile({
     op_timestamp: NOW.toISOString(),
-    dosage: '10mg',
-    form: 'tablet',
     prescribingPhysician: 'Dr. Smith',
     conditionTreated: 'POTS',
     schedule: { kind: 'prn' },
     ...overrides,
-  };
+  });
 }
 
 function symptom(

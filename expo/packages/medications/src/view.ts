@@ -32,7 +32,7 @@
  * exhaustively testable under vitest (property test 11.6, unit tests 11.7).
  */
 
-import type { MedicationProfile, MedicationSchedule, TimeBlock } from '@complex-patient/domain';
+import { scheduledTimesForMedication, type MedicationProfile, type TimeBlock } from '@complex-patient/domain';
 
 /** The >10 boundary: strictly greater than this count switches to grouped. */
 const FLAT_LIST_MAX = 10;
@@ -123,47 +123,11 @@ export function buildPolypharmacyView(meds: readonly MedicationProfile[]): PolyV
  */
 function blocksForMedication(med: MedicationProfile): Set<TimeBlock> {
   const blocks = new Set<TimeBlock>();
-  for (const time of scheduledTimes(med.schedule)) {
+  for (const time of scheduledTimesForMedication(med)) {
     const block = blockForTime(time);
     if (block !== null) blocks.add(block);
   }
   return blocks;
-}
-
-/**
- * Extract the scheduled administration times ("HH:mm") for a schedule. PRN and
- * taper schedules carry no time-of-day, so they yield no times and are treated
- * as as-needed / no scheduled time (14.4).
- */
-function scheduledTimes(schedule: MedicationSchedule): readonly string[] {
-  switch (schedule.kind) {
-    case 'weekly':
-    case 'alternating':
-    case 'rotating-interval':
-      return schedule.times;
-    case 'prn':
-    case 'taper':
-    default:
-      return [];
-  }
-}
-
-/**
- * Assign an "HH:mm" time to its time-of-day block, or `null` when the string is
- * not a valid 24-hour time (14.3):
- *   - Morning       05:00–10:59  → minutes 300–659
- *   - Midday        11:00–16:59  → minutes 660–1019
- *   - Evening       17:00–21:59  → minutes 1020–1319
- *   - Night/Bedtime 22:00–04:59  → minutes 1320–1439 or 0–299
- */
-function blockForTime(time: string): TimeBlock | null {
-  const minutes = parseMinutes(time);
-  if (minutes === null) return null;
-  if (minutes >= 300 && minutes <= 659) return 'Morning';
-  if (minutes >= 660 && minutes <= 1019) return 'Midday';
-  if (minutes >= 1020 && minutes <= 1319) return 'Evening';
-  // 22:00–23:59 (1320–1439) or 00:00–04:59 (0–299) → Night/Bedtime (wraps midnight).
-  return 'Night/Bedtime';
 }
 
 /**
@@ -177,6 +141,15 @@ function parseMinutes(time: string): number | null {
   const mins = Number(match[2]);
   if (hours < 0 || hours > 23 || mins < 0 || mins > 59) return null;
   return hours * 60 + mins;
+}
+
+function blockForTime(time: string): TimeBlock | null {
+  const minutes = parseMinutes(time);
+  if (minutes === null) return null;
+  if (minutes >= 300 && minutes <= 659) return 'Morning';
+  if (minutes >= 660 && minutes <= 1019) return 'Midday';
+  if (minutes >= 1020 && minutes <= 1319) return 'Evening';
+  return 'Night/Bedtime';
 }
 
 /**

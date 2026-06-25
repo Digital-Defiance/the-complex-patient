@@ -41,11 +41,11 @@ export async function syncMedicationNotifications(
       }
 
       await Notifications.scheduleNotificationAsync({
-        identifier: notificationTriggerId(trigger.medicationId, trigger.scheduledAt),
+        identifier: notificationTriggerId(trigger.medicationId, trigger.regimenId, trigger.scheduledAt),
         content: {
           title: trigger.title,
           body: trigger.body,
-          data: { medicationId: trigger.medicationId },
+          data: { medicationId: trigger.medicationId, regimenId: trigger.regimenId },
         },
         trigger: new Date(when),
       });

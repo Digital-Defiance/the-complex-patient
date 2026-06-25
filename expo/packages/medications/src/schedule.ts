@@ -2,11 +2,13 @@
  * Expand medication schedules into concrete dose slots for a calendar day.
  */
 
-import type { MedicationProfile, MedicationSchedule, Weekday } from '@complex-patient/domain';
+import type { DoseRegimen, MedicationProfile, MedicationSchedule, Weekday } from '@complex-patient/domain';
 
 export interface ScheduledDoseSlot {
   medicationId: string;
+  regimenId: string;
   drugName: string;
+  regimenLabel?: string;
   dosageLabel: string;
   scheduledAt: string;
   timeLabel: string;
@@ -71,16 +73,15 @@ function timesForSchedule(schedule: MedicationSchedule): readonly string[] {
   }
 }
 
-function dosageForDay(med: MedicationProfile, day: string): string {
-  if (med.schedule.kind !== 'taper') {
-    return med.dosage;
+function dosageForDay(regimen: DoseRegimen, day: string, anchorDay: string): string {
+  if (regimen.schedule.kind !== 'taper') {
+    return regimen.dosage;
   }
-  const anchorDay = med.op_timestamp.slice(0, 10);
   const weekIndex = Math.floor(daysBetweenUtc(anchorDay, day) / 7);
   const phase =
-    med.schedule.phases.find((entry) => entry.weekIndex === weekIndex) ??
-    med.schedule.phases[med.schedule.phases.length - 1];
-  return phase?.dosage ?? med.dosage;
+    regimen.schedule.phases.find((entry) => entry.weekIndex === weekIndex) ??
+    regimen.schedule.phases[regimen.schedule.phases.length - 1];
+  return phase?.dosage ?? regimen.dosage;
 }
 
 function toScheduledIso(day: string, time: string): string {
@@ -93,8 +94,8 @@ function toScheduledIso(day: string, time: string): string {
   return `${day}T${hours}:${minutes}:00.000Z`;
 }
 
-function slotKey(medicationId: string, scheduledAt: string): string {
-  return `${medicationId}:${scheduledAt}`;
+function slotKey(medicationId: string, regimenId: string, scheduledAt: string): string {
+  return `${medicationId}:${regimenId}:${scheduledAt}`;
 }
 
 /** Expand active scheduled medications into dose slots for one UTC calendar day. */
@@ -106,17 +107,22 @@ export function expandDosesForDay(
 
   for (const med of medications) {
     if (med.active !== true || med.deleted === true) continue;
-    if (!isScheduledOnDay(med.schedule, day, med.op_timestamp)) continue;
 
-    const dosageLabel = dosageForDay(med, day);
-    for (const time of timesForSchedule(med.schedule)) {
-      slots.push({
-        medicationId: med.id,
-        drugName: med.drugName,
-        dosageLabel,
-        scheduledAt: toScheduledIso(day, time),
-        timeLabel: time,
-      });
+    for (const regimen of med.regimens) {
+      if (!isScheduledOnDay(regimen.schedule, day, med.op_timestamp)) continue;
+
+      const dosageLabel = dosageForDay(regimen, day, med.op_timestamp);
+      for (const time of timesForSchedule(regimen.schedule)) {
+        slots.push({
+          medicationId: med.id,
+          regimenId: regimen.id,
+          drugName: med.drugName,
+          regimenLabel: regimen.label,
+          dosageLabel,
+          scheduledAt: toScheduledIso(day, time),
+          timeLabel: time,
+        });
+      }
     }
   }
 
@@ -124,8 +130,12 @@ export function expandDosesForDay(
   return slots;
 }
 
-export function scheduledDoseKey(medicationId: string, scheduledAt: string): string {
-  return slotKey(medicationId, scheduledAt);
+export function scheduledDoseKey(
+  medicationId: string,
+  regimenId: string,
+  scheduledAt: string,
+): string {
+  return slotKey(medicationId, regimenId, scheduledAt);
 }
 
 export { scheduledDoseKey as doseInstanceKey };

@@ -3,6 +3,7 @@
  */
 
 import type { MedEvent, MedicationProfile } from '@complex-patient/domain';
+import { medicationHasPrn } from '@complex-patient/domain';
 import { expandDosesForDay, type ScheduledDoseSlot } from './schedule';
 import { scheduledDoseKey } from './schedule';
 
@@ -15,14 +16,17 @@ export interface TodayScheduledDose extends ScheduledDoseSlot {
   snoozedUntil?: string;
 }
 
-export interface TodayPrnMedication {
+export interface TodayPrnRegimen {
   medication: MedicationProfile;
+  regimenId: string;
+  label?: string;
+  dosage: string;
 }
 
 export interface TodayQueue {
   day: string;
   scheduled: TodayScheduledDose[];
-  prn: TodayPrnMedication[];
+  prn: TodayPrnRegimen[];
 }
 
 function resolveStatus(event: MedEvent | undefined, nowMs: number): TodayDoseStatus {
@@ -48,9 +52,10 @@ function findEventForSlot(
   events: readonly MedEvent[],
   slot: ScheduledDoseSlot,
 ): MedEvent | undefined {
-  const key = scheduledDoseKey(slot.medicationId, slot.scheduledAt);
+  const key = scheduledDoseKey(slot.medicationId, slot.regimenId, slot.scheduledAt);
   return events.find(
-    (event) => scheduledDoseKey(event.medicationId, event.scheduledAt) === key,
+    (event) =>
+      scheduledDoseKey(event.medicationId, event.regimenId, event.scheduledAt) === key,
   );
 }
 
@@ -79,9 +84,19 @@ export function buildTodayQueue(deps: {
     };
   });
 
-  const prn = activeMeds
-    .filter((med) => med.schedule.kind === 'prn' || med.prn !== undefined)
-    .map((medication) => ({ medication }));
+  const prn: TodayPrnRegimen[] = [];
+  for (const medication of activeMeds) {
+    if (!medicationHasPrn(medication)) continue;
+    for (const regimen of medication.regimens) {
+      if (regimen.schedule.kind !== 'prn' && regimen.prn === undefined) continue;
+      prn.push({
+        medication,
+        regimenId: regimen.id,
+        label: regimen.label,
+        dosage: regimen.dosage,
+      });
+    }
+  }
 
   return { day, scheduled, prn };
 }

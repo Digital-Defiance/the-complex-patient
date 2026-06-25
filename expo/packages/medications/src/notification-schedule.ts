@@ -7,6 +7,7 @@ import { expandDosesForDay } from './schedule';
 
 export interface MedicationNotificationTrigger {
   medicationId: string;
+  regimenId: string;
   drugName: string;
   scheduledAt: string;
   title: string;
@@ -30,10 +31,13 @@ export function buildMedicationNotificationTriggers(
     for (const slot of expandDosesForDay(medications, day)) {
       triggers.push({
         medicationId: slot.medicationId,
+        regimenId: slot.regimenId,
         drugName: slot.drugName,
         scheduledAt: slot.scheduledAt,
         title: 'Medication reminder',
-        body: `Time to take ${slot.drugName}`,
+        body: slot.regimenLabel
+          ? `Time to take ${slot.drugName} (${slot.regimenLabel}) — ${slot.dosageLabel}`
+          : `Time to take ${slot.drugName} — ${slot.dosageLabel}`,
       });
     }
   }
@@ -41,6 +45,10 @@ export function buildMedicationNotificationTriggers(
   return triggers;
 }
 
-export function notificationTriggerId(medicationId: string, scheduledAt: string): string {
-  return `med:${medicationId}:${scheduledAt}`;
+export function notificationTriggerId(
+  medicationId: string,
+  regimenId: string,
+  scheduledAt: string,
+): string {
+  return `med:${medicationId}:${regimenId}:${scheduledAt}`;
 }
