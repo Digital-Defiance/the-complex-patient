@@ -1,0 +1,11 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+# iOS number/decimal pads have no system dismiss key — the app exposes testID keyboard-done.
+- runFlow:
+    when:
+      visible:
+        id: keyboard-done
+    commands:
+      - tapOn:
+          id: keyboard-done
+      - waitForAnimationToEnd

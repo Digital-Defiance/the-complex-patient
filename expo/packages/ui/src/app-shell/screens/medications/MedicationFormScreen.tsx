@@ -2,7 +2,7 @@
  * Add / edit medication wizard.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
 import type { VaultRecord } from '@complex-patient/domain';
 import { splitMedicationsPartition } from '@complex-patient/clinical-export';
@@ -11,13 +11,35 @@ import {
   validateMedicationSchedule,
   validatePrnConfig,
 } from '@complex-patient/domain';
+import {
+  buildConfirmedRxIdentity,
+  buildDeclinedRxIdentity,
+  DRUG_NAMING_ASSIST_ENABLED,
+  getConceptByRxcui,
+  getDrugNamingCatalog,
+  matchMedicationName,
+  resolveRxcuiFromNdc,
+  searchDrugNameSuggestions,
+  type RxMatchCandidate,
+} from '@complex-patient/drug-naming';
 import { useAppHost } from '../../app-host';
+import {
+  IosKeyboardDoneAccessory,
+  keyboardDoneAccessoryProps,
+} from '../../ios-keyboard-done-accessory';
 import { usePartition } from '../../hooks';
 import {
   buildProfileFromDraft,
   draftFromProfile,
   emptyMedicationDraft,
   emptyRegimenDraft,
+  applyBarcodeScanToDraft,
+  applyDrugNameChangeToDraft,
+  applyProductCodeChangeToDraft,
+  medicationIdentityBaseline,
+  EMPTY_RX_DRAFT_FIELDS,
+  shouldInvalidateConfirmedRxMatch,
+  shouldShowRxMatchConfirmPanel,
   MEDICATION_FORMS,
   mergeMedicationRecord,
   REGIMEN_LABEL_PRESETS,
@@ -29,6 +51,9 @@ import {
 import { PillAppearancePicker } from './PillAppearancePicker';
 import { DosageField } from './DosageField';
 import { ScheduleEditor } from './ScheduleEditor';
+import { DrugNamingDisclaimer } from './DrugNamingDisclaimer';
+import { RxMatchConfirmPanel } from './RxMatchConfirmPanel';
+import { MedProductCodeScanner } from './MedProductCodeScanner';
 
 export interface MedicationFormScreenProps {
   medicationId?: string;
@@ -76,6 +101,97 @@ function MedicationFormInner({
   );
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pendingCandidate, setPendingCandidate] = useState<RxMatchCandidate | null>(null);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+
+  const identityBaseline = useMemo(
+    () => medicationIdentityBaseline(existing),
+    [existing],
+  );
+
+  const clearRxDraftFields = useCallback(() => EMPTY_RX_DRAFT_FIELDS, []);
+
+  useEffect(() => {
+    if (!DRUG_NAMING_ASSIST_ENABLED || draft.userConfirmedRxMatch !== true || !pendingCandidate) {
+      return;
+    }
+    if (shouldInvalidateConfirmedRxMatch(draft, pendingCandidate.rxcui)) {
+      setDraft((current) => ({
+        ...current,
+        ...clearRxDraftFields(),
+      }));
+    }
+  }, [clearRxDraftFields, draft, pendingCandidate]);
+
+  const drugNameSuggestions = useMemo(() => {
+    if (!DRUG_NAMING_ASSIST_ENABLED) return [];
+    return searchDrugNameSuggestions(draft.drugName);
+  }, [draft.drugName]);
+
+  useEffect(() => {
+    if (!DRUG_NAMING_ASSIST_ENABLED) {
+      setPendingCandidate(null);
+      return;
+    }
+    const ndcRxcui = draft.productCode.trim() ? resolveRxcuiFromNdc(draft.productCode) : null;
+    const result = matchMedicationName(draft.drugName, { rxcuiHint: ndcRxcui ?? undefined });
+    setPendingCandidate(result.candidate);
+  }, [draft.drugName, draft.productCode]);
+
+  const applyConfirmedMatch = useCallback((candidate: RxMatchCandidate) => {
+    const identity = buildConfirmedRxIdentity(candidate);
+    setDraft((current) => ({
+      ...current,
+      rxcui: identity.rxcui,
+      ingredientRxcui: identity.ingredientRxcui,
+      rxDisplayName: identity.rxDisplayName,
+      rxMatchConfidence: String(identity.rxMatchConfidence),
+      userConfirmedRxMatch: true,
+      rxnormDatasetVersion: identity.rxnormDatasetVersion,
+    }));
+    setFieldError(null);
+  }, []);
+
+  const applyDeclinedMatch = useCallback(() => {
+    const declined = buildDeclinedRxIdentity();
+    setDraft((current) => ({
+      ...current,
+      rxcui: '',
+      ingredientRxcui: '',
+      rxDisplayName: '',
+      rxMatchConfidence: '',
+      userConfirmedRxMatch: false,
+      rxnormDatasetVersion: declined.rxnormDatasetVersion,
+    }));
+  }, []);
+
+  const handleDrugNameChange = useCallback(
+    (drugName: string) => {
+      setDraft((current) => applyDrugNameChangeToDraft(current, identityBaseline, drugName));
+      setFieldError(null);
+    },
+    [identityBaseline],
+  );
+
+  const handleProductCodeChange = useCallback(
+    (productCode: string) => {
+      setDraft((current) => applyProductCodeChangeToDraft(current, identityBaseline, productCode));
+      setFieldError(null);
+    },
+    [identityBaseline],
+  );
+
+  const handleBarcodeScan = useCallback(
+    (rawCode: string) => {
+      const rxcui = resolveRxcuiFromNdc(rawCode);
+      const concept = rxcui ? getConceptByRxcui(getDrugNamingCatalog(), rxcui) : undefined;
+      setDraft((current) =>
+        applyBarcodeScanToDraft(current, identityBaseline, rawCode, concept?.displayName),
+      );
+      setFieldError(null);
+    },
+    [identityBaseline],
+  );
 
   const physicianSuggestions = useMemo(
     () => suggestPrescribingPhysicians(medications, draft.prescribingPhysician),
@@ -158,7 +274,13 @@ function MedicationFormInner({
   const primaryUnit = draft.regimens[0]?.dosageUnit ?? 'mg';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
+      <IosKeyboardDoneAccessory />
+
       <Text style={styles.title}>{existing ? 'Edit medication' : 'Add medication'}</Text>
 
       {fieldError && (
@@ -167,7 +289,37 @@ function MedicationFormInner({
         </Text>
       )}
 
-      <Field label="Drug name" value={draft.drugName} onChange={(drugName) => patchDraft({ drugName })} testID="med-drug-name" />
+      {DRUG_NAMING_ASSIST_ENABLED ? <DrugNamingDisclaimer /> : null}
+
+      {DRUG_NAMING_ASSIST_ENABLED ? (
+        <>
+          <AutocompleteField
+            label="Drug name"
+            value={draft.drugName}
+            onChange={handleDrugNameChange}
+            suggestions={drugNameSuggestions}
+            testID="med-drug-name"
+            suggestionsTestID="med-drug-name-suggestions"
+          />
+          {shouldShowRxMatchConfirmPanel(draft, pendingCandidate) ? (
+            <RxMatchConfirmPanel
+              typedName={draft.drugName}
+              candidate={pendingCandidate}
+              confirmed={draft.userConfirmedRxMatch}
+              onConfirm={() => pendingCandidate && applyConfirmedMatch(pendingCandidate)}
+              onDecline={applyDeclinedMatch}
+              onUnsure={applyDeclinedMatch}
+            />
+          ) : null}
+        </>
+      ) : (
+        <Field
+          label="Drug name"
+          value={draft.drugName}
+          onChange={handleDrugNameChange}
+          testID="med-drug-name"
+        />
+      )}
       <AutocompleteField
         label="Prescribing physician"
         optional
@@ -283,7 +435,37 @@ function MedicationFormInner({
       <Text style={styles.sectionTitle}>Refill tracking</Text>
       <Field label="Quantity on hand" value={draft.quantityOnHand} onChange={(quantityOnHand) => patchDraft({ quantityOnHand })} testID="med-qty" />
       <Field label="Low stock alert at" value={draft.lowStockThreshold} onChange={(lowStockThreshold) => patchDraft({ lowStockThreshold })} testID="med-low-stock" />
-      <Field label="Product code / barcode (manual)" value={draft.productCode} onChange={(productCode) => patchDraft({ productCode })} testID="med-product-code" />
+      <View style={styles.field}>
+        <Text style={styles.fieldLabel}>Product code / barcode</Text>
+        <View style={styles.productCodeRow}>
+          <TextInput
+            style={[styles.input, styles.productCodeInput]}
+            value={draft.productCode}
+            onChangeText={handleProductCodeChange}
+            placeholder="NDC or barcode digits"
+            testID="med-product-code"
+            keyboardType="number-pad"
+            {...keyboardDoneAccessoryProps()}
+          />
+          {DRUG_NAMING_ASSIST_ENABLED ? (
+            <Pressable
+              style={styles.scanButton}
+              onPress={() => setShowBarcodeScanner(true)}
+              accessibilityRole="button"
+              testID="med-product-code-scan"
+            >
+              <Text style={styles.scanButtonText}>Scan</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
+      {showBarcodeScanner ? (
+        <MedProductCodeScanner
+          onScan={handleBarcodeScan}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
+      ) : null}
 
       <View style={styles.actions}>
         <Pressable style={styles.saveBtn} onPress={() => void handleSave()} disabled={saving} testID="medication-form-save">
@@ -348,6 +530,7 @@ function AutocompleteField(props: {
         onChangeText={props.onChange}
         autoCapitalize="words"
         testID={props.testID}
+        {...keyboardDoneAccessoryProps()}
       />
       <SuggestionList
         suggestions={props.suggestions}
@@ -378,6 +561,7 @@ function Field(props: {
         onChangeText={props.onChange}
         multiline={props.multiline}
         testID={props.testID}
+        {...keyboardDoneAccessoryProps()}
       />
     </View>
   );
@@ -392,6 +576,17 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 13, fontWeight: '600', color: '#555' },
   fieldHelp: { fontSize: 12, color: '#666', marginTop: -4, marginBottom: 4 },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, fontSize: 14 },
+  productCodeRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  productCodeInput: { flex: 1 },
+  scanButton: {
+    borderWidth: 1,
+    borderColor: '#2563eb',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: '#eff6ff',
+  },
+  scanButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 14 },
   multiline: { minHeight: 72, textAlignVertical: 'top' },
   regimenCard: {
     borderWidth: 1,

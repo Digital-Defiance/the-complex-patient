@@ -278,6 +278,68 @@ describe('MedicationProfileEngine.update — editing existing profiles (10.4, 10
   });
 });
 
+describe('MedicationProfileEngine — RxNorm identity fields', () => {
+  it('persists confirmed rx fields on create and round-trips through the vault', async () => {
+    const engine = makeEngine();
+    const created = await engine.create(
+      makeInput({
+        drugName: 'Advil',
+        rxcui: '5640',
+        ingredientRxcui: '5640',
+        rxDisplayName: 'Ibuprofen',
+        rxMatchConfidence: 0.92,
+        userConfirmedRxMatch: true,
+        rxnormDatasetVersion: 'seed-2026',
+      }),
+    );
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    expect(created.profile.rxcui).toBe('5640');
+    expect(created.profile.rxDisplayName).toBe('Ibuprofen');
+    expect(created.profile.userConfirmedRxMatch).toBe(true);
+
+    const reread = await engine.get(created.profile.id);
+    expect(reread?.rxcui).toBe('5640');
+    expect(reread?.rxDisplayName).toBe('Ibuprofen');
+    expect(reread?.userConfirmedRxMatch).toBe(true);
+  });
+
+  it('clears rx identity fields when user declines a previously confirmed match', async () => {
+    const engine = makeEngine();
+    const created = await engine.create(
+      makeInput({
+        drugName: 'Advil',
+        rxcui: '5640',
+        ingredientRxcui: '5640',
+        rxDisplayName: 'Ibuprofen',
+        rxMatchConfidence: 0.92,
+        userConfirmedRxMatch: true,
+        rxnormDatasetVersion: 'seed-2026',
+      }),
+    );
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const updated = await engine.update(created.profile.id, {
+      userConfirmedRxMatch: false,
+      rxnormDatasetVersion: 'seed-2026',
+    });
+    expect(updated.ok).toBe(true);
+    if (!updated.ok) return;
+
+    expect(updated.profile.userConfirmedRxMatch).toBe(false);
+    expect(updated.profile.rxcui).toBeUndefined();
+    expect(updated.profile.rxDisplayName).toBeUndefined();
+    expect(updated.profile.rxMatchConfidence).toBeUndefined();
+
+    const reread = await engine.get(created.profile.id);
+    expect(reread?.userConfirmedRxMatch).toBe(false);
+    expect(reread?.rxcui).toBeUndefined();
+    expect(reread?.rxDisplayName).toBeUndefined();
+  });
+});
+
 describe('MedicationProfileEngine.update — non-existent profiles (10.6)', () => {
   it('rejects an edit to a profile that does not exist and leaves records unchanged', async () => {
     const engine = makeEngine();

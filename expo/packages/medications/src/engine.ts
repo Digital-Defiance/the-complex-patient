@@ -115,6 +115,12 @@ export class MedicationProfileEngine {
       ...(input.appearance !== undefined ? { appearance: input.appearance } : {}),
       ...(input.refill !== undefined ? { refill: input.refill } : {}),
       ...(input.productCode !== undefined ? { productCode: input.productCode } : {}),
+      ...(input.rxcui !== undefined ? { rxcui: input.rxcui } : {}),
+      ...(input.ingredientRxcui !== undefined ? { ingredientRxcui: input.ingredientRxcui } : {}),
+      ...(input.rxDisplayName !== undefined ? { rxDisplayName: input.rxDisplayName } : {}),
+      ...(input.rxMatchConfidence !== undefined ? { rxMatchConfidence: input.rxMatchConfidence } : {}),
+      ...(input.userConfirmedRxMatch !== undefined ? { userConfirmedRxMatch: input.userConfirmedRxMatch } : {}),
+      ...(input.rxnormDatasetVersion !== undefined ? { rxnormDatasetVersion: input.rxnormDatasetVersion } : {}),
     };
 
     const nextRecords = [...state.records, profile];
@@ -159,7 +165,20 @@ export class MedicationProfileEngine {
       ...(edit.appearance !== undefined ? { appearance: edit.appearance } : {}),
       ...(edit.refill !== undefined ? { refill: edit.refill } : {}),
       ...(edit.productCode !== undefined ? { productCode: edit.productCode } : {}),
+      ...(edit.rxcui !== undefined ? { rxcui: edit.rxcui } : {}),
+      ...(edit.ingredientRxcui !== undefined ? { ingredientRxcui: edit.ingredientRxcui } : {}),
+      ...(edit.rxDisplayName !== undefined ? { rxDisplayName: edit.rxDisplayName } : {}),
+      ...(edit.rxMatchConfidence !== undefined ? { rxMatchConfidence: edit.rxMatchConfidence } : {}),
+      ...(edit.userConfirmedRxMatch !== undefined ? { userConfirmedRxMatch: edit.userConfirmedRxMatch } : {}),
+      ...(edit.rxnormDatasetVersion !== undefined ? { rxnormDatasetVersion: edit.rxnormDatasetVersion } : {}),
     };
+
+    if (edit.userConfirmedRxMatch === false) {
+      delete merged.rxcui;
+      delete merged.ingredientRxcui;
+      delete merged.rxDisplayName;
+      delete merged.rxMatchConfidence;
+    }
 
     const failure = validateProfileShape(merged);
     if (failure !== null) {

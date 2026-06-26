@@ -1,0 +1,12 @@
+{
+  "name": "@complex-patient/drug-naming",
+  "version": "0.0.1",
+  "private": true,
+  "description": "On-device RxNorm drug naming, duplicate-ingredient and class-overlap notices",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc"
+  }
+}

@@ -68,6 +68,12 @@ export type MedicationProfileInput = {
   appearance?: import('@complex-patient/domain').MedAppearance;
   refill?: import('@complex-patient/domain').MedRefillTracking;
   productCode?: string;
+  rxcui?: string;
+  ingredientRxcui?: string;
+  rxDisplayName?: string;
+  rxMatchConfidence?: number;
+  userConfirmedRxMatch?: boolean;
+  rxnormDatasetVersion?: string;
 };
 
 /**

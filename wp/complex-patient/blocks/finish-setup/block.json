@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "complex-patient/finish-setup",
+  "title": "Complex Patient Finish Setup",
+  "category": "complex-patient",
+  "keywords": [ "finish", "setup", "sso", "complex patient" ],
+  "icon": "yes",
+  "description": "Confirm profile details after WordPress.com sign-in and create an application password.",
+  "textdomain": "complex-patient",
+  "editorScript": "file:./editor.js",
+  "supports": {
+    "html": false
+  }
+}

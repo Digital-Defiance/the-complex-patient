@@ -45,6 +45,13 @@ type DomainExtensionPayload =
       prescribingPhysician: string;
       conditionTreated: string;
       active: boolean;
+      rxcui?: string;
+      ingredientRxcui?: string;
+      rxDisplayName?: string;
+      rxMatchConfidence?: number;
+      userConfirmedRxMatch?: boolean;
+      rxnormDatasetVersion?: string;
+      rxAnnotation?: string | null;
     }
   | { kind: 'prn-log'; medicationId: string; amount: number; takenAt: string; override?: boolean }
   | { kind: 'symptom'; symptomType: string; systemicLocation: string; severity: number; duration: SymptomEntry['duration']; notes: string; active: boolean }
@@ -76,6 +83,21 @@ function readExtensionString(
 ): string | undefined {
   const extensions = resource.extension as Array<{ url?: string; valueString?: string }> | undefined;
   return extensions?.find((ext) => ext.url === url)?.valueString;
+}
+
+function readRxNormCoding(
+  resource: Record<string, unknown>,
+): { rxcui: string; rxDisplayName?: string } | null {
+  const concept = resource.medicationCodeableConcept as
+    | { coding?: Array<{ system?: string; code?: string; display?: string }> }
+    | undefined;
+  const coding = concept?.coding?.find(
+    (entry) => entry.system === 'http://www.nlm.nih.gov/research/umls/rxnorm' && entry.code,
+  );
+  if (!coding?.code) {
+    return null;
+  }
+  return { rxcui: coding.code, rxDisplayName: coding.display };
 }
 
 function parseMedicationFallback(resource: Record<string, unknown>, id: string, op_timestamp: string): MedicationProfile | null {
@@ -226,13 +248,36 @@ export function parseFhirBundleToSource(bundle: FhirBundle): ParseFhirBundleResu
 
     if (resourceType === 'MedicationStatement') {
       if (domain?.kind === 'medication') {
-        const { kind: _kind, ...fields } = domain;
-        source.medications.push({ id, op_timestamp, ...fields });
+        const { kind: _kind, rxAnnotation: _rxAnnotation, ...fields } = domain;
+        const rxFromCoding = readRxNormCoding(resource);
+        source.medications.push({
+          id,
+          op_timestamp,
+          ...fields,
+          ...(fields.userConfirmedRxMatch !== true && rxFromCoding
+            ? {
+                rxcui: rxFromCoding.rxcui,
+                rxDisplayName: rxFromCoding.rxDisplayName ?? fields.rxDisplayName,
+                userConfirmedRxMatch: true,
+              }
+            : {}),
+        });
         continue;
       }
       const parsed = parseMedicationFallback(resource, id, op_timestamp);
-      if (parsed) source.medications.push(parsed);
-      else warnings.push(`Skipped medication ${id}: could not parse.`);
+      if (parsed) {
+        const rxFromCoding = readRxNormCoding(resource);
+        if (rxFromCoding) {
+          source.medications.push({
+            ...parsed,
+            rxcui: rxFromCoding.rxcui,
+            rxDisplayName: rxFromCoding.rxDisplayName ?? parsed.drugName,
+            userConfirmedRxMatch: true,
+          });
+        } else {
+          source.medications.push(parsed);
+        }
+      } else warnings.push(`Skipped medication ${id}: could not parse.`);
       continue;
     }
 

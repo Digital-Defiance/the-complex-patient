@@ -8,6 +8,7 @@ import { WeatherSettingsSection } from './WeatherSettingsSection';
 import { ChangePassphraseSection } from './ChangePassphraseSection';
 import { PasskeyUnlockSection } from './PasskeyUnlockSection';
 import { PaperBackupSection } from './PaperBackupSection';
+import { DrugNamingAboutSection } from './medications/DrugNamingAboutSection';
 import type { KdfMaterialStorage } from './kdf-material-storage';
 
 export interface VaultSettingsScreenProps {
@@ -35,6 +36,7 @@ export function VaultSettingsScreen({
         <Text style={styles.sectionGroupTitle}>Security &amp; recovery</Text>
         <ChangePassphraseSection kdfStorage={kdfStorage} />
         <PasskeyUnlockSection />
+        <DrugNamingAboutSection />
         <PaperBackupSection kdfStorage={kdfStorage} />
       </View>
 

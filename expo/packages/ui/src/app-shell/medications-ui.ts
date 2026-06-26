@@ -11,6 +11,15 @@ import type {
   VaultRecord,
   Weekday,
 } from '@complex-patient/domain';
+import {
+  buildMedicationNamingNotices,
+  DRUG_NAMING_ASSIST_ENABLED,
+  medicationForNamingCheck,
+  resolveRxcuiFromNdc,
+  RX_MATCH_CONFIRM_THRESHOLD,
+  type MedicationNamingNotice,
+  type RxMatchCandidate,
+} from '@complex-patient/drug-naming';
 import { DEFAULT_MED_APPEARANCE } from '@complex-patient/med-visuals';
 import { DEFAULT_DOSAGE_UNIT, formatDosageString, parseDosageString } from './dosage-units';
 
@@ -134,6 +143,12 @@ export interface MedicationDraft {
   quantityOnHand: string;
   lowStockThreshold: string;
   productCode: string;
+  rxcui: string;
+  ingredientRxcui: string;
+  rxDisplayName: string;
+  rxMatchConfidence: string;
+  userConfirmedRxMatch: boolean | null;
+  rxnormDatasetVersion: string;
 }
 
 export function emptyRegimenDraft(preset?: { label?: string; times?: string }): RegimenDraft {
@@ -165,6 +180,12 @@ export function emptyMedicationDraft(): MedicationDraft {
     quantityOnHand: '',
     lowStockThreshold: '',
     productCode: '',
+    rxcui: '',
+    ingredientRxcui: '',
+    rxDisplayName: '',
+    rxMatchConfidence: '',
+    userConfirmedRxMatch: null,
+    rxnormDatasetVersion: '',
   };
 }
 
@@ -213,6 +234,13 @@ export function draftFromProfile(profile: MedicationProfile): MedicationDraft {
     quantityOnHand: profile.refill?.quantityOnHand?.toString() ?? '',
     lowStockThreshold: profile.refill?.lowStockThreshold?.toString() ?? '',
     productCode: profile.productCode ?? '',
+    rxcui: profile.rxcui ?? '',
+    ingredientRxcui: profile.ingredientRxcui ?? '',
+    rxDisplayName: profile.rxDisplayName ?? '',
+    rxMatchConfidence:
+      profile.rxMatchConfidence !== undefined ? String(profile.rxMatchConfidence) : '',
+    userConfirmedRxMatch: profile.userConfirmedRxMatch ?? null,
+    rxnormDatasetVersion: profile.rxnormDatasetVersion ?? '',
   };
 }
 
@@ -322,7 +350,207 @@ export function buildProfileFromDraft(draft: MedicationDraft, existing?: Medicat
     profile.productCode = draft.productCode.trim();
   }
 
+  if (draft.userConfirmedRxMatch === true) {
+    if (draft.rxcui.trim()) profile.rxcui = draft.rxcui.trim();
+    if (draft.ingredientRxcui.trim()) profile.ingredientRxcui = draft.ingredientRxcui.trim();
+    if (draft.rxDisplayName.trim()) profile.rxDisplayName = draft.rxDisplayName.trim();
+    const confidence = Number.parseFloat(draft.rxMatchConfidence);
+    if (Number.isFinite(confidence)) profile.rxMatchConfidence = confidence;
+    profile.userConfirmedRxMatch = true;
+    if (draft.rxnormDatasetVersion.trim()) {
+      profile.rxnormDatasetVersion = draft.rxnormDatasetVersion.trim();
+    }
+  } else if (draft.userConfirmedRxMatch === false) {
+    profile.userConfirmedRxMatch = false;
+    if (draft.rxnormDatasetVersion.trim()) {
+      profile.rxnormDatasetVersion = draft.rxnormDatasetVersion.trim();
+    }
+  }
+
   return profile;
+}
+
+export interface MedicationIdentityBaseline {
+  drugName: string;
+  productCode: string;
+}
+
+export const EMPTY_RX_DRAFT_FIELDS: Pick<
+  MedicationDraft,
+  'rxcui' | 'ingredientRxcui' | 'rxDisplayName' | 'rxMatchConfidence' | 'userConfirmedRxMatch'
+> = {
+  rxcui: '',
+  ingredientRxcui: '',
+  rxDisplayName: '',
+  rxMatchConfidence: '',
+  userConfirmedRxMatch: null,
+};
+
+export function medicationIdentityBaseline(
+  existing?: Pick<MedicationProfile, 'drugName' | 'productCode'>,
+): MedicationIdentityBaseline {
+  return {
+    drugName: existing?.drugName.trim() ?? '',
+    productCode: existing?.productCode?.trim() ?? '',
+  };
+}
+
+export function identityChangedFromBaseline(
+  baseline: MedicationIdentityBaseline,
+  drugName: string,
+  productCode: string,
+): boolean {
+  return (
+    drugName.trim() !== baseline.drugName || productCode.trim() !== baseline.productCode
+  );
+}
+
+export function shouldInvalidateConfirmedRxMatch(
+  draft: Pick<MedicationDraft, 'userConfirmedRxMatch' | 'rxcui'>,
+  pendingRxcui: string | null | undefined,
+): boolean {
+  return (
+    draft.userConfirmedRxMatch === true &&
+    Boolean(draft.rxcui?.trim()) &&
+    Boolean(pendingRxcui) &&
+    pendingRxcui !== draft.rxcui
+  );
+}
+
+export function applyDrugNameChangeToDraft(
+  draft: MedicationDraft,
+  baseline: MedicationIdentityBaseline,
+  drugName: string,
+): MedicationDraft {
+  const typedChanged = drugName.trim() !== draft.drugName.trim();
+  const baselineChanged = identityChangedFromBaseline(baseline, drugName, draft.productCode);
+  return {
+    ...draft,
+    drugName,
+    ...(typedChanged || baselineChanged ? EMPTY_RX_DRAFT_FIELDS : {}),
+  };
+}
+
+export function applyProductCodeChangeToDraft(
+  draft: MedicationDraft,
+  baseline: MedicationIdentityBaseline,
+  productCode: string,
+): MedicationDraft {
+  const codeChanged = productCode.trim() !== draft.productCode.trim();
+  const baselineChanged = identityChangedFromBaseline(baseline, draft.drugName, productCode);
+  return {
+    ...draft,
+    productCode,
+    ...(codeChanged || baselineChanged ? EMPTY_RX_DRAFT_FIELDS : {}),
+  };
+}
+
+export function applyBarcodeScanToDraft(
+  draft: MedicationDraft,
+  baseline: MedicationIdentityBaseline,
+  rawCode: string,
+  resolvedDisplayName?: string,
+): MedicationDraft {
+  const drugName =
+    !draft.drugName.trim() && resolvedDisplayName?.trim()
+      ? resolvedDisplayName.trim()
+      : draft.drugName;
+  const codeChanged = rawCode.trim() !== draft.productCode.trim();
+  const baselineChanged = identityChangedFromBaseline(baseline, drugName, rawCode);
+  const nameChanged = drugName !== draft.drugName;
+  return {
+    ...draft,
+    productCode: rawCode,
+    drugName,
+    ...(codeChanged || baselineChanged || nameChanged ? EMPTY_RX_DRAFT_FIELDS : {}),
+  };
+}
+
+export type RxMatchConfirmView = 'hidden' | 'prompt' | 'confirmed' | 'declined' | 'unidentified';
+
+/** Resolve which Rx match confirmation UI state to show. */
+export function resolveRxMatchConfirmView(
+  hasCandidate: boolean,
+  confirmed: boolean | null,
+): RxMatchConfirmView {
+  if (!hasCandidate) {
+    return confirmed === false ? 'unidentified' : 'hidden';
+  }
+  if (confirmed === true) {
+    return 'confirmed';
+  }
+  if (confirmed === false) {
+    return 'declined';
+  }
+  return 'prompt';
+}
+
+export type MedicationRxLabelKind = 'stored-as' | 'matched' | 'unidentified';
+
+export interface MedicationRxLabelResult {
+  kind: MedicationRxLabelKind;
+  generic?: string;
+}
+
+/** Pure display resolver for {@link MedicationRxLabel}. */
+export function resolveMedicationRxLabelForUi(
+  medication: Pick<MedicationProfile, 'drugName' | 'rxDisplayName' | 'userConfirmedRxMatch'>,
+  assistEnabled: boolean = DRUG_NAMING_ASSIST_ENABLED,
+): MedicationRxLabelResult | null {
+  if (!assistEnabled) {
+    return null;
+  }
+  return resolveMedicationRxLabel(medication);
+}
+
+/** Passive overlap notices for cabinet/hub surfaces (respects kill switch). */
+export function resolveMedicationNamingNoticesForUi(
+  medications: readonly MedicationProfile[],
+  assistEnabled: boolean = DRUG_NAMING_ASSIST_ENABLED,
+): MedicationNamingNotice[] {
+  if (!assistEnabled) {
+    return [];
+  }
+  return buildMedicationNamingNotices(medications.map(medicationForNamingCheck));
+}
+
+/** Whether the Rx match confirm panel should appear on the medication form. */
+export function shouldShowRxMatchConfirmPanel(
+  draft: Pick<MedicationDraft, 'drugName' | 'productCode'>,
+  pendingCandidate: Pick<RxMatchCandidate, 'confidence'> | null,
+  options: {
+    assistEnabled?: boolean;
+    confirmThreshold?: number;
+    resolveNdc?: (productCode: string) => string | null;
+  } = {},
+): boolean {
+  const assistEnabled = options.assistEnabled ?? DRUG_NAMING_ASSIST_ENABLED;
+  const confirmThreshold = options.confirmThreshold ?? RX_MATCH_CONFIRM_THRESHOLD;
+  const resolveNdc = options.resolveNdc ?? resolveRxcuiFromNdc;
+  if (!assistEnabled || !draft.drugName.trim() || !pendingCandidate) {
+    return false;
+  }
+  return (
+    (pendingCandidate.confidence ?? 0) >= confirmThreshold ||
+    Boolean(draft.productCode.trim() && resolveNdc(draft.productCode))
+  );
+}
+
+export function resolveMedicationRxLabel(
+  medication: Pick<MedicationProfile, 'drugName' | 'rxDisplayName' | 'userConfirmedRxMatch'>,
+): MedicationRxLabelResult | null {
+  if (medication.userConfirmedRxMatch === true && medication.rxDisplayName?.trim()) {
+    const generic = medication.rxDisplayName.trim();
+    const typed = medication.drugName.trim();
+    if (generic.toLowerCase() !== typed.toLowerCase()) {
+      return { kind: 'stored-as', generic };
+    }
+    return { kind: 'matched' };
+  }
+  if (medication.userConfirmedRxMatch === false) {
+    return { kind: 'unidentified' };
+  }
+  return null;
 }
 
 export function mergeMedicationRecord(current: VaultRecord[], profile: MedicationProfile): VaultRecord[] {

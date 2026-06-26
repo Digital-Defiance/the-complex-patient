@@ -1,0 +1,8 @@
+appId: org.digitaldefiance.com.complexpatient
+env:
+  MAESTRO_DRUG_NAME: ${MAESTRO_DRUG_NAME || "Advil"}
+---
+- tapOn:
+    id: med-drug-name
+- inputText: ${MAESTRO_DRUG_NAME}
+- runFlow: tap-keyboard-done.yaml

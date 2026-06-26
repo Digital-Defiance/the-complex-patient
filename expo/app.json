@@ -10,7 +10,13 @@
       "web"
     ],
     "plugins": [
-      "expo-dev-client",
+      [
+        "expo-dev-client",
+        {
+          "skipOnboarding": true,
+          "showMenuAtLaunch": false
+        }
+      ],
       "./plugins/with-android-gradle8.js",
       [
         "expo-router",

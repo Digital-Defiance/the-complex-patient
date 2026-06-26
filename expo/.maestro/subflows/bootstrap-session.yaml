@@ -1,0 +1,32 @@
+appId: org.digitaldefiance.com.complexpatient
+env:
+  MAESTRO_UNLOCK_TIMEOUT_MS: ${MAESTRO_UNLOCK_TIMEOUT_MS || "300000"}
+---
+- launchApp
+
+- runFlow: dismiss-expo-dev-ui.yaml
+
+- runFlow:
+    when:
+      visible:
+        id: age-gate-screen
+    file: age-gate.yaml
+
+- runFlow: wait-for-auth-screen.yaml
+
+- runFlow:
+    when:
+      visible:
+        id: sign-in-screen
+    file: sign-in.yaml
+
+- runFlow:
+    when:
+      visible:
+        id: unlock-screen
+    file: unlock-vault.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: home-summary
+    timeout: ${MAESTRO_UNLOCK_TIMEOUT_MS || "300000"}

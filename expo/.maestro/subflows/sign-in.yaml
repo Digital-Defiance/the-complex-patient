@@ -1,0 +1,38 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+- extendedWaitUntil:
+    visible:
+      id: sign-in-screen
+    timeout: 15000
+
+- assertVisible:
+    id: sign-in-username
+- assertVisible:
+    id: sign-in-password
+
+- tapOn:
+    id: sign-in-username
+- inputText: ${MAESTRO_WP_USERNAME}
+- tapOn:
+    id: sign-in-password
+- inputText: ${MAESTRO_WP_PASSWORD}
+- runFlow: tap-keyboard-done.yaml
+
+- scrollUntilVisible:
+    element:
+      id: sign-in-submit
+- tapOn:
+    id: sign-in-submit
+
+- runFlow:
+    when:
+      visible:
+        id: sign-in-error
+    commands:
+      - assertVisible:
+          text: "invalid or expired"
+
+- extendedWaitUntil:
+    visible:
+      id: unlock-screen
+    timeout: 60000

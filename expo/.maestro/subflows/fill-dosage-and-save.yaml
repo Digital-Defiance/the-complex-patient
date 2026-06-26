@@ -1,0 +1,20 @@
+appId: org.digitaldefiance.com.complexpatient
+env:
+  MAESTRO_DOSAGE: ${MAESTRO_DOSAGE || "200"}
+---
+- scrollUntilVisible:
+    element:
+      id: med-dosage-amount
+- tapOn:
+    id: med-dosage-amount
+- inputText: ${MAESTRO_DOSAGE}
+- runFlow: tap-keyboard-done.yaml
+- scrollUntilVisible:
+    element:
+      id: medication-form-save
+- tapOn:
+    id: medication-form-save
+- extendedWaitUntil:
+    visible:
+      id: medications-screen
+    timeout: 30000

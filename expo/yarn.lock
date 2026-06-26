@@ -855,6 +855,7 @@ __metadata:
   resolution: "@complex-patient/clinical-export@workspace:packages/clinical-export"
   dependencies:
     "@complex-patient/domain": "workspace:*"
+    "@complex-patient/drug-naming": "workspace:*"
     "@zip.js/zip.js": "npm:2.7.57"
   languageName: unknown
   linkType: soft
@@ -876,11 +877,18 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@complex-patient/drug-naming@workspace:*, @complex-patient/drug-naming@workspace:packages/drug-naming":
+  version: 0.0.0-use.local
+  resolution: "@complex-patient/drug-naming@workspace:packages/drug-naming"
+  languageName: unknown
+  linkType: soft
+
 "@complex-patient/insights@npm:*, @complex-patient/insights@workspace:*, @complex-patient/insights@workspace:packages/insights":
   version: 0.0.0-use.local
   resolution: "@complex-patient/insights@workspace:packages/insights"
   dependencies:
     "@complex-patient/domain": "npm:*"
+    "@complex-patient/drug-naming": "workspace:*"
     "@complex-patient/weather": "workspace:*"
   languageName: unknown
   linkType: soft
@@ -971,6 +979,7 @@ __metadata:
     "@complex-patient/clinical-export": "workspace:*"
     "@complex-patient/crypto-engine": "workspace:*"
     "@complex-patient/domain": "workspace:*"
+    "@complex-patient/drug-naming": "workspace:*"
     "@complex-patient/insights": "workspace:*"
     "@complex-patient/key-store": "workspace:*"
     "@complex-patient/local-vault": "workspace:*"

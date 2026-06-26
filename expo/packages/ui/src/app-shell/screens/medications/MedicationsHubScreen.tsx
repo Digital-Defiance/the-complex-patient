@@ -2,8 +2,15 @@
  * Medications hub — entry to Today, Cabinet, History, and PRN log.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import type { VaultRecord } from '@complex-patient/domain';
+import { splitMedicationsPartition } from '@complex-patient/clinical-export';
+import { DRUG_NAMING_ASSIST_ENABLED } from '@complex-patient/drug-naming';
+import { useAppHost } from '../../app-host';
+import { usePartition } from '../../hooks';
+import { DrugNamingDisclaimer } from './DrugNamingDisclaimer';
+import { MedicationNamingNotices } from './MedicationNamingNotices';
 
 export interface MedicationsHubScreenProps {
   onToday: () => void;
@@ -14,14 +21,45 @@ export interface MedicationsHubScreenProps {
   onBack?: () => void;
 }
 
-export function MedicationsHubScreen({
+export function MedicationsHubScreen(props: MedicationsHubScreenProps): React.ReactElement {
+  const { home } = useAppHost();
+  if (!home) {
+    return <MedicationsHubLayout {...props} notices={null} disclaimer={null} />;
+  }
+  return <MedicationsHubWithData home={home} {...props} />;
+}
+
+function MedicationsHubWithData({
+  home,
+  ...props
+}: MedicationsHubScreenProps & {
+  home: NonNullable<ReturnType<typeof useAppHost>['home']>;
+}): React.ReactElement {
+  const records = usePartition<VaultRecord>(home, 'medications');
+  const medications = useMemo(() => splitMedicationsPartition(records).medications, [records]);
+
+  return (
+    <MedicationsHubLayout
+      {...props}
+      disclaimer={DRUG_NAMING_ASSIST_ENABLED ? <DrugNamingDisclaimer /> : null}
+      notices={DRUG_NAMING_ASSIST_ENABLED ? <MedicationNamingNotices medications={medications} /> : null}
+    />
+  );
+}
+
+function MedicationsHubLayout({
   onToday,
   onCabinet,
   onHistory,
   onPrn,
   onAdd,
   onBack,
-}: MedicationsHubScreenProps): React.ReactElement {
+  disclaimer,
+  notices,
+}: MedicationsHubScreenProps & {
+  disclaimer: React.ReactNode;
+  notices: React.ReactNode;
+}): React.ReactElement {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
@@ -32,6 +70,9 @@ export function MedicationsHubScreen({
         )}
         <Text style={styles.title}>Medications</Text>
       </View>
+
+      {disclaimer}
+      {notices}
 
       <Pressable style={styles.primaryCard} onPress={onToday} accessibilityRole="button" testID="medications-nav-today">
         <Text style={styles.primaryTitle}>Today</Text>

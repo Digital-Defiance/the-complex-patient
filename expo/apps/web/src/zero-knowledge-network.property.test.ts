@@ -46,7 +46,24 @@ import { createWebHome } from './entry';
 import { createNetworkSpy, type CapturedRequest } from './network-spy';
 
 // The only fields permitted to cross the zero-knowledge boundary (4.6, 4.8).
-const ENVELOPE_KEYS = ['auth_tag', 'ciphertext', 'iv', 'sync_version'].sort();
+const BASE_ENVELOPE_KEYS = ['auth_tag', 'ciphertext', 'iv', 'sync_version'] as const;
+
+function expectedEnvelopeKeys(parsed: Record<string, unknown>): string[] {
+  return parsed.device_id !== undefined
+    ? [...BASE_ENVELOPE_KEYS, 'device_id'].sort()
+    : [...BASE_ENVELOPE_KEYS].sort();
+}
+
+function assertBlindEnvelopeBody(parsed: Record<string, unknown>): void {
+  expect(Object.keys(parsed).sort()).toEqual(expectedEnvelopeKeys(parsed));
+  expect(typeof parsed.sync_version).toBe('number');
+  expect(typeof parsed.iv).toBe('string');
+  expect(typeof parsed.auth_tag).toBe('string');
+  expect(typeof parsed.ciphertext).toBe('string');
+  if (parsed.device_id !== undefined) {
+    expect(typeof parsed.device_id).toBe('string');
+  }
+}
 
 // A fixed, non-PHI session KEK (32 bytes) for hydrating the vault store.
 const KEK: CryptoKeyRef = wrapKey(new Uint8Array(32).fill(7));
@@ -319,23 +336,27 @@ describe('Property 12: Zero-knowledge network invariant', () => {
         // --- Assert the invariant over EVERY captured request. ---
         const phiTokens = collectPhiTokens(phi);
         for (const request of spy.requests) {
+          const serialized = spy.serialize(request);
+
+          if (request.method === 'GET') {
+            for (const token of phiTokens) {
+              expect(serialized.toLowerCase()).not.toContain(token.toLowerCase());
+            }
+            continue;
+          }
+
           // 1) Body carries ONLY the blind envelope fields (4.6, 4.8).
           expect(typeof request.body).toBe('string');
           const parsed = JSON.parse(request.body as string) as Record<string, unknown>;
-          expect(Object.keys(parsed).sort()).toEqual(ENVELOPE_KEYS);
-          expect(typeof parsed.sync_version).toBe('number');
-          expect(typeof parsed.iv).toBe('string');
-          expect(typeof parsed.auth_tag).toBe('string');
-          expect(typeof parsed.ciphertext).toBe('string');
+          assertBlindEnvelopeBody(parsed);
 
           // 2) Headers expose only the auth credential + content type — no PHI.
           expect(Object.keys(request.headers).sort()).toEqual(
-            ['Authorization', 'Content-Type'].sort(),
+            ['Authorization', 'Content-Type', 'X-WP-Authorization'].sort(),
           );
 
           // 3) No plaintext PHI token appears in the method, URL, query string,
           //    headers, or body of the request (4.6, 4.8, 19.1, 19.2).
-          const serialized = spy.serialize(request);
           for (const token of phiTokens) {
             expect(serialized.includes(token)).toBe(false);
           }

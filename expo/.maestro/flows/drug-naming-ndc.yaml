@@ -1,0 +1,19 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+- runFlow: ../subflows/bootstrap-session.yaml
+- runFlow: ../subflows/navigate-medication-add.yaml
+- tapOn:
+    id: med-drug-name
+- inputText: "Advil"
+- runFlow: tap-keyboard-done.yaml
+- scrollUntilVisible:
+    element:
+      id: med-product-code
+- tapOn:
+    id: med-product-code
+- inputText: "00573-0150-70"
+- runFlow: tap-keyboard-done.yaml
+- runFlow: ../subflows/confirm-rx-match.yaml
+- runFlow: ../subflows/fill-dosage-and-save.yaml
+- assertVisible:
+    text: "Stored as: Ibuprofen"

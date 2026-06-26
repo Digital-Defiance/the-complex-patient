@@ -1,0 +1,52 @@
+appId: org.digitaldefiance.com.complexpatient
+env:
+  MAESTRO_UNLOCK_TIMEOUT_MS: ${MAESTRO_UNLOCK_TIMEOUT_MS || "300000"}
+---
+- extendedWaitUntil:
+    visible:
+      id: unlock-screen
+    timeout: 15000
+
+- runFlow:
+    when:
+      visible:
+        id: unlock-use-passphrase
+    commands:
+      - tapOn:
+          id: unlock-use-passphrase
+
+- extendedWaitUntil:
+    visible:
+      id: unlock-passphrase
+    timeout: 15000
+
+- tapOn:
+    id: unlock-passphrase
+- inputText: ${MAESTRO_VAULT_PASSPHRASE}
+- runFlow: tap-keyboard-done.yaml
+- tapOn:
+    id: unlock-submit
+
+# KDF + remote reconcile can take several minutes on simulator (especially first unlock).
+- extendedWaitUntil:
+    visible:
+      id: unlock-loading-message
+    timeout: 15000
+
+- extendedWaitUntil:
+    visible:
+      id: home-summary
+    timeout: ${MAESTRO_UNLOCK_TIMEOUT_MS}
+
+# First native unlock may show informational alerts over the home screen.
+- runFlow:
+    when:
+      visible: "Biometric unlock ready"
+    commands:
+      - tapOn: "OK"
+
+- runFlow:
+    when:
+      visible: "Some vault data was quarantined"
+    commands:
+      - tapOn: "Continue"

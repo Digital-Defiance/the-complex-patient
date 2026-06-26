@@ -1,0 +1,7 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+- runFlow: ../subflows/bootstrap-session.yaml
+- assertVisible:
+    id: home-summary
+- assertVisible:
+    id: home-nav-medications

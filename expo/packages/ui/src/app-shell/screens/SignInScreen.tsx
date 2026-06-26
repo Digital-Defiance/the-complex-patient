@@ -159,7 +159,7 @@ export function SignInScreen(): React.ReactElement {
             )}
 
           {error && (
-            <Text style={styles.error} accessibilityRole="alert">
+            <Text style={styles.error} accessibilityRole="alert" testID="sign-in-error">
               {error}
             </Text>
           )}

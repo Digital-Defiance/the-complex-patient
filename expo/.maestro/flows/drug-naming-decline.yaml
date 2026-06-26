@@ -1,0 +1,9 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+- runFlow: ../subflows/bootstrap-session.yaml
+- runFlow: ../subflows/navigate-medication-add.yaml
+- runFlow: ../subflows/enter-drug-name.yaml
+- runFlow: ../subflows/decline-rx-match.yaml
+- runFlow: ../subflows/fill-dosage-and-save.yaml
+- assertVisible:
+    text: "could not match this name"

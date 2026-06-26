@@ -1,0 +1,12 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+- extendedWaitUntil:
+    visible:
+      id: rx-match-confirm
+    timeout: 15000
+- tapOn:
+    id: rx-match-confirm-no
+- extendedWaitUntil:
+    visible:
+      id: rx-match-confirm-declined
+    timeout: 10000

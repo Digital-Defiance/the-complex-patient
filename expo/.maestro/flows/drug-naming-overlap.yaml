@@ -1,0 +1,27 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+- runFlow: ../subflows/bootstrap-session.yaml
+- runFlow: ../subflows/navigate-medication-add.yaml
+- runFlow: ../subflows/enter-drug-name.yaml
+- runFlow: ../subflows/confirm-rx-match.yaml
+- runFlow: ../subflows/fill-dosage-and-save.yaml
+- assertVisible:
+    text: "Stored as: Ibuprofen"
+- tapOn:
+    id: medications-add
+- extendedWaitUntil:
+    visible:
+      id: med-drug-name
+    timeout: 15000
+- runFlow:
+    file: ../subflows/enter-drug-name.yaml
+    env:
+      MAESTRO_DRUG_NAME: "Motrin"
+- runFlow: ../subflows/confirm-rx-match.yaml
+- runFlow: ../subflows/fill-dosage-and-save.yaml
+- assertVisible:
+    id: medication-naming-notices
+- assertVisible:
+    id: medication-naming-notices-duplicate-ingredient
+- assertVisible:
+    text: "same ingredient"

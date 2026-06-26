@@ -85,6 +85,59 @@ describe('buildPhysicianReport — active polypharmacy (21.1)', () => {
     expect(medSection.lines).toHaveLength(2);
     expect(medSection.lines[0]).toContain('Atenolol');
   });
+
+  it('includes confirmed generic names and RxNorm annotation in medication lines', () => {
+    const source = createInMemoryReportDataSource({
+      medications: [
+        medication({
+          id: 'm1',
+          drugName: 'Advil',
+          active: true,
+          rxDisplayName: 'Ibuprofen',
+          rxcui: '5640',
+          ingredientRxcui: '5640',
+          userConfirmedRxMatch: true,
+          rxnormDatasetVersion: 'seed-2026',
+        }),
+      ],
+    });
+
+    const result = buildPhysicianReport(source, fixedClock);
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+
+    const medSection = result.report.sections.find(
+      (s) => s.title === REPORT_SECTION_TITLES.medications,
+    )!;
+    expect(medSection.lines[0]).toContain('Advil (naming database: Ibuprofen)');
+    expect(medSection.lines[0]).toContain('RxCUI 5640');
+    expect(medSection.lines[0]).toContain('dataset seed-2026');
+  });
+
+  it('omits naming-database generic and RxNorm annotation for declined matches', () => {
+    const source = createInMemoryReportDataSource({
+      medications: [
+        medication({
+          id: 'm-declined',
+          drugName: 'Herb blend',
+          active: true,
+          userConfirmedRxMatch: false,
+          rxnormDatasetVersion: 'seed-2026',
+        }),
+      ],
+    });
+
+    const result = buildPhysicianReport(source, fixedClock);
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+
+    const medSection = result.report.sections.find(
+      (s) => s.title === REPORT_SECTION_TITLES.medications,
+    )!;
+    expect(medSection.lines[0]).toContain('Herb blend');
+    expect(medSection.lines[0]).not.toContain('naming database');
+    expect(medSection.lines[0]).not.toContain('RxCUI');
+  });
 });
 
 describe('buildPhysicianReport — trailing-90-day severe-symptom frequency (21.4)', () => {

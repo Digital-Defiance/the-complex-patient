@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "complex-patient/application-passwords",
+  "title": "Application Passwords",
+  "category": "complex-patient",
+  "keywords": [ "application", "password", "app", "mobile", "complex patient" ],
+  "icon": "lock",
+  "description": "Manage WordPress application passwords for apps and devices.",
+  "textdomain": "complex-patient",
+  "editorScript": "file:./editor.js",
+  "supports": {
+    "html": false
+  }
+}

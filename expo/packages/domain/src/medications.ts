@@ -106,6 +106,18 @@ export interface MedicationProfile extends VaultRecord {
   refill?: MedRefillTracking;
   /** Optional NDC or barcode string (manual entry; scan can populate later). */
   productCode?: string;
+  /** RxNorm concept id — set only after user confirms a naming match. */
+  rxcui?: string;
+  /** Ingredient-level RxCUI for duplicate-ingredient checks. */
+  ingredientRxcui?: string;
+  /** Generic display name from RxNorm (e.g. Ibuprofen). */
+  rxDisplayName?: string;
+  /** Match confidence 0–1 when user was prompted. */
+  rxMatchConfidence?: number;
+  /** User confirmed the suggested RxNorm match. */
+  userConfirmedRxMatch?: boolean;
+  /** Version of bundled naming dataset used at match time. */
+  rxnormDatasetVersion?: string;
 }
 
 /** Human-readable dosage summary across all regimens (e.g. "1mg · 2mg bedtime"). */

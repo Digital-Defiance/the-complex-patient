@@ -1,0 +1,1068 @@
+{
+  "version": "rxnorm-06012026",
+  "attribution": "RxNorm / RxClass subset (NIH). Imported via scripts/rxnorm-import-csv.mjs from UMLS-licensed extracts.",
+  "concepts": [
+    {
+      "rxcui": "5640",
+      "displayName": "Ibuprofen",
+      "ingredientRxcui": "5640",
+      "ingredientName": "Ibuprofen",
+      "synonyms": [
+        "Advil",
+        "Motrin",
+        "ibuprofen",
+        "Nuprin",
+        "Genpril",
+        "Ibu",
+        "Vicoprofen",
+        "Samson 8",
+        "Reprexain",
+        "Neoprofen",
+        "Wal-Profen",
+        "Ibuprohm",
+        "Caldolor",
+        "Motrin PM",
+        "Addaprin",
+        "Duexis",
+        "Counteract IB",
+        "Proprinal",
+        "Ibudone",
+        "Combogesic"
+      ],
+      "classIds": [
+        "nsaid"
+      ]
+    },
+    {
+      "rxcui": "7258",
+      "displayName": "Naproxen",
+      "ingredientRxcui": "7258",
+      "ingredientName": "Naproxen",
+      "synonyms": [
+        "Aleve",
+        "Naprosyn",
+        "naproxen",
+        "Anaprox",
+        "Naprelan",
+        "Wal-Proxen",
+        "Treximet",
+        "Vimovo",
+        "Aleve PM"
+      ],
+      "classIds": [
+        "nsaid"
+      ]
+    },
+    {
+      "rxcui": "1191",
+      "displayName": "Aspirin",
+      "ingredientRxcui": "1191",
+      "ingredientName": "Aspirin",
+      "synonyms": [
+        "aspirin",
+        "Bayer",
+        "Ecotrin",
+        "Alka-Seltzer",
+        "Equagesic",
+        "Aspergum",
+        "Anacin",
+        "Bayer Aspirin",
+        "Bufferin",
+        "Excedrin",
+        "Norgesic",
+        "Norwich Aspirin",
+        "Saleto",
+        "St. Joseph Aspirin",
+        "Vanquish",
+        "Orphengesic",
+        "Anacin Advanced Headache Formula",
+        "Anacin Aspirin Regimen",
+        "Miniprin",
+        "Pamprin Max Formula",
+        "Stanback Headache Powder Reformulated Jan 2011",
+        "BC Arthritis",
+        "BC Original Formula",
+        "Arthriten Inflammatory Pain",
+        "Bromo Seltzer Antacid Pain Reliever",
+        "Exaprin",
+        "Backaid IPF",
+        "Ascomp",
+        "Excedrin PM Triple Action",
+        "Aspi-Cor",
+        "Durlaza",
+        "Yosprala",
+        "Vazalore",
+        "Exaprin Plus"
+      ],
+      "classIds": [
+        "nsaid"
+      ]
+    },
+    {
+      "rxcui": "161",
+      "displayName": "Acetaminophen",
+      "ingredientRxcui": "161",
+      "ingredientName": "Acetaminophen",
+      "synonyms": [
+        "Tylenol",
+        "acetaminophen",
+        "paracetamol",
+        "Percocet",
+        "Lortab",
+        "Fioricet",
+        "Panadol",
+        "Anacin AF",
+        "Bupap",
+        "Endocet",
+        "Esgic",
+        "Excedrin",
+        "Excedrin PM",
+        "Feverall",
+        "Fioricet with Codeine",
+        "Legatrin PM",
+        "Mapap",
+        "Marten-Tab",
+        "Norco",
+        "Redutemp",
+        "Repan",
+        "Saleto",
+        "Tempra Quicklets",
+        "Tencon",
+        "Tycolene",
+        "Tylenol Gelcap Extra Strength",
+        "Tylenol PM",
+        "Tylenol with Codeine",
+        "Unisom with Pain Relief",
+        "Vanquish",
+        "Zebutal",
+        "Acephen",
+        "Contragesic",
+        "Relagesic",
+        "Ultracet",
+        "Excedrin Tension Headache",
+        "Frenadol",
+        "Dologesic",
+        "Hycet",
+        "Anabar",
+        "Ed Flex",
+        "By Ache",
+        "Excedrin Quick Tab",
+        "Comtrex Sore Throat Relief",
+        "Anacin Advanced Headache Formula",
+        "Trezix",
+        "Tactinal",
+        "Backprin"
+      ],
+      "classIds": [
+        "acetaminophen"
+      ]
+    },
+    {
+      "rxcui": "36437",
+      "displayName": "Sertraline",
+      "ingredientRxcui": "36437",
+      "ingredientName": "Sertraline",
+      "synonyms": [
+        "Zoloft",
+        "sertraline"
+      ],
+      "classIds": [
+        "ssri"
+      ]
+    },
+    {
+      "rxcui": "4493",
+      "displayName": "Fluoxetine",
+      "ingredientRxcui": "4493",
+      "ingredientName": "Fluoxetine",
+      "synonyms": [
+        "Prozac",
+        "fluoxetine",
+        "Symbyax",
+        "RECONCILE"
+      ],
+      "classIds": [
+        "ssri"
+      ]
+    },
+    {
+      "rxcui": "321988",
+      "displayName": "Escitalopram",
+      "ingredientRxcui": "321988",
+      "ingredientName": "Escitalopram",
+      "synonyms": [
+        "Lexapro",
+        "escitalopram"
+      ],
+      "classIds": [
+        "ssri"
+      ]
+    },
+    {
+      "rxcui": "1040028",
+      "displayName": "Duloxetine",
+      "ingredientRxcui": "1040028",
+      "ingredientName": "Duloxetine",
+      "synonyms": [
+        "Cymbalta",
+        "duloxetine",
+        "lurasidone",
+        "Latuda"
+      ],
+      "classIds": [
+        "snri"
+      ]
+    },
+    {
+      "rxcui": "39786",
+      "displayName": "Venlafaxine",
+      "ingredientRxcui": "39786",
+      "ingredientName": "Venlafaxine",
+      "synonyms": [
+        "Effexor",
+        "venlafaxine"
+      ],
+      "classIds": [
+        "snri"
+      ]
+    },
+    {
+      "rxcui": "6470",
+      "displayName": "Lorazepam",
+      "ingredientRxcui": "6470",
+      "ingredientName": "Lorazepam",
+      "synonyms": [
+        "Ativan",
+        "lorazepam",
+        "Loreev"
+      ],
+      "classIds": [
+        "benzodiazepine"
+      ]
+    },
+    {
+      "rxcui": "2598",
+      "displayName": "Clonazepam",
+      "ingredientRxcui": "2598",
+      "ingredientName": "Clonazepam",
+      "synonyms": [
+        "Klonopin",
+        "clonazepam"
+      ],
+      "classIds": [
+        "benzodiazepine"
+      ]
+    },
+    {
+      "rxcui": "596",
+      "displayName": "Alprazolam",
+      "ingredientRxcui": "596",
+      "ingredientName": "Alprazolam",
+      "synonyms": [
+        "Xanax",
+        "alprazolam"
+      ],
+      "classIds": [
+        "benzodiazepine"
+      ]
+    },
+    {
+      "rxcui": "7804",
+      "displayName": "Oxycodone",
+      "ingredientRxcui": "7804",
+      "ingredientName": "Oxycodone",
+      "synonyms": [
+        "OxyContin",
+        "Percocet",
+        "oxycodone",
+        "Roxicodone",
+        "Endocet",
+        "Primlev",
+        "Oxaydo",
+        "Xtampza",
+        "Roxybond",
+        "Nalocet",
+        "Prolate"
+      ],
+      "classIds": [
+        "opioid"
+      ]
+    },
+    {
+      "rxcui": "5489",
+      "displayName": "Hydrocodone",
+      "ingredientRxcui": "5489",
+      "ingredientName": "Hydrocodone",
+      "synonyms": [
+        "Vicodin",
+        "Norco",
+        "hydrocodone",
+        "Lortab",
+        "Hydromet",
+        "Ventuss",
+        "Vicoprofen",
+        "Hy-KXP",
+        "Hycet",
+        "Tussionex",
+        "Reprexain",
+        "Hycodan",
+        "Ibudone",
+        "Zohydro",
+        "Verdrocet",
+        "Hysingla",
+        "Obredon",
+        "Hycofenix"
+      ],
+      "classIds": [
+        "opioid"
+      ]
+    },
+    {
+      "rxcui": "7052",
+      "displayName": "Morphine",
+      "ingredientRxcui": "7052",
+      "ingredientName": "Morphine",
+      "synonyms": [
+        "MS Contin",
+        "morphine",
+        "Kadian",
+        "Duramorph",
+        "Infumorph",
+        "Mitigo"
+      ],
+      "classIds": [
+        "opioid"
+      ]
+    },
+    {
+      "rxcui": "10689",
+      "displayName": "Tramadol",
+      "ingredientRxcui": "10689",
+      "ingredientName": "Tramadol",
+      "synonyms": [
+        "Ultram",
+        "tramadol",
+        "Ultracet",
+        "ConZip",
+        "Qdolo",
+        "Seglentis"
+      ],
+      "classIds": [
+        "opioid"
+      ]
+    },
+    {
+      "rxcui": "25480",
+      "displayName": "Gabapentin",
+      "ingredientRxcui": "25480",
+      "ingredientName": "Gabapentin",
+      "synonyms": [
+        "Neurontin",
+        "gabapentin",
+        "Gabarone",
+        "Gralise",
+        "Horizant",
+        "Relgaabi"
+      ],
+      "classIds": [
+        "gabapentinoid"
+      ]
+    },
+    {
+      "rxcui": "187832",
+      "displayName": "Pregabalin",
+      "ingredientRxcui": "187832",
+      "ingredientName": "Pregabalin",
+      "synonyms": [
+        "Lyrica",
+        "pregabalin",
+        "Bonqat"
+      ],
+      "classIds": [
+        "gabapentinoid"
+      ]
+    },
+    {
+      "rxcui": "29046",
+      "displayName": "Lisinopril",
+      "ingredientRxcui": "29046",
+      "ingredientName": "Lisinopril",
+      "synonyms": [
+        "Prinivil",
+        "Zestril",
+        "lisinopril",
+        "Zestoretic",
+        "Qbrelis"
+      ],
+      "classIds": [
+        "ace-inhibitor"
+      ]
+    },
+    {
+      "rxcui": "6918",
+      "displayName": "Metoprolol",
+      "ingredientRxcui": "6918",
+      "ingredientName": "Metoprolol",
+      "synonyms": [
+        "Lopressor",
+        "Toprol",
+        "metoprolol",
+        "Lopressor HCT",
+        "Kapspargo"
+      ],
+      "classIds": [
+        "beta-blocker"
+      ]
+    },
+    {
+      "rxcui": "11289",
+      "displayName": "Warfarin",
+      "ingredientRxcui": "11289",
+      "ingredientName": "Warfarin",
+      "synonyms": [
+        "Coumadin",
+        "Jantoven",
+        "warfarin"
+      ],
+      "classIds": [
+        "anticoagulant"
+      ]
+    },
+    {
+      "rxcui": "1364430",
+      "displayName": "Apixaban",
+      "ingredientRxcui": "1364430",
+      "ingredientName": "Apixaban",
+      "synonyms": [
+        "Eliquis",
+        "apixaban"
+      ],
+      "classIds": [
+        "anticoagulant"
+      ]
+    },
+    {
+      "rxcui": "7646",
+      "displayName": "Omeprazole",
+      "ingredientRxcui": "7646",
+      "ingredientName": "Omeprazole",
+      "synonyms": [
+        "Prilosec",
+        "omeprazole",
+        "Zegerid Reformulated Aug 2006",
+        "UlcerGard",
+        "Yosprala",
+        "Talicia",
+        "Konvomep",
+        "Primeguard",
+        "Gastrobim"
+      ],
+      "classIds": [
+        "ppi"
+      ]
+    },
+    {
+      "rxcui": "6813",
+      "displayName": "Methocarbamol",
+      "ingredientRxcui": "6813",
+      "ingredientName": "Methocarbamol",
+      "synonyms": [
+        "Robaxin",
+        "methocarbamol",
+        "methadone",
+        "Methadose",
+        "Dolophine",
+        "Diskets"
+      ],
+      "classIds": [
+        "muscle-relaxant"
+      ]
+    },
+    {
+      "rxcui": "37418",
+      "displayName": "Sumatriptan",
+      "ingredientRxcui": "37418",
+      "ingredientName": "Sumatriptan",
+      "synonyms": [
+        "Imitrex",
+        "sumatriptan",
+        "Treximet",
+        "Zembrace",
+        "Onzetra",
+        "Tosymra"
+      ],
+      "classIds": [
+        "triptan"
+      ]
+    },
+    {
+      "rxcui": "352372",
+      "displayName": "Lisdexamfetamine",
+      "ingredientRxcui": "352372",
+      "ingredientName": "Lisdexamfetamine",
+      "synonyms": [
+        "Vyvanse",
+        "lisdexamfetamine",
+        "dexmethylphenidate",
+        "Focalin",
+        "Azstarys"
+      ],
+      "classIds": [
+        "stimulant"
+      ]
+    },
+    {
+      "rxcui": "203088",
+      "displayName": "Celecoxib",
+      "ingredientRxcui": "203088",
+      "ingredientName": "Celecoxib",
+      "synonyms": [
+        "Celebrex",
+        "celecoxib",
+        "ketoconazole 2 % Topical Cream",
+        "ketoconazole 20 MG/ML Topical Cream [Kuric]"
+      ],
+      "classIds": [
+        "nsaid"
+      ]
+    },
+    {
+      "rxcui": "32968",
+      "displayName": "Meloxicam",
+      "ingredientRxcui": "32968",
+      "ingredientName": "Meloxicam",
+      "synonyms": [
+        "Mobic",
+        "meloxicam",
+        "clopidogrel",
+        "Plavix"
+      ],
+      "classIds": [
+        "nsaid"
+      ]
+    },
+    {
+      "rxcui": "4337",
+      "displayName": "Fentanyl",
+      "ingredientRxcui": "4337",
+      "ingredientName": "Fentanyl",
+      "synonyms": [
+        "Duragesic",
+        "fentanyl",
+        "Actiq",
+        "Fentora",
+        "Abstral",
+        "Subsys",
+        "Ionsys"
+      ],
+      "classIds": [
+        "opioid"
+      ]
+    },
+    {
+      "rxcui": "7514",
+      "displayName": "Nortriptyline",
+      "ingredientRxcui": "7514",
+      "ingredientName": "Nortriptyline",
+      "synonyms": [
+        "Pamelor",
+        "nortriptyline",
+        "norethindrone",
+        "Aygestin",
+        "Combipatch",
+        "Femhrt",
+        "Jinteli",
+        "Jevantique",
+        "Fyavolv",
+        "Myfembree",
+        "Gallifrey"
+      ],
+      "classIds": [
+        "tca"
+      ]
+    },
+    {
+      "rxcui": "214182",
+      "displayName": "Acetaminophen-Hydrocodone",
+      "ingredientRxcui": "5489",
+      "ingredientName": "Hydrocodone",
+      "synonyms": [
+        "Norco",
+        "Vicodin",
+        "Lortab",
+        "acetaminophen-hydrocodone",
+        "hydrocodone",
+        "Hydromet",
+        "Ventuss",
+        "Vicoprofen",
+        "Hy-KXP",
+        "Hycet",
+        "Tussionex",
+        "Reprexain",
+        "Hycodan",
+        "Ibudone",
+        "Zohydro",
+        "Verdrocet",
+        "Hysingla",
+        "Obredon",
+        "Hycofenix"
+      ],
+      "classIds": [
+        "opioid"
+      ]
+    },
+    {
+      "rxcui": "214256",
+      "displayName": "Oxycodone-Acetaminophen",
+      "ingredientRxcui": "7804",
+      "ingredientName": "Oxycodone",
+      "synonyms": [
+        "Percocet",
+        "Endocet",
+        "oxycodone-acetaminophen",
+        "oxycodone",
+        "Oxycontin",
+        "Roxicodone",
+        "Primlev",
+        "Oxaydo",
+        "Xtampza",
+        "Roxybond",
+        "Nalocet",
+        "Prolate"
+      ],
+      "classIds": [
+        "opioid"
+      ]
+    },
+    {
+      "rxcui": "6902",
+      "displayName": "Methylphenidate",
+      "ingredientRxcui": "6902",
+      "ingredientName": "Methylphenidate",
+      "synonyms": [
+        "Ritalin",
+        "Concerta",
+        "methylphenidate",
+        "methylprednisolone",
+        "Depo-Medrol",
+        "Medrol",
+        "Solu-Medrol",
+        "HybriSil"
+      ],
+      "classIds": [
+        "stimulant"
+      ]
+    },
+    {
+      "rxcui": "861634",
+      "displayName": "Amphetamine-Dextroamphetamine",
+      "ingredientRxcui": "861634",
+      "ingredientName": "Amphetamine-Dextroamphetamine",
+      "synonyms": [
+        "Adderall",
+        "amphetamine-dextroamphetamine",
+        "pitavastatin",
+        "Livalo",
+        "Zypitamag",
+        "Nikita"
+      ],
+      "classIds": [
+        "stimulant"
+      ]
+    },
+    {
+      "rxcui": "42351",
+      "displayName": "Mirtazapine",
+      "ingredientRxcui": "42351",
+      "ingredientName": "Mirtazapine",
+      "synonyms": [
+        "Remeron",
+        "mirtazapine",
+        "lithium carbonate",
+        "Lithobid"
+      ],
+      "classIds": [
+        "atypical-antidepressant"
+      ]
+    },
+    {
+      "rxcui": "42347",
+      "displayName": "Bupropion",
+      "ingredientRxcui": "42347",
+      "ingredientName": "Bupropion",
+      "synonyms": [
+        "Wellbutrin",
+        "bupropion",
+        "Aplenzin",
+        "Forfivo",
+        "Contrave",
+        "Auvelity"
+      ],
+      "classIds": [
+        "atypical-antidepressant"
+      ]
+    },
+    {
+      "rxcui": "704",
+      "displayName": "Amitriptyline",
+      "ingredientRxcui": "704",
+      "ingredientName": "Amitriptyline",
+      "synonyms": [
+        "Elavil",
+        "amitriptyline"
+      ],
+      "classIds": [
+        "tca"
+      ]
+    },
+    {
+      "rxcui": "83367",
+      "displayName": "Atorvastatin",
+      "ingredientRxcui": "83367",
+      "ingredientName": "Atorvastatin",
+      "synonyms": [
+        "Lipitor",
+        "atorvastatin",
+        "Caduet",
+        "Atorvaliq"
+      ],
+      "classIds": [
+        "statin"
+      ]
+    },
+    {
+      "rxcui": "36567",
+      "displayName": "Simvastatin",
+      "ingredientRxcui": "36567",
+      "ingredientName": "Simvastatin",
+      "synonyms": [
+        "Zocor",
+        "simvastatin",
+        "Vytorin",
+        "Flolipid"
+      ],
+      "classIds": [
+        "statin"
+      ]
+    },
+    {
+      "rxcui": "301542",
+      "displayName": "Rosuvastatin",
+      "ingredientRxcui": "301542",
+      "ingredientName": "Rosuvastatin",
+      "synonyms": [
+        "Crestor",
+        "rosuvastatin",
+        "Ezallor",
+        "Roszet"
+      ],
+      "classIds": [
+        "statin"
+      ]
+    },
+    {
+      "rxcui": "1292",
+      "displayName": "Baclofen",
+      "ingredientRxcui": "1292",
+      "ingredientName": "Baclofen",
+      "synonyms": [
+        "Lioresal",
+        "baclofen",
+        "Gablofen",
+        "Ozobax",
+        "Lyvispah",
+        "Fleqsuvy"
+      ],
+      "classIds": [
+        "muscle-relaxant"
+      ]
+    },
+    {
+      "rxcui": "2194",
+      "displayName": "Cyclobenzaprine",
+      "ingredientRxcui": "2194",
+      "ingredientName": "Cyclobenzaprine",
+      "synonyms": [
+        "Flexeril",
+        "cyclobenzaprine",
+        "cefuroxime"
+      ],
+      "classIds": [
+        "muscle-relaxant"
+      ]
+    },
+    {
+      "rxcui": "57258",
+      "displayName": "Tizanidine",
+      "ingredientRxcui": "57258",
+      "ingredientName": "Tizanidine",
+      "synonyms": [
+        "Zanaflex",
+        "tizanidine",
+        "Ontralfy"
+      ],
+      "classIds": [
+        "muscle-relaxant"
+      ]
+    },
+    {
+      "rxcui": "3355",
+      "displayName": "Diclofenac",
+      "ingredientRxcui": "3355",
+      "ingredientName": "Diclofenac",
+      "synonyms": [
+        "Voltaren",
+        "diclofenac",
+        "Arthrotec",
+        "Flector",
+        "Cataflam",
+        "Zipsor",
+        "Cambia",
+        "Pennsaid",
+        "Surpass Anti-Inflammatory",
+        "Zorvolex",
+        "Licart",
+        "Aleve Arthritis Pain",
+        "Lofena",
+        "Trifena",
+        "Xiclo"
+      ],
+      "classIds": [
+        "nsaid"
+      ]
+    },
+    {
+      "rxcui": "2002",
+      "displayName": "Carbamazepine",
+      "ingredientRxcui": "2002",
+      "ingredientName": "Carbamazepine",
+      "synonyms": [
+        "Tegretol",
+        "carbamazepine",
+        "Epitol",
+        "Carbatrol",
+        "Equetro"
+      ],
+      "classIds": [
+        "anticonvulsant"
+      ]
+    },
+    {
+      "rxcui": "28439",
+      "displayName": "Lamotrigine",
+      "ingredientRxcui": "28439",
+      "ingredientName": "Lamotrigine",
+      "synonyms": [
+        "Lamictal",
+        "lamotrigine",
+        "Subvenite"
+      ],
+      "classIds": [
+        "anticonvulsant"
+      ]
+    },
+    {
+      "rxcui": "114477",
+      "displayName": "Levetiracetam",
+      "ingredientRxcui": "114477",
+      "ingredientName": "Levetiracetam",
+      "synonyms": [
+        "Keppra",
+        "levetiracetam",
+        "Elepsia",
+        "Roweepra",
+        "Spritam"
+      ],
+      "classIds": [
+        "anticonvulsant"
+      ]
+    },
+    {
+      "rxcui": "38404",
+      "displayName": "Topiramate",
+      "ingredientRxcui": "38404",
+      "ingredientName": "Topiramate",
+      "synonyms": [
+        "Topamax",
+        "topiramate",
+        "Qsymia",
+        "Trokendi",
+        "Qudexy",
+        "Eprontia"
+      ],
+      "classIds": [
+        "anticonvulsant"
+      ]
+    },
+    {
+      "rxcui": "6851",
+      "displayName": "Methotrexate",
+      "ingredientRxcui": "6851",
+      "ingredientName": "Methotrexate",
+      "synonyms": [
+        "Trexall",
+        "methotrexate",
+        "Otrexup",
+        "Rasuvo",
+        "Xatmep",
+        "Reditrex",
+        "Jylamvo"
+      ],
+      "classIds": [
+        "dmard"
+      ]
+    },
+    {
+      "rxcui": "5521",
+      "displayName": "Hydroxychloroquine",
+      "ingredientRxcui": "5521",
+      "ingredientName": "Hydroxychloroquine",
+      "synonyms": [
+        "Plaquenil",
+        "hydroxychloroquine",
+        "Sovuna"
+      ],
+      "classIds": [
+        "dmard"
+      ]
+    },
+    {
+      "rxcui": "6809",
+      "displayName": "Metformin",
+      "ingredientRxcui": "6809",
+      "ingredientName": "Metformin",
+      "synonyms": [
+        "Glucophage",
+        "metformin",
+        "Riomet",
+        "Actoplus Met",
+        "Glumetza",
+        "Kazano",
+        "Jentadueto",
+        "Kombiglyze",
+        "Janumet",
+        "Invokamet",
+        "Xigduo",
+        "Synjardy",
+        "Segluromet",
+        "Trijardy",
+        "Zituvimet"
+      ],
+      "classIds": [
+        "antidiabetic"
+      ]
+    },
+    {
+      "rxcui": "10582",
+      "displayName": "Levothyroxine",
+      "ingredientRxcui": "10582",
+      "ingredientName": "Levothyroxine",
+      "synonyms": [
+        "Synthroid",
+        "levothyroxine",
+        "Thyrolar",
+        "Euthyrox",
+        "Levo-T",
+        "Levoxyl",
+        "Unithroid",
+        "Tirosint",
+        "Thyro-Tabs",
+        "ThyroKare",
+        "Thyquidity",
+        "Ermeza",
+        "Thyrocryn"
+      ],
+      "classIds": [
+        "thyroid"
+      ]
+    },
+    {
+      "rxcui": "8640",
+      "displayName": "Prednisone",
+      "ingredientRxcui": "8640",
+      "ingredientName": "Prednisone",
+      "synonyms": [
+        "Deltasone",
+        "prednisone",
+        "Rayos"
+      ],
+      "classIds": [
+        "corticosteroid"
+      ]
+    },
+    {
+      "rxcui": "51272",
+      "displayName": "Quetiapine",
+      "ingredientRxcui": "51272",
+      "ingredientName": "Quetiapine",
+      "synonyms": [
+        "Seroquel",
+        "quetiapine"
+      ],
+      "classIds": [
+        "antipsychotic"
+      ]
+    },
+    {
+      "rxcui": "8787",
+      "displayName": "Propranolol",
+      "ingredientRxcui": "8787",
+      "ingredientName": "Propranolol",
+      "synonyms": [
+        "Inderal",
+        "propranolol",
+        "InnoPran",
+        "Hemangeol"
+      ],
+      "classIds": [
+        "beta-blocker"
+      ]
+    },
+    {
+      "rxcui": "20352",
+      "displayName": "Carvedilol",
+      "ingredientRxcui": "20352",
+      "ingredientName": "Carvedilol",
+      "synonyms": [
+        "Coreg",
+        "carvedilol"
+      ],
+      "classIds": [
+        "beta-blocker"
+      ]
+    }
+  ],
+  "ndcMap": {
+    "00006027731": "7804",
+    "00378018010": "25480",
+    "00573015070": "5640",
+    "00573015080": "5640",
+    "00904759180": "161",
+    "68180098101": "36437"
+  },
+  "classes": {
+    "nsaid": "Nonsteroidal anti-inflammatory drug (NSAID)",
+    "acetaminophen": "Acetaminophen",
+    "ssri": "Selective serotonin reuptake inhibitor (SSRI)",
+    "snri": "Serotonin-norepinephrine reuptake inhibitor (SNRI)",
+    "benzodiazepine": "Benzodiazepine",
+    "opioid": "Opioid analgesic",
+    "gabapentinoid": "Gabapentinoid",
+    "ace-inhibitor": "ACE inhibitor",
+    "beta-blocker": "Beta blocker",
+    "anticoagulant": "Anticoagulant",
+    "ppi": "Proton pump inhibitor (PPI)",
+    "muscle-relaxant": "Skeletal muscle relaxant",
+    "triptan": "Triptan",
+    "stimulant": "CNS stimulant",
+    "tca": "Tricyclic antidepressant (TCA)",
+    "atypical-antidepressant": "Atypical antidepressant",
+    "anticonvulsant": "Anticonvulsant",
+    "statin": "HMG-CoA reductase inhibitor (statin)",
+    "dmard": "Disease-modifying antirheumatic drug (DMARD)",
+    "antidiabetic": "Antidiabetic",
+    "thyroid": "Thyroid hormone",
+    "corticosteroid": "Corticosteroid",
+    "antipsychotic": "Antipsychotic"
+  }
+}

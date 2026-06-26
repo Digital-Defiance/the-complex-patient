@@ -273,6 +273,14 @@ if ( ! function_exists( 'register_rest_route' ) ) {
     }
 }
 
+// Stub of add_filter / add_action used by plugin bootstrap hooks.
+if ( ! function_exists( 'add_filter' ) ) {
+    function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 )
+    {
+        return true;
+    }
+}
+
 // Stub of add_action used to bind the controller to rest_api_init.
 if ( ! function_exists( 'add_action' ) ) {
     function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 )
@@ -283,6 +291,13 @@ if ( ! function_exists( 'add_action' ) ) {
 
         $GLOBALS['complex_patient_actions'][ $hook ][] = $callback;
 
+        return true;
+    }
+}
+
+if ( ! function_exists( 'add_shortcode' ) ) {
+    function add_shortcode( $tag, $callback )
+    {
         return true;
     }
 }
@@ -305,5 +320,65 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
     function wp_json_encode( $data, $options = 0, $depth = 512 )
     {
         return json_encode( $data, $options, $depth );
+    }
+}
+
+if ( ! function_exists( 'get_option' ) ) {
+    function get_option( $option, $default = false )
+    {
+        if ( $option === 'users_can_register' ) {
+            return $GLOBALS['complex_patient_users_can_register'] ?? true;
+        }
+
+        return $default;
+    }
+}
+
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+    function sanitize_text_field( $str )
+    {
+        return trim( (string) $str );
+    }
+}
+
+if ( ! function_exists( 'sanitize_user' ) ) {
+    function sanitize_user( $username, $strict = false )
+    {
+        return strtolower( (string) $username );
+    }
+}
+
+if ( ! function_exists( 'sanitize_email' ) ) {
+    function sanitize_email( $email )
+    {
+        return (string) $email;
+    }
+}
+
+if ( ! function_exists( 'is_email' ) ) {
+    function is_email( $email )
+    {
+        return str_contains( (string) $email, '@' );
+    }
+}
+
+if ( ! function_exists( 'username_exists' ) ) {
+    function username_exists( $username )
+    {
+        return in_array( (string) $username, $GLOBALS['complex_patient_taken_usernames'] ?? array(), true );
+    }
+}
+
+if ( ! function_exists( 'email_exists' ) ) {
+    function email_exists( $email )
+    {
+        return in_array( (string) $email, $GLOBALS['complex_patient_taken_emails'] ?? array(), true );
+    }
+}
+
+if ( ! function_exists( '__' ) ) {
+    function __( $text, $domain = null )
+    {
+        return $text;
     }
 }

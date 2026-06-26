@@ -22,6 +22,13 @@ expo/web-build/
 expo/**/dist/
 expo/ios/
 expo/android/
+expo/.ipa-run-cache/
+expo/build-*.ipa
+expo/build-*.aab
+expo/*.ipa
+expo/*.aab
+expo/*.apks
+expo/my_app.apks
 *.jks
 *.p8
 *.p12
@@ -33,6 +40,7 @@ expo/android/
 .env
 .env.local
 .env.*.local
+expo/.maestro/.env
 
 # IDE
 .vscode/

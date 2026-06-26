@@ -1,0 +1,8 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+- runFlow: ../subflows/bootstrap-session.yaml
+- runFlow: ../subflows/navigate-medication-add.yaml
+- assertVisible:
+    id: drug-naming-disclaimer
+- assertVisible:
+    text: "not medical advice"

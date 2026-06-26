@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'COMPLEX_PATIENT_VERSION', '0.0.3' );
+define( 'COMPLEX_PATIENT_VERSION', '0.0.4' );
 define( 'COMPLEX_PATIENT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'COMPLEX_PATIENT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -52,6 +52,7 @@ require_once COMPLEX_PATIENT_PLUGIN_DIR . 'src/Activation.php';
  */
 function complex_patient_activate(): void {
     \ComplexPatient\Activation::activate();
+    \ComplexPatient\Account\AccountPages::scheduleEnsurePages();
 }
 
 register_activation_hook( __FILE__, 'complex_patient_activate' );
@@ -72,6 +73,11 @@ add_action(
     },
     5
 );
+
+\ComplexPatient\Account\AccountBlocks::register();
+\ComplexPatient\Account\AccountRedirects::register();
+\ComplexPatient\Account\JetpackSsoIntegration::register();
+\ComplexPatient\Account\AccountPages::register();
 
 \ComplexPatient\Auth\AuthorizationHeaderBootstrap::register();
 

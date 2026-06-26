@@ -16,6 +16,10 @@ import { MedProductIcon } from '@complex-patient/med-visuals';
 import { parseDosageString } from '../../dosage-units';
 import { useAppHost } from '../../app-host';
 import { usePartition } from '../../hooks';
+import { DRUG_NAMING_ASSIST_ENABLED } from '@complex-patient/drug-naming';
+import { DrugNamingDisclaimer } from './DrugNamingDisclaimer';
+import { MedicationNamingNotices } from './MedicationNamingNotices';
+import { MedicationRxLabel } from './MedicationRxLabel';
 
 export interface MedicationsTodayScreenProps {
   onBack?: () => void;
@@ -116,6 +120,9 @@ function MedicationsTodayInner({
         </Text>
       )}
 
+      {DRUG_NAMING_ASSIST_ENABLED ? <DrugNamingDisclaimer /> : null}
+      {DRUG_NAMING_ASSIST_ENABLED ? <MedicationNamingNotices medications={medications} /> : null}
+
       {queue.scheduled.length === 0 ? (
         <Text style={styles.empty} testID="medications-today-empty">
           No scheduled doses today. Check your cabinet schedules or log a PRN dose.
@@ -140,6 +147,7 @@ function MedicationsTodayInner({
                     {dose.drugName}
                     {dose.regimenLabel ? ` (${dose.regimenLabel})` : ''}
                   </Text>
+                  {med ? <MedicationRxLabel medication={med} testID={`today-rx-${med.id}`} /> : null}
                   <Text style={styles.doseMeta}>
                     {dose.timeLabel} · {dose.dosageLabel} · {dose.status}
                   </Text>

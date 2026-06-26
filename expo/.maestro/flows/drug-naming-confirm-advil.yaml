@@ -1,0 +1,11 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+- runFlow: ../subflows/bootstrap-session.yaml
+- runFlow: ../subflows/navigate-medication-add.yaml
+- assertVisible:
+    id: drug-naming-disclaimer
+- runFlow: ../subflows/enter-drug-name.yaml
+- runFlow: ../subflows/confirm-rx-match.yaml
+- runFlow: ../subflows/fill-dosage-and-save.yaml
+- assertVisible:
+    text: "Stored as: Ibuprofen"

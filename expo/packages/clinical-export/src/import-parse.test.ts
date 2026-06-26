@@ -4,9 +4,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { makeTestMedicationProfile } from '@complex-patient/domain';
+import { DOMAIN_EXTENSION_URL } from './constants';
 import { buildFhirBundle } from './fhir';
 import { parseFhirBundleToSource, parsedImportRecordCount } from './import-parse';
-import type { ClinicalExportSource } from './types';
+import type { ClinicalExportSource, FhirBundle } from './types';
 
 const sampleSource: ClinicalExportSource = {
   medications: [
@@ -78,4 +79,110 @@ describe('parseFhirBundleToSource', () => {
     expect(parsed.source.associations[0]).toMatchObject(sampleSource.associations[0]);
     expect(parsed.warnings).toHaveLength(0);
   });
+
+  it('round-trips confirmed RxNorm identity fields', () => {
+    const rxSource: ClinicalExportSource = {
+      ...sampleSource,
+      medications: [
+        makeTestMedicationProfile({
+          id: 'med-rx',
+          op_timestamp: '2026-06-01T10:00:00.000Z',
+          drugName: 'Advil',
+          rxDisplayName: 'Ibuprofen',
+          rxcui: '5640',
+          ingredientRxcui: '5640',
+          userConfirmedRxMatch: true,
+          rxMatchConfidence: 0.91,
+          rxnormDatasetVersion: 'seed-2026',
+          dosage: '200mg',
+          form: 'tablet',
+          schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+        }),
+      ],
+    };
+
+    const bundle = buildFhirBundle(rxSource, '2026-06-14T00:00:00.000Z');
+    const parsed = parseFhirBundleToSource(bundle);
+
+    expect(parsed.status).toBe('ok');
+    if (parsed.status !== 'ok') return;
+
+    expect(parsed.source.medications[0]).toMatchObject({
+      id: 'med-rx',
+      drugName: 'Advil',
+      rxDisplayName: 'Ibuprofen',
+      rxcui: '5640',
+      ingredientRxcui: '5640',
+      userConfirmedRxMatch: true,
+      rxnormDatasetVersion: 'seed-2026',
+    });
+  });
+
+  it('restores rxcui from RxNorm coding when domain extension lacks rx fields', () => {
+    const rxSource: ClinicalExportSource = {
+      ...sampleSource,
+      medications: [
+        makeTestMedicationProfile({
+          id: 'med-coding-only',
+          op_timestamp: '2026-06-01T10:00:00.000Z',
+          drugName: 'Advil',
+          rxDisplayName: 'Ibuprofen',
+          rxcui: '5640',
+          userConfirmedRxMatch: true,
+          dosage: '200mg',
+          form: 'tablet',
+          schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+        }),
+      ],
+    };
+
+    const bundle = buildFhirBundle(rxSource, '2026-06-14T00:00:00.000Z');
+    const codingOnlyBundle = stripMedicationRxFromDomainExtension(bundle);
+
+    const parsed = parseFhirBundleToSource(codingOnlyBundle);
+    expect(parsed.status).toBe('ok');
+    if (parsed.status !== 'ok') return;
+
+    expect(parsed.source.medications[0]).toMatchObject({
+      id: 'med-coding-only',
+      drugName: 'Advil',
+      rxcui: '5640',
+      rxDisplayName: 'Ibuprofen',
+      userConfirmedRxMatch: true,
+    });
+  });
 });
+
+function stripMedicationRxFromDomainExtension(bundle: FhirBundle): FhirBundle {
+  return {
+    ...bundle,
+    entry: bundle.entry.map((entry) => {
+      const resource = entry.resource;
+      if (resource.resourceType !== 'MedicationStatement') {
+        return entry;
+      }
+
+      const extensions = [...(resource.extension as Array<{ url?: string; valueString?: string }> ?? [])];
+      const domainExt = extensions.find((ext) => ext.url === DOMAIN_EXTENSION_URL);
+      if (domainExt?.valueString) {
+        const domain = JSON.parse(domainExt.valueString) as Record<string, unknown>;
+        delete domain.rxcui;
+        delete domain.ingredientRxcui;
+        delete domain.rxDisplayName;
+        delete domain.rxMatchConfidence;
+        delete domain.userConfirmedRxMatch;
+        delete domain.rxnormDatasetVersion;
+        delete domain.rxAnnotation;
+        domainExt.valueString = JSON.stringify(domain);
+      }
+
+      return {
+        ...entry,
+        resource: {
+          ...resource,
+          extension: extensions,
+        },
+      };
+    }),
+  };
+}

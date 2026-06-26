@@ -12,6 +12,7 @@ import type {
   SymptomEntry,
 } from '@complex-patient/domain';
 import { summarizeMedicationDosage, summarizeMedicationForm } from '@complex-patient/domain';
+import { formatMedicationExportLabel, formatMedicationRxAnnotation } from '@complex-patient/drug-naming';
 import type { ClinicalExportSource } from './types';
 import { filterActive } from './partition';
 import { EXPORT_JSON_FILENAME } from './types';
@@ -53,8 +54,13 @@ function formatDuration(symptom: SymptomEntry): string {
 }
 
 function medicationLine(med: MedicationProfile): string {
-  const base = `**${mdCell(med.drugName)}** — ${mdCell(summarizeMedicationDosage(med))}, ${mdCell(summarizeMedicationForm(med))}`;
+  const label = formatMedicationExportLabel(med);
+  const base = `**${mdCell(label)}** — ${mdCell(summarizeMedicationDosage(med))}, ${mdCell(summarizeMedicationForm(med))}`;
   const extras: string[] = [];
+  const rxNote = formatMedicationRxAnnotation(med);
+  if (rxNote) {
+    extras.push(rxNote);
+  }
   if (med.notes?.trim()) {
     extras.push(mdCell(med.notes.trim()));
   }

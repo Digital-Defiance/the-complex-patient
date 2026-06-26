@@ -17,6 +17,7 @@
     "@complex-patient/clinical-export": "workspace:*",
     "@complex-patient/crypto-engine": "workspace:*",
     "@complex-patient/domain": "workspace:*",
+    "@complex-patient/drug-naming": "workspace:*",
     "@complex-patient/key-store": "workspace:*",
     "@complex-patient/local-vault": "workspace:*",
     "@complex-patient/med-visuals": "workspace:*",

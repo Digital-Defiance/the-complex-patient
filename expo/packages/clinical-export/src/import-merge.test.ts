@@ -84,6 +84,53 @@ describe('prepareClinicalImportMerge', () => {
       'med-local',
     ]);
   });
+
+  it('preserves RxNorm identity when merging imported medications', () => {
+    const exportSource: ClinicalExportSource = {
+      medications: [
+        makeTestMedicationProfile({
+          id: 'med-rx',
+          op_timestamp: '2026-06-04T00:00:00.000Z',
+          drugName: 'Advil',
+          rxDisplayName: 'Ibuprofen',
+          rxcui: '5640',
+          ingredientRxcui: '5640',
+          userConfirmedRxMatch: true,
+          rxnormDatasetVersion: 'seed-2026',
+          dosage: '200mg',
+          form: 'tablet',
+          schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+        }),
+      ],
+      prnLogs: [],
+      symptoms: [],
+      conditions: [],
+      flares: [],
+      associations: [],
+    };
+
+    const bundle = buildFhirBundle(exportSource, '2026-06-14T00:00:00.000Z');
+    const parsed = parseFhirBundleToSource(bundle);
+    expect(parsed.status).toBe('ok');
+    if (parsed.status !== 'ok') return;
+
+    const prepared = prepareClinicalImportMerge(parsed.source, {
+      medications: [],
+      prnLogs: [],
+      symptoms: [],
+      conditions: [],
+      flares: [],
+      associations: [],
+    });
+
+    const imported = prepared.partitions.medications.records.find((record) => record.id === 'med-rx');
+    expect(imported).toMatchObject({
+      drugName: 'Advil',
+      rxDisplayName: 'Ibuprofen',
+      rxcui: '5640',
+      userConfirmedRxMatch: true,
+    });
+  });
 });
 
 describe('applyClinicalImportMerge', () => {

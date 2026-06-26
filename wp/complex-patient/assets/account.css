@@ -1,0 +1,272 @@
+.cp-account {
+  --cp-account-accent: #0066cc;
+  --cp-account-bg: #ffffff;
+  --cp-account-border: #d8dee9;
+  --cp-account-text: #1a1a1a;
+  --cp-account-muted: #5b6472;
+  --cp-account-radius: 14px;
+  --cp-account-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+  color: var(--cp-account-text);
+  font-family: inherit;
+  line-height: 1.5;
+  margin: 2rem auto;
+  max-width: 560px;
+  padding: 0 1rem;
+}
+
+.cp-account__card {
+  background: var(--cp-account-bg);
+  border: 1px solid var(--cp-account-border);
+  border-radius: var(--cp-account-radius);
+  box-shadow: var(--cp-account-shadow);
+  color: var(--cp-account-text);
+  padding: 2rem;
+}
+
+.cp-account__card :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--cp-account-text);
+}
+
+.cp-account__title {
+  color: var(--cp-account-text);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 0.75rem;
+}
+
+.cp-account__lede {
+  color: var(--cp-account-muted);
+  margin: 0 0 1.5rem;
+}
+
+.cp-account__meta,
+.cp-account__hint,
+.cp-account__help,
+.cp-account__checkbox-help {
+  color: var(--cp-account-muted);
+  font-size: 0.95rem;
+}
+
+.cp-account__form {
+  display: grid;
+  gap: 1rem;
+}
+
+.cp-account__field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.cp-account__label {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.cp-account__field input[type="text"],
+.cp-account__field input[type="email"],
+.cp-account__field input[type="password"] {
+  border: 1px solid var(--cp-account-border);
+  border-radius: 10px;
+  font-size: 1rem;
+  padding: 0.8rem 0.9rem;
+  width: 100%;
+}
+
+.cp-account__checkbox {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.cp-account__checkbox input {
+  margin-top: 0.2rem;
+}
+
+.cp-account__checkbox-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.cp-account__checkbox-label {
+  line-height: 1.5;
+}
+
+.cp-account__link,
+.cp-account__footer a,
+.cp-account__card a:not(.cp-account__button) {
+  color: var(--cp-account-accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+.cp-account__link:hover,
+.cp-account__footer a:hover,
+.cp-account__card a:not(.cp-account__button):hover {
+  color: #004999;
+}
+
+.cp-account__button {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 1rem;
+  font-weight: 600;
+  justify-content: center;
+  padding: 0.85rem 1.25rem;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.cp-account__button--primary,
+.cp-account__button:not(.cp-account__button--secondary):not(.cp-account__button--danger):not(.cp-account__button--wpcom) {
+  background: var(--cp-account-accent);
+  color: #fff;
+}
+
+.cp-account__button--secondary {
+  background: transparent;
+  border-color: var(--cp-account-border);
+  color: var(--cp-account-text);
+}
+
+.cp-account__button--wpcom {
+  background: #3858e9;
+  color: #fff;
+  width: 100%;
+}
+
+.cp-account__button--danger {
+  background: #fff;
+  border-color: #d63638;
+  color: #b32d2e;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.8rem;
+}
+
+.cp-account__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.cp-account__divider {
+  align-items: center;
+  color: var(--cp-account-muted);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr auto 1fr;
+  margin: 1.5rem 0 1rem;
+  text-transform: uppercase;
+}
+
+.cp-account__divider::before,
+.cp-account__divider::after {
+  background: var(--cp-account-border);
+  content: "";
+  height: 1px;
+}
+
+.cp-account__footer {
+  color: var(--cp-account-muted);
+  margin-top: 1.25rem;
+  text-align: center;
+}
+
+.cp-account__message {
+  border-radius: 10px;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+}
+
+.cp-account__message--error {
+  background: #fff1f0;
+  color: #8a1f17;
+}
+
+.cp-account__message--success {
+  background: #edf9f0;
+  color: #1f6b3b;
+}
+
+.cp-account__field-error {
+  color: #b32d2e;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.cp-account__readonly {
+  background: #f7f9fc;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+
+.cp-account__readonly p {
+  margin: 0.25rem 0;
+}
+
+.cp-account__success {
+  background: #f3f8ff;
+  border: 1px solid #c7ddff;
+  border-radius: 12px;
+  margin: 1rem 0;
+  padding: 1rem;
+}
+
+.cp-account__success h3 {
+  margin: 0 0 0.5rem;
+}
+
+.cp-account__secret {
+  background: #0f172a;
+  border-radius: 10px;
+  color: #f8fafc;
+  display: block;
+  font-size: 1rem;
+  margin: 0.75rem 0;
+  overflow-wrap: anywhere;
+  padding: 0.9rem 1rem;
+  word-break: break-all;
+}
+
+.cp-account__table {
+  border-collapse: collapse;
+  margin-top: 1.5rem;
+  width: 100%;
+}
+
+.cp-account__table th,
+.cp-account__table td {
+  border-bottom: 1px solid var(--cp-account-border);
+  color: var(--cp-account-text);
+  padding: 0.75rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.cp-account__inline-form {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .cp-account__card {
+    padding: 1.25rem;
+  }
+
+  .cp-account__actions {
+    flex-direction: column;
+  }
+
+  .cp-account__button {
+    width: 100%;
+  }
+
+  .cp-account__table th:nth-child(3),
+  .cp-account__table td:nth-child(3) {
+    display: none;
+  }
+}

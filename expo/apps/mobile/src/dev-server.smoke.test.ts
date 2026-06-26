@@ -13,6 +13,9 @@ import { resolve } from 'path';
 
 const WORKSPACE_ROOT = resolve(__dirname, '../../..');
 const STARTUP_TIMEOUT_MS = 60_000;
+const DEV_SERVER_PORT =
+  32_100 + (Number(process.env.VITEST_POOL_ID ?? '0') % 100) * 10 + (process.pid % 7);
+const DEV_SERVER_WEB_PORT = DEV_SERVER_PORT + 1;
 
 /**
  * Spawns an Expo dev server process and collects output until a condition is met
@@ -141,7 +144,7 @@ describe('Development Server Smoke Tests', () => {
   it(
     'yarn expo start reaches a running state and prints a reachable URL without SDK version error (Requirement 1.4)',
     async () => {
-      const output = await spawnAndWait(['start'], {
+      const output = await spawnAndWait(['start', '--port', String(DEV_SERVER_PORT)], {
         resolveWhen: (acc) => SERVER_URL_PATTERN.test(acc),
         rejectWhen: (acc) => {
           if (SDK_ERROR_PATTERN.test(acc)) {
@@ -163,7 +166,7 @@ describe('Development Server Smoke Tests', () => {
   it(
     'yarn expo start --web serves on localhost (secure context) (Requirement 4.6)',
     async () => {
-      const output = await spawnAndWait(['start', '--web'], {
+      const output = await spawnAndWait(['start', '--web', '--port', String(DEV_SERVER_WEB_PORT)], {
         resolveWhen: (acc) => {
           // Expo web dev server outputs something like "Metro waiting on http://localhost:8081"
           // or the webpack/metro bundler URL for web

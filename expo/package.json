@@ -19,7 +19,8 @@
     "packages/symptom-journal",
     "packages/clinical-export",
     "packages/weather",
-    "packages/med-visuals"
+    "packages/med-visuals",
+    "packages/drug-naming"
   ],
   "scripts": {
     "eas-build-pre-install": "corepack enable",
@@ -43,6 +44,15 @@
     "build:local": "yarn build:ios:local && yarn build:android:local",
     "build:local-rev": "yarn build:android:local && yarn build:ios:local",
     "build:clean": "rm -rf android ios && npx expo prebuild --clean",
+    "build:rxnorm-db": "node scripts/build-rxnorm-db.mjs",
+    "import:rxnorm-csv": "node scripts/rxnorm-import-csv.mjs",
+    "rxnorm:rrf-to-csv": "node scripts/rxnorm-rrf-to-csv.mjs",
+    "rxnorm:build-from-rrf": "node scripts/rxnorm-rrf-to-csv.mjs && node scripts/rxnorm-import-csv.mjs --dir ../../thecomplexpatient.com/rxnorm/export-csv --output ./tmp/rxnorm-catalog.json --version rxnorm-06012026 && node scripts/build-rxnorm-db.mjs --input ./tmp/rxnorm-catalog.json",
+    "test:drug-naming": "vitest run packages/drug-naming packages/ui/src/app-shell/medications-ui.rx.test.ts packages/ui/src/app-shell/drug-naming-qa.integration.test.ts packages/ui/src/app-shell/screens/medications/MedProductCodeScanner.test.ts packages/clinical-export/src/clinical-export.test.ts packages/clinical-export/src/import-parse.test.ts packages/clinical-export/src/import-merge.test.ts packages/medications/src/engine.test.ts packages/insights/src/report.test.ts",
+    "test:maestro": "bash scripts/maestro-test.sh",
+    "test:maestro:smoke": "bash scripts/maestro-test.sh .maestro/flows/smoke-unlock-home.yaml",
+    "maestro:provision": "bash scripts/maestro-provision-wp-user.sh",
+    "maestro:verify": "bash scripts/maestro-provision-wp-user.sh --verify-only",
     "android": "expo run:android",
     "ios": "expo run:ios"
   },

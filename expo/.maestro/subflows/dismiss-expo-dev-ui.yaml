@@ -1,0 +1,34 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+# Expo dev client first-launch sheet ("This is the developer menu…" + Continue).
+- runFlow:
+    when:
+      visible: "This is the developer menu"
+    commands:
+      - tapOn: "Continue"
+      - waitForAnimationToEnd
+
+# Dev launcher stuck on Metro URL picker instead of the app.
+- runFlow:
+    when:
+      visible: "http://.*"
+    commands:
+      - tapOn: "http://.*"
+      - waitForAnimationToEnd
+
+# Dev tools drawer open over the app (auto-launch or accidental open).
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - swipe:
+          direction: DOWN
+      - waitForAnimationToEnd
+
+# Onboarding can appear after picking a dev server URL.
+- runFlow:
+    when:
+      visible: "This is the developer menu"
+    commands:
+      - tapOn: "Continue"
+      - waitForAnimationToEnd

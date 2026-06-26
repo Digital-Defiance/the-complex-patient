@@ -1,0 +1,15 @@
+appId: org.digitaldefiance.com.complexpatient
+env:
+  MAESTRO_DRUG_NAME: "Unknown herb blend"
+---
+- runFlow: ../subflows/bootstrap-session.yaml
+- runFlow: ../subflows/navigate-medication-add.yaml
+- runFlow:
+    file: ../subflows/enter-drug-name.yaml
+    env:
+      MAESTRO_DRUG_NAME: "Unknown herb blend"
+- runFlow: ../subflows/fill-dosage-and-save.yaml
+- assertVisible:
+    text: "Unknown herb blend"
+- assertNotVisible:
+    text: "Stored as:"

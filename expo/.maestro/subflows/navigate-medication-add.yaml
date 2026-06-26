@@ -1,0 +1,14 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+- tapOn:
+    id: home-nav-medications
+- extendedWaitUntil:
+    visible:
+      id: medications-add
+    timeout: 15000
+- tapOn:
+    id: medications-add
+- extendedWaitUntil:
+    visible:
+      id: med-drug-name
+    timeout: 15000

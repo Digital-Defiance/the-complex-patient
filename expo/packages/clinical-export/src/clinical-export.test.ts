@@ -14,7 +14,9 @@ import {
   serializeFhirJson,
   buildClinicalSummaryMarkdown,
   type ClinicalExportSource,
+  parseFhirBundleToSource,
 } from './index';
+import { DOMAIN_EXTENSION_URL } from './constants';
 
 const sampleSource: ClinicalExportSource = {
   medications: [
@@ -99,6 +101,80 @@ describe('buildFhirBundle', () => {
 
     const ids = bundle.entry.map((entry) => entry.resource.id);
     expect(ids).not.toContain('cond-deleted');
+  });
+
+  it('includes RxNorm coding on user-confirmed medication matches', () => {
+    const source: ClinicalExportSource = {
+      ...sampleSource,
+      medications: [
+        makeTestMedicationProfile({
+          id: 'med-rx',
+          op_timestamp: '2026-06-01T10:00:00.000Z',
+          drugName: 'Advil',
+          rxDisplayName: 'Ibuprofen',
+          rxcui: '5640',
+          ingredientRxcui: '5640',
+          userConfirmedRxMatch: true,
+          rxnormDatasetVersion: 'seed-2026',
+          dosage: '200mg',
+          form: 'tablet',
+          schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+        }),
+      ],
+    };
+
+    const bundle = buildFhirBundle(source, '2026-06-14T00:00:00.000Z');
+    const medEntry = bundle.entry.find(
+      (entry) => entry.resource.resourceType === 'MedicationStatement',
+    );
+    expect(medEntry).toBeDefined();
+
+    const concept = medEntry!.resource.medicationCodeableConcept as {
+      text?: string;
+      coding?: Array<{ system?: string; code?: string; display?: string }>;
+    };
+    expect(concept.text).toContain('Advil (naming database: Ibuprofen)');
+    expect(concept.coding).toEqual([
+      {
+        system: 'http://www.nlm.nih.gov/research/umls/rxnorm',
+        code: '5640',
+        display: 'Ibuprofen',
+      },
+    ]);
+
+    const extensionPayload = JSON.parse(
+      (
+        medEntry!.resource.extension as Array<{ url: string; valueString?: string }>
+      ).find((ext) => ext.url === DOMAIN_EXTENSION_URL)!.valueString!,
+    );
+    expect(extensionPayload.rxAnnotation).toContain('RxCUI 5640');
+  });
+
+  it('omits RxNorm coding when the match is not user-confirmed', () => {
+    const source: ClinicalExportSource = {
+      ...sampleSource,
+      medications: [
+        makeTestMedicationProfile({
+          id: 'med-unconfirmed',
+          drugName: 'Advil',
+          rxcui: '5640',
+          rxDisplayName: 'Ibuprofen',
+          userConfirmedRxMatch: false,
+        }),
+      ],
+    };
+
+    const bundle = buildFhirBundle(source, '2026-06-14T00:00:00.000Z');
+    const medEntry = bundle.entry.find(
+      (entry) => entry.resource.resourceType === 'MedicationStatement',
+    );
+    const concept = medEntry!.resource.medicationCodeableConcept as {
+      coding?: unknown;
+      text?: string;
+    };
+    expect(concept.coding).toBeUndefined();
+    expect(concept.text).toContain('Advil');
+    expect(concept.text).not.toContain('naming database');
   });
 });
 
@@ -197,5 +273,63 @@ describe('createClinicalExport', () => {
     expect(stages).toContain('serializing');
     expect(stages).toContain('encrypting');
     expect(stages.at(-1)).toBe('encrypting');
+  });
+
+  it('preserves RxNorm coding through zip export and re-import', async () => {
+    const rxSource: ClinicalExportSource = {
+      ...sampleSource,
+      medications: [
+        makeTestMedicationProfile({
+          id: 'med-rx',
+          op_timestamp: '2026-06-01T10:00:00.000Z',
+          drugName: 'Advil',
+          rxDisplayName: 'Ibuprofen',
+          rxcui: '5640',
+          ingredientRxcui: '5640',
+          userConfirmedRxMatch: true,
+          rxnormDatasetVersion: 'seed-2026',
+          dosage: '200mg',
+          form: 'tablet',
+          schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+        }),
+      ],
+    };
+
+    const result = await createClinicalExport({
+      source: rxSource,
+      zipPassword: 'test-export-password',
+      exportedAt: '2026-06-14T00:00:00.000Z',
+    });
+
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+
+    expect(result.markdown).toContain('Advil (naming database: Ibuprofen)');
+    expect(result.markdown).toContain('RxCUI 5640');
+
+    const reader = new ZipReader(new BlobReader(new Blob([result.zipBytes])));
+    const entries = await reader.getEntries();
+    const jsonEntry = entries.find((entry) => entry.filename === EXPORT_JSON_FILENAME);
+    expect(jsonEntry?.getData).toBeDefined();
+    if (!jsonEntry?.getData) return;
+
+    const extractedJson = await jsonEntry.getData(new TextWriter(), {
+      password: 'test-export-password',
+    });
+    expect(extractedJson).toContain('"system":"http://www.nlm.nih.gov/research/umls/rxnorm"');
+    expect(extractedJson).toContain('"code":"5640"');
+
+    const bundle = JSON.parse(extractedJson);
+    const reimported = parseFhirBundleToSource(bundle);
+    expect(reimported.status).toBe('ok');
+    if (reimported.status !== 'ok') return;
+
+    expect(reimported.source.medications[0]).toMatchObject({
+      drugName: 'Advil',
+      rxDisplayName: 'Ibuprofen',
+      rxcui: '5640',
+      userConfirmedRxMatch: true,
+    });
+    await reader.close();
   });
 });

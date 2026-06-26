@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { makeTestMedicationProfile } from '@complex-patient/domain';
 import { buildClinicalSummaryMarkdown } from './clinical-summary';
 import type { ClinicalExportSource } from './types';
 
@@ -79,5 +80,37 @@ describe('buildClinicalSummaryMarkdown', () => {
     expect(markdown).toContain('_No conditions recorded._');
     expect(markdown).toContain('_No active medications recorded._');
     expect(markdown).toContain('_No symptoms or flare-ups recorded._');
+  });
+
+  it('includes confirmed generic names and RxNorm annotation in medication lines', () => {
+    const markdown = buildClinicalSummaryMarkdown(
+      {
+        medications: [
+          makeTestMedicationProfile({
+            id: 'med-1',
+            op_timestamp: '2026-06-21T12:00:00.000Z',
+            drugName: 'Advil',
+            rxDisplayName: 'Ibuprofen',
+            rxcui: '5640',
+            ingredientRxcui: '5640',
+            userConfirmedRxMatch: true,
+            rxnormDatasetVersion: 'seed-2026',
+            dosage: '200mg',
+            form: 'tablet',
+            schedule: { kind: 'weekly', daysOfWeek: ['MON'], times: ['08:00'] },
+          }),
+        ],
+        prnLogs: [],
+        symptoms: [],
+        conditions: [],
+        flares: [],
+        associations: [],
+      },
+      '2026-06-21T12:00:00.000Z',
+    );
+
+    expect(markdown).toContain('**Advil (naming database: Ibuprofen)**');
+    expect(markdown).toContain('RxCUI 5640');
+    expect(markdown).toContain('dataset seed-2026');
   });
 });

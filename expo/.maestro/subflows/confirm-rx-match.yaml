@@ -1,0 +1,14 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+- extendedWaitUntil:
+    visible:
+      id: rx-match-confirm
+    timeout: 15000
+- tapOn:
+    id: rx-match-confirm-yes
+- extendedWaitUntil:
+    visible:
+      id: rx-match-confirm-confirmed
+    timeout: 10000
+- assertVisible:
+    text: "Stored as: Ibuprofen"

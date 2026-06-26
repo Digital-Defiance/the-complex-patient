@@ -20,6 +20,10 @@ import { MedProductIcon } from '@complex-patient/med-visuals';
 import { parseDosageString } from '../dosage-units';
 import { useAppHost } from '../app-host';
 import { usePartition } from '../hooks';
+import { DRUG_NAMING_ASSIST_ENABLED } from '@complex-patient/drug-naming';
+import { DrugNamingDisclaimer } from './medications/DrugNamingDisclaimer';
+import { MedicationNamingNotices } from './medications/MedicationNamingNotices';
+import { MedicationRxLabel } from './medications/MedicationRxLabel';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -209,6 +213,9 @@ function MedicationsScreenInner({ home, onNavigatePrn, onAdd, onEditMedication, 
         </Text>
       )}
 
+      {DRUG_NAMING_ASSIST_ENABLED ? <DrugNamingDisclaimer /> : null}
+      {DRUG_NAMING_ASSIST_ENABLED ? <MedicationNamingNotices medications={medications} /> : null}
+
       {/* Render the adaptive view blocks in exact order (Requirements 9.1, 9.2) */}
       {polyView.layout === 'flat' ? (
         <FlatMedicationList
@@ -397,6 +404,7 @@ function MedicationRow({ medication, editing, onEdit, onEditMedication, onSave, 
         <Text style={styles.drugName} testID={`med-name-${medication.id}`}>
           {medication.drugName}
         </Text>
+        <MedicationRxLabel medication={medication} testID={`med-rx-label-${medication.id}`} />
         <Text style={styles.dosageText}>
           {summarizeMedicationDosage(medication)} — {summarizeMedicationForm(medication)}
         </Text>

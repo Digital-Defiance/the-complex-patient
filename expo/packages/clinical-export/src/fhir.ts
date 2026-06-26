@@ -13,6 +13,7 @@ import type {
   SymptomEntry,
 } from '@complex-patient/domain';
 import { summarizeMedicationDosage, summarizeMedicationForm } from '@complex-patient/domain';
+import { formatMedicationExportLabel, formatMedicationRxAnnotation } from '@complex-patient/drug-naming';
 import type { ClinicalExportSource, FhirBundle, FhirBundleEntry } from './types';
 import { filterActive } from './partition';
 import {
@@ -82,7 +83,18 @@ function buildMedicationStatement(med: MedicationProfile): Record<string, unknow
       status: med.active ? 'active' : 'completed',
       subject: patientReference(),
       medicationCodeableConcept: {
-        text: `${med.drugName} (${summarizeMedicationForm(med)}, ${summarizeMedicationDosage(med)})`,
+        text: `${formatMedicationExportLabel(med)} (${summarizeMedicationForm(med)}, ${summarizeMedicationDosage(med)})`,
+        ...(med.rxcui && med.userConfirmedRxMatch
+          ? {
+              coding: [
+                {
+                  system: 'http://www.nlm.nih.gov/research/umls/rxnorm',
+                  code: med.rxcui,
+                  display: med.rxDisplayName ?? med.drugName,
+                },
+              ],
+            }
+          : {}),
       },
       dosage: med.regimens.map((regimen) => ({
         text: regimen.label ? `${regimen.label}: ${regimen.dosage}` : regimen.dosage,
@@ -96,6 +108,12 @@ function buildMedicationStatement(med: MedicationProfile): Record<string, unknow
     {
       kind: 'medication',
       drugName: med.drugName,
+      rxDisplayName: med.rxDisplayName,
+      rxcui: med.rxcui,
+      ingredientRxcui: med.ingredientRxcui,
+      userConfirmedRxMatch: med.userConfirmedRxMatch,
+      rxnormDatasetVersion: med.rxnormDatasetVersion,
+      rxAnnotation: formatMedicationRxAnnotation(med),
       regimens: med.regimens,
       notes: med.notes,
       prescribingPhysician: med.prescribingPhysician,

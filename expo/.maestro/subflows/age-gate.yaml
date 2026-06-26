@@ -1,0 +1,18 @@
+appId: org.digitaldefiance.com.complexpatient
+env:
+  MAESTRO_BIRTH_MONTH: ${MAESTRO_BIRTH_MONTH || "6"}
+  MAESTRO_BIRTH_YEAR: ${MAESTRO_BIRTH_YEAR || "1990"}
+---
+- tapOn:
+    id: age-gate-birth-month
+- inputText: ${MAESTRO_BIRTH_MONTH}
+- tapOn:
+    id: age-gate-birth-year
+- inputText: ${MAESTRO_BIRTH_YEAR}
+- runFlow: tap-keyboard-done.yaml
+- tapOn:
+    id: age-gate-submit
+- extendedWaitUntil:
+    notVisible:
+      id: age-gate-screen
+    timeout: 30000

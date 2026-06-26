@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { DEFAULT_DOSAGE_UNIT, DOSAGE_UNITS, isPresetDosageUnit } from '../../dosage-units';
+import { keyboardDoneAccessoryProps } from '../../ios-keyboard-done-accessory';
 
 export interface DosageFieldProps {
   amount: string;
@@ -28,6 +29,7 @@ export function DosageField({
         keyboardType="decimal-pad"
         accessibilityLabel="Dosage amount"
         testID={`${testIDPrefix}-amount`}
+        {...keyboardDoneAccessoryProps()}
       />
       <UnitSelector value={unit} onChange={onUnitChange} testIDPrefix={`${testIDPrefix}-unit`} />
     </View>

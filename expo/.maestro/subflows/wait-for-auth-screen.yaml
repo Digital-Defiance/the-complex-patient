@@ -1,0 +1,7 @@
+appId: org.digitaldefiance.com.complexpatient
+---
+# enterHome() + router.replace after age gate can take a moment.
+- extendedWaitUntil:
+    visible:
+      id: sign-in-screen|unlock-screen
+    timeout: 60000
