@@ -108,22 +108,23 @@ final class ApplicationPasswordsBlock
             <?php if ( $passwords === array() ) : ?>
                 <p class="cp-account__hint"><?php esc_html_e( 'You have no application passwords yet.', 'complex-patient' ); ?></p>
             <?php else : ?>
+                <div class="cp-account__table-wrap">
                 <table class="cp-account__table">
                     <thead>
                         <tr>
-                            <th><?php esc_html_e( 'Name', 'complex-patient' ); ?></th>
-                            <th><?php esc_html_e( 'Created', 'complex-patient' ); ?></th>
-                            <th><?php esc_html_e( 'Last used', 'complex-patient' ); ?></th>
-                            <th></th>
+                            <th class="cp-account__table-col-name"><?php esc_html_e( 'Name', 'complex-patient' ); ?></th>
+                            <th class="cp-account__table-col-date"><?php esc_html_e( 'Created', 'complex-patient' ); ?></th>
+                            <th class="cp-account__table-col-date"><?php esc_html_e( 'Last used', 'complex-patient' ); ?></th>
+                            <th class="cp-account__table-col-actions"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'complex-patient' ); ?></span></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ( $passwords as $row ) : ?>
                             <tr>
-                                <td><?php echo esc_html( (string) ( $row['name'] ?? '' ) ); ?></td>
-                                <td><?php echo esc_html( self::formatDate( $row['created'] ?? '' ) ); ?></td>
-                                <td><?php echo esc_html( self::formatDate( $row['last_used'] ?? '' ) ); ?></td>
-                                <td>
+                                <td class="cp-account__table-col-name"><?php echo esc_html( (string) ( $row['name'] ?? '' ) ); ?></td>
+                                <td class="cp-account__table-col-date"><?php echo esc_html( self::formatDate( $row['created'] ?? '', false ) ); ?></td>
+                                <td class="cp-account__table-col-date"><?php echo esc_html( self::formatDate( $row['last_used'] ?? '', false ) ); ?></td>
+                                <td class="cp-account__table-col-actions">
                                     <form method="post" action="" class="cp-account__inline-form">
                                         <input type="hidden" name="complex_patient_action" value="<?php echo esc_attr( RegistrationService::ACTION_APP_PW . '_revoke' ); ?>" />
                                         <input type="hidden" name="app_password_uuid" value="<?php echo esc_attr( (string) ( $row['uuid'] ?? '' ) ); ?>" />
@@ -137,6 +138,7 @@ final class ApplicationPasswordsBlock
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+                </div>
             <?php endif; ?>
 
             <?php if ( $user ) : ?>
@@ -156,29 +158,32 @@ final class ApplicationPasswordsBlock
         return (string) ob_get_clean();
     }
 
-    private static function formatDate( $value ): string
+    private static function formatDate( $value, bool $includeTime = true ): string
     {
         if ( $value === null || $value === '' ) {
             return '—';
         }
 
+        $timestamp = null;
         if ( is_int( $value ) || is_float( $value ) ) {
-            return wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $value );
+            $timestamp = (int) $value;
+        } elseif ( is_string( $value ) && is_numeric( $value ) ) {
+            $timestamp = (int) $value;
+        } elseif ( is_string( $value ) ) {
+            $parsed = strtotime( $value );
+            if ( $parsed !== false ) {
+                $timestamp = $parsed;
+            }
         }
 
-        if ( is_string( $value ) && is_numeric( $value ) ) {
-            return wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $value );
-        }
-
-        if ( ! is_string( $value ) ) {
+        if ( $timestamp === null ) {
             return '—';
         }
 
-        $time = strtotime( $value );
-        if ( $time === false ) {
-            return '—';
-        }
+        $format = $includeTime
+            ? get_option( 'date_format' ) . ' ' . get_option( 'time_format' )
+            : get_option( 'date_format' );
 
-        return wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $time );
+        return wp_date( $format, $timestamp );
     }
 }

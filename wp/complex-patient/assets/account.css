@@ -233,9 +233,20 @@
   word-break: break-all;
 }
 
+.cp-account--app-passwords {
+  max-width: min(100%, 56rem);
+  width: 100%;
+}
+
+.cp-account__table-wrap {
+  margin-top: 1.5rem;
+  overflow-x: auto;
+  width: 100%;
+}
+
 .cp-account__table {
   border-collapse: collapse;
-  margin-top: 1.5rem;
+  min-width: 32rem;
   width: 100%;
 }
 
@@ -243,9 +254,37 @@
 .cp-account__table td {
   border-bottom: 1px solid var(--cp-account-border);
   color: var(--cp-account-text);
-  padding: 0.75rem 0.5rem;
+  padding: 0.75rem 0.65rem;
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.cp-account__table-col-name {
+  min-width: 4.5rem;
+}
+
+.cp-account__table-col-date {
+  font-size: 0.92rem;
+}
+
+.cp-account__table-col-actions {
+  min-width: 6.75rem;
+  padding-left: 1rem;
+  text-align: right;
+  width: 6.75rem;
+}
+
+.cp-account__table .cp-account__inline-form {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cp-account__table .cp-account__button--danger {
+  flex-shrink: 0;
+  min-width: 5.75rem;
+  white-space: nowrap;
+  width: auto;
 }
 
 .cp-account__inline-form {
@@ -263,6 +302,10 @@
 
   .cp-account__button {
     width: 100%;
+  }
+
+  .cp-account__table .cp-account__button {
+    width: auto;
   }
 
   .cp-account__table th:nth-child(3),
